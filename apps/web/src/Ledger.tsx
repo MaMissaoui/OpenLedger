@@ -66,6 +66,7 @@ export function Ledger() {
       <div className="workspace">
         <AccountTree
           accounts={accounts.data ?? []}
+          rootGuid={book.rootAccountGuid}
           selectedGuid={selectedGuid}
           onSelect={setSelectedGuid}
           onAddAccount={() => setShowNewAccount(true)}

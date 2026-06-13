@@ -134,11 +134,13 @@ func accountDTO(a domain.Account) map[string]any {
 	}
 }
 
-// accountWithBalanceDTO is accountDTO plus the account's balance, rendered at
-// the commodity fraction (like the register), used by the chart-of-accounts list.
+// accountWithBalanceDTO is accountDTO plus the account's own balance and its
+// subtree roll-up (own + same-commodity descendants), both rendered at the
+// commodity fraction (like the register), used by the chart-of-accounts list.
 func accountWithBalanceDTO(a app.AccountWithBalance) map[string]any {
 	dto := accountDTO(a.Account)
 	dto["balance"] = numericAtScale(a.Balance, a.BalanceScale)
+	dto["subtreeBalance"] = numericAtScale(a.SubtreeBalance, a.BalanceScale)
 	return dto
 }
 

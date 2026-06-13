@@ -264,6 +264,13 @@ components:
               description: >-
                 Sum of the account's own splits, in its own commodity, rendered
                 at the commodity fraction. Excludes subtree roll-ups.
+            subtreeBalance:
+              allOf:
+                - $ref: "#/components/schemas/Numeric"
+              description: >-
+                The account's own balance plus the balances of all descendants
+                sharing its commodity (the roll-up shown against placeholder
+                parents). Descendants in a different commodity are not converted.
     AccountList:
       type: object
       properties:

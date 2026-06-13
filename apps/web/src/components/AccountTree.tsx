@@ -1,6 +1,6 @@
-import type { Account } from "../lib/types";
+import type { Account, Numeric } from "../lib/types";
 import { TOP_LEVEL_ORDER } from "../lib/types";
-import { formatMoney } from "../lib/money";
+import { formatMoney, sumBalances } from "../lib/money";
 
 const BUCKET_LABEL: Record<string, string> = {
   ASSET: "Assets",
@@ -22,15 +22,26 @@ function bucket(type: string): string {
 
 interface Props {
   accounts: Account[];
+  rootGuid: string;
   selectedGuid: string | null;
   onSelect: (guid: string) => void;
   onAddAccount: () => void;
 }
 
-export function AccountTree({ accounts, selectedGuid, onSelect, onAddAccount }: Props) {
+export function AccountTree({ accounts, rootGuid, selectedGuid, onSelect, onAddAccount }: Props) {
   // Only postable (non-placeholder) accounts are selectable rows; placeholder
   // "group" accounts are represented by the section headers.
   const postable = accounts.filter((a) => !a.placeholder && a.type !== "ROOT");
+
+  // sectionTotal rolls a bucket up from its top-level accounts' subtree
+  // balances, so each placeholder parent is counted once. Returns null when the
+  // section mixes commodities (we can't add those without a rate yet).
+  const sectionTotal = (b: string): Numeric | null => {
+    const tops = accounts.filter(
+      (a) => a.parentGuid === rootGuid && bucket(a.type) === b && a.subtreeBalance,
+    );
+    return sumBalances(tops.map((a) => a.subtreeBalance!));
+  };
 
   return (
     <nav className="sidebar">
@@ -46,9 +57,13 @@ export function AccountTree({ accounts, selectedGuid, onSelect, onAddAccount }: 
           .filter((a) => bucket(a.type) === b)
           .sort((x, y) => (x.code || x.name).localeCompare(y.code || y.name));
         if (inBucket.length === 0) return null;
+        const total = sectionTotal(b);
         return (
           <div className="acct-group" key={b}>
-            <div className="acct-group__label">{BUCKET_LABEL[b]}</div>
+            <div className="acct-group__label">
+              <span>{BUCKET_LABEL[b]}</span>
+              {total && <span className="acct-group__total">{formatMoney(total)}</span>}
+            </div>
             {inBucket.map((a) => (
               <button
                 key={a.guid}

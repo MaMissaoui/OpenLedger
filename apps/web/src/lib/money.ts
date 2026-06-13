@@ -36,3 +36,18 @@ export function parseAmount(input: string, denom = 100): Numeric | null {
 export function negate(n: Numeric): Numeric {
   return { num: -n.num, denom: n.denom };
 }
+
+// sumBalances adds exact amounts that share a denominator (commodity fraction).
+// Returns null if the inputs are empty or mix denominators — we cannot add
+// across commodities without a conversion rate, so the caller omits the total
+// rather than show a wrong one.
+export function sumBalances(nums: Numeric[]): Numeric | null {
+  if (nums.length === 0) return null;
+  const denom = nums[0].denom;
+  let num = 0;
+  for (const n of nums) {
+    if (n.denom !== denom) return null;
+    num += n.num;
+  }
+  return { num, denom };
+}

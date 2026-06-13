@@ -34,15 +34,55 @@ type StructureRepository interface {
 	ListAccountsUnderRoot(ctx context.Context, rootGUID string) ([]AccountWithBalance, error)
 }
 
-// AccountWithBalance pairs an account with the sum of its own splits' quantity
-// (in the account's own commodity). BalanceScale is the commodity fraction, so
-// the transport layer can render the amount at its natural denominator, mirroring
-// the register. An account with no splits has a zero balance. The balance is the
-// account's own; subtree roll-ups for placeholder parents are not included.
+// AccountWithBalance pairs an account with its balances, both in the account's
+// own commodity. Balance is the sum of the account's own splits; SubtreeBalance
+// adds the balances of every descendant sharing this account's commodity (the
+// roll-up shown against placeholder parents). BalanceScale is the commodity
+// fraction, so the transport layer can render either amount at its natural
+// denominator, mirroring the register. An account with no splits has a zero
+// Balance. Descendants in a different commodity are not converted (there is no
+// price engine yet), so they contribute only to same-commodity ancestors.
 type AccountWithBalance struct {
-	Account      domain.Account
-	Balance      domain.GncNumeric
-	BalanceScale int64
+	Account        domain.Account
+	Balance        domain.GncNumeric
+	SubtreeBalance domain.GncNumeric
+	BalanceScale   int64
+}
+
+// rollUpSubtreeBalances sets SubtreeBalance on each account to its own balance
+// plus the subtree balance of every child that shares its commodity. It walks
+// the account forest (the rows exclude the book root, so top-level accounts are
+// those whose parent is not itself in the slice) in post-order, so each parent
+// sees its children's totals. The input slice is mutated in place.
+func rollUpSubtreeBalances(accts []AccountWithBalance) {
+	idx := make(map[string]int, len(accts))
+	for i := range accts {
+		idx[accts[i].Account.GUID] = i
+	}
+	children := make(map[string][]int, len(accts))
+	var roots []int
+	for i := range accts {
+		if _, ok := idx[accts[i].Account.ParentGUID]; ok {
+			children[accts[i].Account.ParentGUID] = append(children[accts[i].Account.ParentGUID], i)
+		} else {
+			roots = append(roots, i)
+		}
+	}
+	var visit func(i int) domain.GncNumeric
+	visit = func(i int) domain.GncNumeric {
+		total := accts[i].Balance
+		for _, c := range children[accts[i].Account.GUID] {
+			sub := visit(c)
+			if accts[c].Account.CommodityGUID == accts[i].Account.CommodityGUID {
+				total = total.Add(sub)
+			}
+		}
+		accts[i].SubtreeBalance = total
+		return total
+	}
+	for _, r := range roots {
+		visit(r)
+	}
 }
 
 // StructureService creates and reads books, commodities, and accounts — the
@@ -139,5 +179,10 @@ func (s *StructureService) ListAccounts(ctx context.Context, bookGUID string) ([
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.ListAccountsUnderRoot(ctx, root)
+	accts, err := s.repo.ListAccountsUnderRoot(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	rollUpSubtreeBalances(accts)
+	return accts, nil
 }

@@ -30,6 +30,9 @@ export interface Account {
   // Present on the chart-of-accounts list; absent on the create response. Sum of
   // the account's own splits in its commodity (no subtree roll-up).
   balance?: Numeric;
+  // Own balance plus all same-commodity descendants — the roll-up shown against
+  // placeholder parents and section totals. List-only, like balance.
+  subtreeBalance?: Numeric;
 }
 
 export interface Commodity {
