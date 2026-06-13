@@ -7,13 +7,24 @@ OpenLedger reuses GnuCash's proven double-entry kernel — `Book → Accounts �
 ## Core principles
 
 - **True double-entry.** Every transaction's splits balance to exactly zero in its currency; the posting service rejects anything that doesn't.
-- **Exact rational money, never floats.** Amounts are stored as integer numerator/denominator pairs (GnuCash-style), wrapped in a `GncNumeric` value object.
+- **Exact rational money, never floats.** Amounts are stored as integer numerator/denominator pairs (GnuCash-style), wrapped in a `GncNumeric` value object backed by Go's `math/big.Rat`.
 - **Multi-currency correct.** Per-split value (transaction currency) and quantity (account commodity), with optional trading accounts for whole-book balance.
 - **GnuCash-compatible.** Import/export of GnuCash SQLite (and XML) files is a first-class feature.
 
 ## Planned stack
 
-TypeScript end to end — NestJS API, React + Vite frontend, PostgreSQL, Drizzle ORM, in a pnpm monorepo (`packages/engine`, `packages/shared`, `apps/api`, `apps/web`).
+- **Backend:** Go (chi, `pgx` + `sqlc`, `goose` migrations), `math/big.Rat` money kernel, JWT auth.
+- **Frontend:** React + Vite + TanStack Query, consuming an OpenAPI-generated TypeScript client.
+- **Database:** PostgreSQL, with a schema that mirrors GnuCash's SQL backend.
+- **Deployment:** Docker multi-stage builds (distroless API image) orchestrated with `docker compose`.
+
+## Running locally
+
+```bash
+docker compose up --build        # full stack: db + api + web
+# or, for host-side dev with hot reload:
+docker compose -f docker-compose.dev.yml up   # Postgres only
+```
 
 ## Status
 
