@@ -1,5 +1,13 @@
 # OpenLedger — Architecture & Scaffolding Plan
 
+> **Note — deviations from the original plan.** This document is the founding
+> design narrative; a few decisions have since changed in the code. **Auth** is
+> now handled at the proxy layer (Traefik + Authelia forward-auth in the
+> `homelab-auth` repo), not JWT/Argon2id in the API — there are no `/auth/*`
+> routes. The **HTTP layer** uses the stdlib `net/http` 1.22 mux, not chi. The
+> sections below still describe the original intent; see `CLAUDE.md` for the
+> authoritative, current rules.
+
 ## Context
 
 OpenLedger is a web-based accounting application for **personal finance and small businesses**, reusing the proven **data model and accounting logic of GnuCash** (the mature desktop double-entry app). The goal is to keep GnuCash's correctness guarantees (true double-entry, exact rational arithmetic, multi-currency, lots) while delivering a modern multi-user web experience.
@@ -47,7 +55,7 @@ GnuCash's domain kernel, which we reuse conceptually and (for the schema) struct
 
 ## 2. Data model & database schema
 
-**Strategy:** mirror GnuCash's SQL backend table structure so import/export is a near-direct mapping, then layer our own tables (users, orgs, sessions, audit) *around* it rather than altering the GnuCash core tables.
+**Strategy:** mirror GnuCash's SQL backend table structure so import/export is a near-direct mapping, then layer our own tables (users, orgs, memberships, audit) *around* it rather than altering the GnuCash core tables.
 
 - **Database:** PostgreSQL (GnuCash itself supports a Postgres backend, which keeps us close to its expectations).
 - **Data access:** **`pgx`** driver + **`sqlc`** — hand-written SQL compiled into type-safe Go. No ORM; the SQL stays explicit, which matters when the schema is a deliberate GnuCash mirror.
@@ -63,7 +71,7 @@ GnuCash's domain kernel, which we reuse conceptually and (for the schema) struct
 `lots`, `schedules`/`recurrences` + template transactions, `budgets`/`budget_amounts` (phase 3); `customers`, `vendors`, `employees`, `invoices`, `bills`, `entries`, `jobs`, `billterms`, `taxtables`, `taxtable_entries` (phase 4).
 
 ### Web-only tables (new, not in GnuCash)
-`organizations`, `users`, `memberships` (user↔book + role), `sessions`/`refresh_tokens`, `audit_log` (append-only record of every posting/edit for traceability), `import_jobs`.
+`organizations`, `users` (keyed by `ldap_uid`), `memberships` (user↔book + role), `audit_log` (append-only record of every posting/edit for traceability), `import_jobs`. There are no `sessions`/`refresh_tokens` tables — sessions live in the Authelia proxy layer, not the API.
 
 ---
 
@@ -72,12 +80,12 @@ GnuCash's domain kernel, which we reuse conceptually and (for the schema) struct
 | Layer | Choice | Why |
 |---|---|---|
 | Backend language | **Go** (1.22+) | Static binary, tiny container, goroutines for async import jobs; team experience |
-| HTTP | **chi** router (or std `net/http` 1.22 routing) | Lightweight, idiomatic, no heavy framework |
+| HTTP | std **`net/http`** 1.22 mux (method-pattern routing) | Lightweight, idiomatic, no heavy framework |
 | Money | `GncNumeric` wrapping **`math/big.Rat`** | Exact rational arithmetic, direct GnuCash fidelity |
 | DB | **PostgreSQL** | GnuCash-compatible backend; transactional integrity for balanced posting |
 | Data access | **`pgx`** + **`sqlc`** (type-safe SQL) | Explicit SQL over a GnuCash-mirrored schema |
 | Migrations | **`goose`** (plain SQL) | Versioned, reviewable DDL |
-| Auth | JWT access + rotating refresh tokens; **Argon2id** password hashing | Standard, stateless API auth |
+| Auth | **Proxy-layer** (Traefik + Authelia forward-auth); API trusts `Remote-User`/`Remote-Email` headers | No auth logic in the API; SSO across homelab services |
 | API contract | **OpenAPI** spec → generated **TS client** for the frontend | Replaces shared types lost by not using TS on the backend |
 | Frontend | **React** + Vite + TanStack Query + a table/grid lib for the register | SPA register UX similar to GnuCash's ledger |
 | Validation | Go: request structs + validator; Frontend: Zod against the generated client | Server is source of truth |
@@ -92,7 +100,7 @@ GnuCash's domain kernel, which we reuse conceptually and (for the schema) struct
 apps/web (React SPA)                      ← built static assets served by web container
         │  HTTPS / JSON (OpenAPI)
 apps/api (Go)
-   ├── transport/http ...... chi handlers, auth middleware, request/response DTOs
+   ├── transport/http ...... net/http handlers, requireAuth (reads proxy headers), request/response DTOs
    ├── app (services) ...... use-cases: create ledger, post transaction, import file
    └── domain (the GnuCash kernel, pure Go, no DB/HTTP imports)
         ├── GncNumeric ...... exact rational money over math/big.Rat
@@ -114,8 +122,7 @@ PostgreSQL
 
 ## 5. API design (REST, versioned `/api/v1`, described by OpenAPI)
 
-Representative endpoints (phase 1–2):
-- `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`
+Representative endpoints (phase 1–2). There are no auth endpoints — login/logout happen at the Authelia portal, and the API trusts the `Remote-User`/`Remote-Email` headers Traefik injects:
 - `GET /books`, `POST /books` (create ledger), `GET /books/:id`
 - `GET /books/:id/accounts` (tree), `POST /accounts`, `PATCH /accounts/:id`
 - `GET /accounts/:id/register` (paginated splits with running balance)
@@ -177,7 +184,7 @@ Repository layout:
       internal/
         domain/                  # GncNumeric, entities, posting, balance (pure Go)
         app/                     # use-case services
-        transport/http/          # chi handlers, middleware
+        transport/http/          # net/http handlers, middleware
         infra/                   # pgx/sqlc repos, gnucash import/export
       db/
         migrations/              # goose SQL migrations
@@ -192,8 +199,8 @@ Repository layout:
 Concrete first tasks:
 1. Init Go module + Vite frontend; set up `sqlc.yaml`, `goose`, linters; `docker-compose.dev.yml` with Postgres.
 2. `internal/domain`: implement and unit-test `GncNumeric` over `math/big.Rat` (add/sub/mul, reduction, denom alignment, compare, to/from decimal string) and the **balance invariant** check — the riskiest correctness code, so it gets tests first.
-3. SQL migrations for phase-1 core tables (`books`, `commodities`, `accounts`, `transactions`, `splits`, `prices`, `slots`, `versions`) **plus** web tables (`organizations`, `users`, `memberships`, `sessions`, `audit_log`); generate accessors with `sqlc`.
-4. Auth (register/login/refresh, Argon2id, JWT middleware).
+3. SQL migrations for phase-1 core tables (`books`, `commodities`, `accounts`, `transactions`, `splits`, `prices`, `slots`, `versions`) **plus** web tables (`organizations`, `users`, `memberships`, `audit_log`); generate accessors with `sqlc`.
+4. Proxy-layer auth: `requireAuth` reads `Remote-User`/`Remote-Email`; `ProvisionService` find-or-creates the user/org on first login; `AuthzService` enforces per-book RBAC.
 5. Posting service + `POST /transactions` handler enforcing the balance rule (422 on imbalance) inside a `pgx.Tx`, with an `audit_log` write.
 6. Accounts + register endpoints; publish the OpenAPI spec and generate the web TS client.
 7. `apps/web`: minimal account tree + register + a "new transaction" form that posts a balanced split pair.
@@ -210,10 +217,10 @@ The app ships as containers; `docker compose up` is the supported way to run it 
 - **Web image** — Vite build stage produces static assets served by a small **nginx/caddy** stage (or, for simplicity, embedded and served by the Go binary so there's one fewer container).
 - **`docker-compose.yml`** services:
   - `db` — `postgres:16`, named volume for data, `POSTGRES_*` from `.env`, `healthcheck` (`pg_isready`).
-  - `api` — built from `apps/api`, `depends_on: db` (condition: healthy), reads `DATABASE_URL`/`JWT_SECRET` from env, runs migrations on startup (or a one-shot `migrate` service), exposes `:8080`, has its own healthcheck endpoint `/healthz`.
+  - `api` — built from `apps/api`, `depends_on: db` (condition: healthy), reads `DATABASE_URL` from env, runs migrations on startup (or a one-shot `migrate` service), exposes `:8080`, has its own healthcheck endpoint `/healthz`. Sits behind Traefik on the shared `proxy` network with Authelia forward-auth.
   - `web` — built from `apps/web`, serves the SPA and reverse-proxies `/api` to `api` (or the SPA calls the API directly via configured base URL).
 - **`docker-compose.dev.yml`** — Postgres only, so you can run `api`/`web` with hot reload on the host during development.
-- **Config** — twelve-factor via environment variables; `.env.example` documents every key (DB DSN, JWT secret, log level, port). No secrets committed.
+- **Config** — twelve-factor via environment variables; `.env.example` documents every key (DB DSN, log level, port). No secrets committed.
 - **Migrations on deploy** — `goose up` runs before the API serves traffic (init/one-shot service or entrypoint step) so the schema is always current.
 
 ---
