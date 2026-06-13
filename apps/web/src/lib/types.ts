@@ -27,6 +27,9 @@ export interface Account {
   code: string;
   description: string;
   placeholder: boolean;
+  // Present on the chart-of-accounts list; absent on the create response. Sum of
+  // the account's own splits in its commodity (no subtree roll-up).
+  balance?: Numeric;
 }
 
 export interface Commodity {

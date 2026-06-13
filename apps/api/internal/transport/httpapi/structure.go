@@ -113,7 +113,7 @@ func (s *Server) handleListAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(accounts))
 	for _, a := range accounts {
-		out = append(out, accountDTO(a))
+		out = append(out, accountWithBalanceDTO(a))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"bookGuid": bookGUID,
@@ -132,6 +132,14 @@ func accountDTO(a domain.Account) map[string]any {
 		"description":   a.Description,
 		"placeholder":   a.Placeholder,
 	}
+}
+
+// accountWithBalanceDTO is accountDTO plus the account's balance, rendered at
+// the commodity fraction (like the register), used by the chart-of-accounts list.
+func accountWithBalanceDTO(a app.AccountWithBalance) map[string]any {
+	dto := accountDTO(a.Account)
+	dto["balance"] = numericAtScale(a.Balance, a.BalanceScale)
+	return dto
 }
 
 // writeStructureError maps a StructureService error to an HTTP response and

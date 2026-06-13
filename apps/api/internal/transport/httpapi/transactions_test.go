@@ -25,7 +25,7 @@ type fakeRepo struct {
 	accounts     []domain.Account
 	bookRoot     string // root returned by BookRootAccount
 	bookNotFound bool   // make BookRootAccount return ErrBookNotFound
-	listAccounts []domain.Account
+	listAccounts []app.AccountWithBalance
 
 	// Provision side.
 	provisionedUserID string // returned by FindOrCreateLDAPUser (default "user-1")
@@ -105,7 +105,7 @@ func (f *fakeRepo) BookRootAccount(_ context.Context, _ string) (string, error) 
 	return f.bookRoot, nil
 }
 
-func (f *fakeRepo) ListAccountsUnderRoot(_ context.Context, _ string) ([]domain.Account, error) {
+func (f *fakeRepo) ListAccountsUnderRoot(_ context.Context, _ string) ([]app.AccountWithBalance, error) {
 	return f.listAccounts, nil
 }
 

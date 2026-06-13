@@ -1,5 +1,6 @@
 import type { Account } from "../lib/types";
 import { TOP_LEVEL_ORDER } from "../lib/types";
+import { formatMoney } from "../lib/money";
 
 const BUCKET_LABEL: Record<string, string> = {
   ASSET: "Assets",
@@ -56,6 +57,9 @@ export function AccountTree({ accounts, selectedGuid, onSelect, onAddAccount }: 
               >
                 {a.code && <span className="acct__code">{a.code}</span>}
                 <span className="acct__name">{a.name}</span>
+                {a.balance && (
+                  <span className="acct__balance">{formatMoney(a.balance)}</span>
+                )}
               </button>
             ))}
           </div>

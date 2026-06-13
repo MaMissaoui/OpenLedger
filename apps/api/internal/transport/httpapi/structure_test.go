@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
 
@@ -109,11 +110,12 @@ func TestCreateAccountUnknownBookReturns404(t *testing.T) {
 }
 
 func TestListAccounts(t *testing.T) {
+	checking, _ := domain.FromNumDenom(12345, 100) // $123.45
 	repo := &fakeRepo{
 		bookRoot: "root-guid",
-		listAccounts: []domain.Account{
-			{GUID: "a1", Name: "Checking", Type: domain.AccountBank},
-			{GUID: "a2", Name: "Groceries", Type: domain.AccountExpense},
+		listAccounts: []app.AccountWithBalance{
+			{Account: domain.Account{GUID: "a1", Name: "Checking", Type: domain.AccountBank}, Balance: checking, BalanceScale: 100},
+			{Account: domain.Account{GUID: "a2", Name: "Groceries", Type: domain.AccountExpense}, Balance: domain.Zero(), BalanceScale: 100},
 		},
 	}
 	rec := getRegister(newTestServer(repo), "/api/v1/books/book-1/accounts")
@@ -121,14 +123,23 @@ func TestListAccounts(t *testing.T) {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
 	}
 	var resp struct {
-		BookGUID string           `json:"bookGuid"`
-		Accounts []map[string]any `json:"accounts"`
+		BookGUID string `json:"bookGuid"`
+		Accounts []struct {
+			GUID    string `json:"guid"`
+			Balance struct {
+				Num   int64 `json:"num"`
+				Denom int64 `json:"denom"`
+			} `json:"balance"`
+		} `json:"accounts"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 	if len(resp.Accounts) != 2 {
 		t.Fatalf("got %d accounts, want 2", len(resp.Accounts))
+	}
+	if got := resp.Accounts[0].Balance; got.Num != 12345 || got.Denom != 100 {
+		t.Errorf("checking balance = {%d, %d}, want {12345, 100}", got.Num, got.Denom)
 	}
 }
 

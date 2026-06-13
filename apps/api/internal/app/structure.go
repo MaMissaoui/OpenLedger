@@ -30,8 +30,19 @@ type StructureRepository interface {
 	// BookRootAccount returns a book's root_account_guid, or ErrBookNotFound.
 	BookRootAccount(ctx context.Context, bookGUID string) (string, error)
 	// ListAccountsUnderRoot returns every descendant of rootGUID (the root
-	// itself excluded), ordered by code then name.
-	ListAccountsUnderRoot(ctx context.Context, rootGUID string) ([]domain.Account, error)
+	// itself excluded), each with its balance, ordered by code then name.
+	ListAccountsUnderRoot(ctx context.Context, rootGUID string) ([]AccountWithBalance, error)
+}
+
+// AccountWithBalance pairs an account with the sum of its own splits' quantity
+// (in the account's own commodity). BalanceScale is the commodity fraction, so
+// the transport layer can render the amount at its natural denominator, mirroring
+// the register. An account with no splits has a zero balance. The balance is the
+// account's own; subtree roll-ups for placeholder parents are not included.
+type AccountWithBalance struct {
+	Account      domain.Account
+	Balance      domain.GncNumeric
+	BalanceScale int64
 }
 
 // StructureService creates and reads books, commodities, and accounts — the
@@ -121,9 +132,9 @@ func (s *StructureService) CreateAccount(ctx context.Context, bookGUID string, a
 	return a, nil
 }
 
-// ListAccounts returns a book's chart of accounts (its root excluded), or
-// ErrBookNotFound if the book does not exist.
-func (s *StructureService) ListAccounts(ctx context.Context, bookGUID string) ([]domain.Account, error) {
+// ListAccounts returns a book's chart of accounts (its root excluded) with each
+// account's balance, or ErrBookNotFound if the book does not exist.
+func (s *StructureService) ListAccounts(ctx context.Context, bookGUID string) ([]AccountWithBalance, error) {
 	root, err := s.repo.BookRootAccount(ctx, bookGUID)
 	if err != nil {
 		return nil, err

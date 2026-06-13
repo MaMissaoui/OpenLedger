@@ -405,6 +405,12 @@ a {
 .acct--child {
   padding-left: 2.2rem;
 }
+.acct__balance {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
 
 /* ---------- register ---------- */
 

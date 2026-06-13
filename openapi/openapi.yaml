@@ -253,6 +253,17 @@ components:
           type: string
         placeholder:
           type: boolean
+    AccountWithBalance:
+      allOf:
+        - $ref: "#/components/schemas/Account"
+        - type: object
+          properties:
+            balance:
+              allOf:
+                - $ref: "#/components/schemas/Numeric"
+              description: >-
+                Sum of the account's own splits, in its own commodity, rendered
+                at the commodity fraction. Excludes subtree roll-ups.
     AccountList:
       type: object
       properties:
@@ -261,7 +272,7 @@ components:
         accounts:
           type: array
           items:
-            $ref: "#/components/schemas/Account"
+            $ref: "#/components/schemas/AccountWithBalance"
     Numeric:
       type: object
       description: Exact rational amount (numerator/denominator).

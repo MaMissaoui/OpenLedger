@@ -235,7 +235,7 @@ func (r *Repository) BookRootAccount(ctx context.Context, bookGUID string) (stri
 
 // ListAccountsUnderRoot returns every descendant of rootGUID (root excluded)
 // via a recursive walk of the parent_guid tree, ordered by code then name.
-func (r *Repository) ListAccountsUnderRoot(ctx context.Context, rootGUID string) ([]domain.Account, error) {
+func (r *Repository) ListAccountsUnderRoot(ctx context.Context, rootGUID string) ([]app.AccountWithBalance, error) {
 	const sql = `
 WITH RECURSIVE tree AS (
     SELECT guid, name, account_type, commodity_guid, parent_guid, code, description, hidden, placeholder
@@ -244,8 +244,14 @@ WITH RECURSIVE tree AS (
     SELECT a.guid, a.name, a.account_type, a.commodity_guid, a.parent_guid, a.code, a.description, a.hidden, a.placeholder
     FROM accounts a JOIN tree t ON a.parent_guid = t.guid
 )
-SELECT guid, name, account_type, commodity_guid, parent_guid, code, description, hidden, placeholder
-FROM tree ORDER BY code, name`
+SELECT t.guid, t.name, t.account_type, t.commodity_guid, t.parent_guid, t.code, t.description, t.hidden, t.placeholder,
+       COALESCE(SUM(s.quantity_num), 0) AS balance_num,
+       COALESCE(c.fraction, 1)          AS balance_denom
+FROM tree t
+LEFT JOIN commodities c ON c.guid = t.commodity_guid
+LEFT JOIN splits s      ON s.account_guid = t.guid
+GROUP BY t.guid, t.name, t.account_type, t.commodity_guid, t.parent_guid, t.code, t.description, t.hidden, t.placeholder, c.fraction
+ORDER BY t.code, t.name`
 
 	rows, err := r.pool.Query(ctx, sql, rootGUID)
 	if err != nil {
@@ -253,17 +259,19 @@ FROM tree ORDER BY code, name`
 	}
 	defer rows.Close()
 
-	var accounts []domain.Account
+	var accounts []app.AccountWithBalance
 	for rows.Next() {
 		var (
-			a                   domain.Account
-			accountType         string
-			commodity, parent   *string
-			hidden, placeholder int
+			a                        domain.Account
+			accountType              string
+			commodity, parent        *string
+			hidden, placeholder      int
+			balanceNum, balanceDenom int64
 		)
 		if err := rows.Scan(
 			&a.GUID, &a.Name, &accountType, &commodity, &parent,
 			&a.Code, &a.Description, &hidden, &placeholder,
+			&balanceNum, &balanceDenom,
 		); err != nil {
 			return nil, fmt.Errorf("scan account: %w", err)
 		}
@@ -276,7 +284,16 @@ FROM tree ORDER BY code, name`
 		}
 		a.Hidden = hidden != 0
 		a.Placeholder = placeholder != 0
-		accounts = append(accounts, a)
+
+		balance, err := domain.FromNumDenom(balanceNum, balanceDenom)
+		if err != nil {
+			return nil, fmt.Errorf("account %s balance: %w", a.GUID, err)
+		}
+		accounts = append(accounts, app.AccountWithBalance{
+			Account:      a,
+			Balance:      balance,
+			BalanceScale: balanceDenom,
+		})
 	}
 	return accounts, rows.Err()
 }
