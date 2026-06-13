@@ -31,12 +31,28 @@ func (s *Server) handleCreateCommodity(w http.ResponseWriter, r *http.Request) {
 	if writeStructureError(w, err) {
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{
+	writeJSON(w, http.StatusCreated, commodityDTO(c))
+}
+
+func (s *Server) handleListCommodities(w http.ResponseWriter, r *http.Request) {
+	commodities, err := s.structure.ListCommodities(r.Context())
+	if writeStructureError(w, err) {
+		return
+	}
+	out := make([]map[string]any, 0, len(commodities))
+	for _, c := range commodities {
+		out = append(out, commodityDTO(c))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"commodities": out})
+}
+
+func commodityDTO(c domain.Commodity) map[string]any {
+	return map[string]any{
 		"guid":      c.GUID,
 		"namespace": c.Namespace,
 		"mnemonic":  c.Mnemonic,
 		"fraction":  c.Fraction,
-	})
+	}
 }
 
 func (s *Server) handleCreateBook(w http.ResponseWriter, r *http.Request) {

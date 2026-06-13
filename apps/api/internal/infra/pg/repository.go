@@ -139,6 +139,33 @@ func (r *Repository) InsertCommodity(ctx context.Context, c domain.Commodity) er
 	return nil
 }
 
+// ListCommodities returns all commodities ordered by namespace then mnemonic.
+func (r *Repository) ListCommodities(ctx context.Context) ([]domain.Commodity, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT guid, namespace, mnemonic, fullname, fraction
+		 FROM commodities ORDER BY namespace, mnemonic`)
+	if err != nil {
+		return nil, fmt.Errorf("list commodities: %w", err)
+	}
+	defer rows.Close()
+
+	var commodities []domain.Commodity
+	for rows.Next() {
+		var (
+			c        domain.Commodity
+			fullname *string
+		)
+		if err := rows.Scan(&c.GUID, &c.Namespace, &c.Mnemonic, &fullname, &c.Fraction); err != nil {
+			return nil, fmt.Errorf("scan commodity: %w", err)
+		}
+		if fullname != nil {
+			c.Fullname = *fullname
+		}
+		commodities = append(commodities, c)
+	}
+	return commodities, rows.Err()
+}
+
 // InsertBook writes the root account, the template root account, and the book
 // row in a single DB transaction so a book never exists without its roots. When
 // ownerUserID is non-empty it also inserts an owner membership.

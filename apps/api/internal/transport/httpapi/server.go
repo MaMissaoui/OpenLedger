@@ -28,6 +28,7 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealth)
 
+	mux.HandleFunc("GET /api/v1/commodities", s.requireAuth(s.handleListCommodities))
 	mux.HandleFunc("POST /api/v1/commodities", s.requireAuth(s.handleCreateCommodity))
 	mux.HandleFunc("GET /api/v1/books", s.requireAuth(s.handleListBooks))
 	mux.HandleFunc("POST /api/v1/books", s.requireAuth(s.handleCreateBook))

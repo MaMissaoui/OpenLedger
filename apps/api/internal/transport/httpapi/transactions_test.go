@@ -84,6 +84,10 @@ func (f *fakeRepo) InsertCommodity(_ context.Context, c domain.Commodity) error 
 	return nil
 }
 
+func (f *fakeRepo) ListCommodities(_ context.Context) ([]domain.Commodity, error) {
+	return f.commodities, nil
+}
+
 func (f *fakeRepo) InsertBook(_ context.Context, b domain.Book, _, _ domain.Account, _ string) error {
 	f.books = append(f.books, b)
 	return nil

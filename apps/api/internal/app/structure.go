@@ -20,6 +20,9 @@ var ErrInvalidInput = errors.New("invalid input")
 // commodities, books, and accounts.
 type StructureRepository interface {
 	InsertCommodity(ctx context.Context, c domain.Commodity) error
+	// ListCommodities returns all commodities (shared reference data, not
+	// book-scoped), ordered by namespace then mnemonic.
+	ListCommodities(ctx context.Context) ([]domain.Commodity, error)
 	// InsertBook writes a book together with its root and template-root accounts
 	// in one DB transaction. When ownerUserID is non-empty it also records an
 	// owner membership linking that user to the new book.
@@ -117,6 +120,12 @@ func (s *StructureService) CreateCommodity(ctx context.Context, c domain.Commodi
 		return domain.Commodity{}, err
 	}
 	return c, nil
+}
+
+// ListCommodities returns all commodities, shared reference data used when
+// creating accounts and posting prices. It is not scoped to a book.
+func (s *StructureService) ListCommodities(ctx context.Context) ([]domain.Commodity, error) {
+	return s.repo.ListCommodities(ctx)
 }
 
 // CreateBook creates a book with a fresh root account and template root. When

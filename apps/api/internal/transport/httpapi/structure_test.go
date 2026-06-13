@@ -40,6 +40,33 @@ func TestCreateCommodityMissingMnemonicReturns400(t *testing.T) {
 	}
 }
 
+func TestListCommodities(t *testing.T) {
+	repo := &fakeRepo{commodities: []domain.Commodity{
+		{GUID: "usd", Namespace: "CURRENCY", Mnemonic: "USD", Fraction: 100},
+		{GUID: "aapl", Namespace: "NASDAQ", Mnemonic: "AAPL", Fraction: 10000},
+	}}
+	rec := getRegister(newTestServer(repo), "/api/v1/commodities")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		Commodities []struct {
+			GUID     string `json:"guid"`
+			Mnemonic string `json:"mnemonic"`
+			Fraction int64  `json:"fraction"`
+		} `json:"commodities"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(resp.Commodities) != 2 {
+		t.Fatalf("got %d commodities, want 2", len(resp.Commodities))
+	}
+	if got := resp.Commodities[0]; got.Mnemonic != "USD" || got.Fraction != 100 {
+		t.Errorf("first commodity = %+v, want USD/100", got)
+	}
+}
+
 func TestCreateBookReturnsRoot(t *testing.T) {
 	repo := &fakeRepo{}
 	rec := postTo(newTestServer(repo), "/api/v1/books", ``)

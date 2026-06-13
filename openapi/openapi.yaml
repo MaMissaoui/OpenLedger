@@ -26,6 +26,16 @@ paths:
               schema:
                 $ref: "#/components/schemas/Health"
   /api/v1/commodities:
+    get:
+      summary: List commodities (shared reference data, not book-scoped)
+      operationId: listCommodities
+      responses:
+        "200":
+          description: All commodities, ordered by namespace then mnemonic
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommodityList"
     post:
       summary: Create a commodity (currency or security)
       operationId: createCommodity
@@ -196,6 +206,13 @@ components:
         fraction:
           type: integer
           format: int64
+    CommodityList:
+      type: object
+      properties:
+        commodities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Commodity"
     Book:
       type: object
       properties:

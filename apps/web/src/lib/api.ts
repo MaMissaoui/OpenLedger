@@ -53,6 +53,8 @@ function post<T>(path: string, body: unknown): Promise<T> {
 export const api = {
   listBooks: () => request<{ books: Book[] }>("/api/v1/books").then((r) => r.books),
   createBook: () => post<Book>("/api/v1/books", {}),
+  listCommodities: () =>
+    request<{ commodities: Commodity[] }>("/api/v1/commodities").then((r) => r.commodities),
   createCommodity: (mnemonic: string, fraction: number, fullname?: string) =>
     post<Commodity>("/api/v1/commodities", { mnemonic, fraction, fullname }),
   listAccounts: (bookGuid: string) =>
