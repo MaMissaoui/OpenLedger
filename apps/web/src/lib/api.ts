@@ -1,4 +1,4 @@
-import type { Account, Book, Commodity, Numeric, RegisterPage } from "./types";
+import type { Account, Book, Commodity, Numeric, Price, RegisterPage } from "./types";
 
 // ApiError carries the HTTP status so callers can branch (e.g. 422 unbalanced)
 // and a human message from the API's { error } body.
@@ -78,4 +78,16 @@ export const api = {
     postDate?: string;
     splits: { accountGuid: string; value: Numeric; quantity: Numeric }[];
   }) => post<{ guid: string }>("/api/v1/transactions", input),
+  listPrices: (commodityGuid: string) =>
+    request<{ prices: Price[] }>(
+      `/api/v1/prices?commodity=${encodeURIComponent(commodityGuid)}`,
+    ).then((r) => r.prices),
+  createPrice: (input: {
+    commodityGuid: string;
+    currencyGuid: string;
+    value: Numeric;
+    date?: string;
+    source?: string;
+    type?: string;
+  }) => post<Price>("/api/v1/prices", input),
 };

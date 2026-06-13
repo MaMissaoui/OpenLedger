@@ -42,6 +42,16 @@ export interface Commodity {
   fraction: number;
 }
 
+export interface Price {
+  guid: string;
+  commodityGuid: string;
+  currencyGuid: string;
+  date: string;
+  source: string;
+  type: string;
+  value: Numeric;
+}
+
 export interface RegisterEntry {
   splitGuid: string;
   txGuid: string;

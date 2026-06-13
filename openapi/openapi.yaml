@@ -168,6 +168,44 @@ paths:
           description: The authenticated user has no membership on this account's book
         "404":
           description: Account not found
+  /api/v1/prices:
+    get:
+      summary: List a commodity's price quotes (shared reference data)
+      operationId: listPrices
+      parameters:
+        - name: commodity
+          in: query
+          required: true
+          description: GUID of the commodity to fetch quotes for.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The commodity's quotes, most recent first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceList"
+        "400":
+          description: The commodity query parameter is missing
+    post:
+      summary: Record a price quote (one unit of commodity in currency)
+      operationId: createPrice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewPrice"
+      responses:
+        "201":
+          description: Price recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Price"
+        "400":
+          description: Invalid input (missing commodity/currency or zero value)
 components:
   schemas:
     Health:
@@ -213,6 +251,54 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Commodity"
+    NewPrice:
+      type: object
+      required: [commodityGuid, currencyGuid, value]
+      properties:
+        commodityGuid:
+          type: string
+          description: The commodity being priced.
+        currencyGuid:
+          type: string
+          description: The currency the value is expressed in.
+        date:
+          type: string
+          format: date-time
+          description: Defaults to now when omitted.
+        source:
+          type: string
+          description: Free-form provenance. Defaults to "user:price".
+        type:
+          type: string
+        value:
+          allOf:
+            - $ref: "#/components/schemas/Numeric"
+          description: Units of currency per one unit of commodity.
+    Price:
+      type: object
+      properties:
+        guid:
+          type: string
+        commodityGuid:
+          type: string
+        currencyGuid:
+          type: string
+        date:
+          type: string
+          format: date-time
+        source:
+          type: string
+        type:
+          type: string
+        value:
+          $ref: "#/components/schemas/Numeric"
+    PriceList:
+      type: object
+      properties:
+        prices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Price"
     Book:
       type: object
       properties:

@@ -21,6 +21,7 @@ type fakeRepo struct {
 
 	// Structure side.
 	commodities  []domain.Commodity
+	prices       []domain.Price
 	books        []domain.Book
 	accounts     []domain.Account
 	bookRoot     string // root returned by BookRootAccount
@@ -88,6 +89,15 @@ func (f *fakeRepo) ListCommodities(_ context.Context) ([]domain.Commodity, error
 	return f.commodities, nil
 }
 
+func (f *fakeRepo) InsertPrice(_ context.Context, p domain.Price) error {
+	f.prices = append(f.prices, p)
+	return nil
+}
+
+func (f *fakeRepo) ListPricesByCommodity(_ context.Context, _ string) ([]domain.Price, error) {
+	return f.prices, nil
+}
+
 func (f *fakeRepo) InsertBook(_ context.Context, b domain.Book, _, _ domain.Account, _ string) error {
 	f.books = append(f.books, b)
 	return nil
@@ -118,6 +128,7 @@ func newTestServer(repo *fakeRepo) http.Handler {
 		app.NewPostingService(repo),
 		app.NewLedgerService(repo),
 		app.NewStructureService(repo),
+		app.NewPriceService(repo),
 		app.NewProvisionService(repo),
 		app.NewAuthzService(repo),
 	).Routes()

@@ -166,6 +166,62 @@ func (r *Repository) ListCommodities(ctx context.Context) ([]domain.Commodity, e
 	return commodities, rows.Err()
 }
 
+// InsertPrice writes a price quote. The value is stored as an exact
+// numerator/denominator pair (a price is a ratio, so it keeps its own
+// precision rather than a commodity fraction).
+func (r *Repository) InsertPrice(ctx context.Context, p domain.Price) error {
+	num, denom, err := p.Value.NumDenom()
+	if err != nil {
+		return fmt.Errorf("price value: %w", err)
+	}
+	if _, err := r.pool.Exec(ctx,
+		`INSERT INTO prices (guid, commodity_guid, currency_guid, date, source, type, value_num, value_denom)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		p.GUID, p.CommodityGUID, p.CurrencyGUID, p.Date,
+		nullable(p.Source), nullable(p.Type), num, denom,
+	); err != nil {
+		return fmt.Errorf("insert price: %w", err)
+	}
+	return nil
+}
+
+// ListPricesByCommodity returns a commodity's quotes, most recent first.
+func (r *Repository) ListPricesByCommodity(ctx context.Context, commodityGUID string) ([]domain.Price, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT guid, commodity_guid, currency_guid, date, source, type, value_num, value_denom
+		 FROM prices WHERE commodity_guid = $1 ORDER BY date DESC`, commodityGUID)
+	if err != nil {
+		return nil, fmt.Errorf("list prices: %w", err)
+	}
+	defer rows.Close()
+
+	var prices []domain.Price
+	for rows.Next() {
+		var (
+			p                 domain.Price
+			source, priceType *string
+			valueNum, valDen  int64
+		)
+		if err := rows.Scan(
+			&p.GUID, &p.CommodityGUID, &p.CurrencyGUID, &p.Date,
+			&source, &priceType, &valueNum, &valDen,
+		); err != nil {
+			return nil, fmt.Errorf("scan price: %w", err)
+		}
+		if source != nil {
+			p.Source = *source
+		}
+		if priceType != nil {
+			p.Type = *priceType
+		}
+		if p.Value, err = domain.FromNumDenom(valueNum, valDen); err != nil {
+			return nil, fmt.Errorf("price %s value: %w", p.GUID, err)
+		}
+		prices = append(prices, p)
+	}
+	return prices, rows.Err()
+}
+
 // InsertBook writes the root account, the template root account, and the book
 // row in a single DB transaction so a book never exists without its roots. When
 // ownerUserID is non-empty it also inserts an owner membership.

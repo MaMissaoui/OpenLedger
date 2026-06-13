@@ -13,13 +13,14 @@ type Server struct {
 	posting   *app.PostingService
 	ledger    *app.LedgerService
 	structure *app.StructureService
+	price     *app.PriceService
 	provision *app.ProvisionService
 	authz     *app.AuthzService
 }
 
 // NewServer builds a Server from its service dependencies.
-func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, provision *app.ProvisionService, authz *app.AuthzService) *Server {
-	return &Server{posting: posting, ledger: ledger, structure: structure, provision: provision, authz: authz}
+func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, provision *app.ProvisionService, authz *app.AuthzService) *Server {
+	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, provision: provision, authz: authz}
 }
 
 // Routes returns the configured HTTP handler. /healthz is public; every
@@ -36,6 +37,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/accounts", s.requireAuth(s.handleCreateAccount))
 	mux.HandleFunc("POST /api/v1/transactions", s.requireAuth(s.handlePostTransaction))
 	mux.HandleFunc("GET /api/v1/accounts/{id}/register", s.requireAuth(s.handleAccountRegister))
+	mux.HandleFunc("GET /api/v1/prices", s.requireAuth(s.handleListPrices))
+	mux.HandleFunc("POST /api/v1/prices", s.requireAuth(s.handleCreatePrice))
 	return mux
 }
 
