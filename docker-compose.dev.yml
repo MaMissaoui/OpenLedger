@@ -1,0 +1,24 @@
+# Postgres only, for host-side development with hot reload.
+#   docker compose -f docker-compose.dev.yml up
+# Then run the API and web on the host:
+#   cd apps/api && go run ./cmd/server
+#   cd apps/web && pnpm dev
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-openledger}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openledger}
+      POSTGRES_DB: ${POSTGRES_DB:-openledger}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-openledger} -d ${POSTGRES_DB:-openledger}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata_dev:

@@ -31,3 +31,8 @@ coverage/
 *.gnucash
 /tmp/
 /uploads/
+
+# Go
+/apps/api/server
+*.out
+*.test

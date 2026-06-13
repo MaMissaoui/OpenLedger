@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: OpenLedger API
+  version: 0.1.0
+  description: >
+    GnuCash-derived double-entry accounting API. This spec is the source of
+    truth for request/response shapes; the web frontend consumes a generated
+    TypeScript client. Money is always exact rational num/denom pairs, never a
+    JSON float.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      summary: Liveness/readiness check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /api/v1/transactions:
+    post:
+      summary: Post a balanced transaction
+      operationId: postTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewTransaction"
+      responses:
+        "201":
+          description: Transaction posted
+        "422":
+          description: Transaction does not balance to zero
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+    Numeric:
+      type: object
+      description: Exact rational amount (numerator/denominator).
+      required: [num, denom]
+      properties:
+        num:
+          type: integer
+          format: int64
+        denom:
+          type: integer
+          format: int64
+          example: 100
+    NewSplit:
+      type: object
+      required: [accountGuid, value, quantity]
+      properties:
+        accountGuid:
+          type: string
+        memo:
+          type: string
+        value:
+          $ref: "#/components/schemas/Numeric"
+        quantity:
+          $ref: "#/components/schemas/Numeric"
+    NewTransaction:
+      type: object
+      required: [currencyGuid, postDate, splits]
+      properties:
+        currencyGuid:
+          type: string
+        num:
+          type: string
+        postDate:
+          type: string
+          format: date-time
+        description:
+          type: string
+        splits:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/NewSplit"
