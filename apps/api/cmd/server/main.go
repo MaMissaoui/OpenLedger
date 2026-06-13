@@ -1,13 +1,9 @@
-// Command server is the OpenLedger HTTP API entrypoint.
-//
-// This scaffold uses the standard library net/http router so it builds with no
-// external dependencies. As the API grows, swap the mux for chi and wire in the
-// pgx/sqlc repositories and middleware described in docs/ARCHITECTURE.md.
+// Command server is the OpenLedger HTTP API entrypoint. It wires a pgx
+// connection pool into the app services and serves the HTTP API.
 package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -15,18 +11,35 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/openledger/openledger/apps/api/internal/app"
+	"github.com/openledger/openledger/apps/api/internal/infra/pg"
+	"github.com/openledger/openledger/apps/api/internal/transport/httpapi"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", handleHealth)
+	dsn := envOr("DATABASE_URL", "postgres://openledger:openledger@localhost:5432/openledger?sslmode=disable")
+	// pgxpool.New is lazy: it validates the DSN but does not dial until first
+	// use, so the server (and /healthz) start even if the DB is briefly down.
+	pool, err := pgxpool.New(context.Background(), dsn)
+	if err != nil {
+		logger.Error("invalid database config", "err", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
+
+	repo := pg.NewRepository(pool)
+	posting := app.NewPostingService(repo)
+	server := httpapi.NewServer(posting)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           mux,
+		Handler:           server.Routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
@@ -38,7 +51,6 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown on SIGINT/SIGTERM.
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
@@ -49,16 +61,6 @@ func main() {
 		logger.Error("graceful shutdown failed", "err", err)
 	}
 	logger.Info("server stopped")
-}
-
-func handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
 }
 
 func envOr(key, fallback string) string {
