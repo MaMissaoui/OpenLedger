@@ -36,6 +36,36 @@ paths:
           description: Transaction posted
         "422":
           description: Transaction does not balance to zero
+  /api/v1/accounts/{id}/register:
+    get:
+      summary: Paginated account register with running balances
+      operationId: getAccountRegister
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: A page of the register
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterPage"
+        "404":
+          description: Account not found
 components:
   schemas:
     Health:
@@ -87,3 +117,43 @@ components:
           minItems: 2
           items:
             $ref: "#/components/schemas/NewSplit"
+    RegisterEntry:
+      type: object
+      properties:
+        splitGuid:
+          type: string
+        txGuid:
+          type: string
+        postDate:
+          type: string
+          format: date-time
+        description:
+          type: string
+        memo:
+          type: string
+        reconcile:
+          type: string
+          description: GnuCash reconcile flag (n/c/y/f/v).
+        value:
+          $ref: "#/components/schemas/Numeric"
+        quantity:
+          $ref: "#/components/schemas/Numeric"
+        balance:
+          $ref: "#/components/schemas/Numeric"
+          description: Running balance in the account commodity.
+    RegisterPage:
+      type: object
+      properties:
+        accountGuid:
+          type: string
+        total:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+        offset:
+          type: integer
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegisterEntry"

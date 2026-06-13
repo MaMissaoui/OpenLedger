@@ -11,11 +11,12 @@ import (
 // Server holds the dependencies the HTTP handlers need.
 type Server struct {
 	posting *app.PostingService
+	ledger  *app.LedgerService
 }
 
 // NewServer builds a Server from its service dependencies.
-func NewServer(posting *app.PostingService) *Server {
-	return &Server{posting: posting}
+func NewServer(posting *app.PostingService, ledger *app.LedgerService) *Server {
+	return &Server{posting: posting, ledger: ledger}
 }
 
 // Routes returns the configured HTTP handler (stdlib mux with method routing).
@@ -23,6 +24,7 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealth)
 	mux.HandleFunc("POST /api/v1/transactions", s.handlePostTransaction)
+	mux.HandleFunc("GET /api/v1/accounts/{id}/register", s.handleAccountRegister)
 	return mux
 }
 

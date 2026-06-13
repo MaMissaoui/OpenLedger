@@ -11,9 +11,13 @@ import (
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
 
-// fakeRepo records the last inserted transaction without a database.
+// fakeRepo implements both the transaction and ledger repository ports in
+// memory, so the HTTP layer can be tested without a database.
 type fakeRepo struct {
-	inserted *domain.Transaction
+	inserted     *domain.Transaction
+	exists       bool
+	registerRows []app.RegisterEntry
+	registerTot  int64
 }
 
 func (f *fakeRepo) InsertTransaction(_ context.Context, tx domain.Transaction, _ app.AuditActor) error {
@@ -22,8 +26,16 @@ func (f *fakeRepo) InsertTransaction(_ context.Context, tx domain.Transaction, _
 	return nil
 }
 
-func newTestServer(repo app.TransactionRepository) http.Handler {
-	return NewServer(app.NewPostingService(repo)).Routes()
+func (f *fakeRepo) AccountExists(_ context.Context, _ string) (bool, error) {
+	return f.exists, nil
+}
+
+func (f *fakeRepo) ListAccountRegister(_ context.Context, _ string, _, _ int) ([]app.RegisterEntry, int64, error) {
+	return f.registerRows, f.registerTot, nil
+}
+
+func newTestServer(repo *fakeRepo) http.Handler {
+	return NewServer(app.NewPostingService(repo), app.NewLedgerService(repo)).Routes()
 }
 
 func post(h http.Handler, body string) *httptest.ResponseRecorder {
