@@ -97,7 +97,7 @@ func numericAtScale(n domain.GncNumeric, scale int64) numericDTO {
 	return numericDTO{Num: num, Denom: denom}
 }
 
-func clampQueryInt(r *http.Request, key string, def, min, max int) int {
+func clampQueryInt(r *http.Request, key string, def, lo, hi int) int {
 	raw := r.URL.Query().Get(key)
 	if raw == "" {
 		return def
@@ -106,11 +106,11 @@ func clampQueryInt(r *http.Request, key string, def, min, max int) int {
 	if err != nil {
 		return def
 	}
-	if v < min {
-		return min
+	if v < lo {
+		return lo
 	}
-	if v > max {
-		return max
+	if v > hi {
+		return hi
 	}
 	return v
 }

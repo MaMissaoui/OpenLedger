@@ -19,6 +19,7 @@ var ErrInsufficientRole = errors.New("insufficient role")
 // constraint on the memberships table.
 type Role string
 
+// The ranked set of roles, lowest to highest capability.
 const (
 	RoleViewer Role = "viewer" // read-only
 	RoleEditor Role = "editor" // read + post/edit ledger data
@@ -47,6 +48,7 @@ func (r Role) rank() int {
 // (read vs. write) and the policy here maps it to the minimum role.
 type Access int
 
+// The access levels handlers can require.
 const (
 	AccessRead  Access = iota + 1 // view accounts and registers
 	AccessWrite                   // create accounts, post transactions

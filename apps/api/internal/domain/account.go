@@ -4,6 +4,7 @@ package domain
 // same token GnuCash uses, which keeps import/export a direct mapping.
 type AccountType string
 
+// The GnuCash account-type tokens.
 const (
 	AccountRoot       AccountType = "ROOT"
 	AccountAsset      AccountType = "ASSET"

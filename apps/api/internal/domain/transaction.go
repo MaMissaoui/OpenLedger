@@ -5,6 +5,7 @@ import "time"
 // ReconcileState mirrors GnuCash's single-character split reconcile flags.
 type ReconcileState rune
 
+// The GnuCash reconcile-state flags.
 const (
 	ReconcileNew     ReconcileState = 'n'
 	ReconcileCleared ReconcileState = 'c'
