@@ -10,21 +10,31 @@ import (
 
 // Server holds the dependencies the HTTP handlers need.
 type Server struct {
-	posting *app.PostingService
-	ledger  *app.LedgerService
+	posting   *app.PostingService
+	ledger    *app.LedgerService
+	structure *app.StructureService
+	provision *app.ProvisionService
+	authz     *app.AuthzService
 }
 
 // NewServer builds a Server from its service dependencies.
-func NewServer(posting *app.PostingService, ledger *app.LedgerService) *Server {
-	return &Server{posting: posting, ledger: ledger}
+func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, provision *app.ProvisionService, authz *app.AuthzService) *Server {
+	return &Server{posting: posting, ledger: ledger, structure: structure, provision: provision, authz: authz}
 }
 
-// Routes returns the configured HTTP handler (stdlib mux with method routing).
+// Routes returns the configured HTTP handler. /healthz is public; every
+// /api/v1/* route requires a verified Authelia session (Remote-User header).
 func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealth)
-	mux.HandleFunc("POST /api/v1/transactions", s.handlePostTransaction)
-	mux.HandleFunc("GET /api/v1/accounts/{id}/register", s.handleAccountRegister)
+
+	mux.HandleFunc("POST /api/v1/commodities", s.requireAuth(s.handleCreateCommodity))
+	mux.HandleFunc("GET /api/v1/books", s.requireAuth(s.handleListBooks))
+	mux.HandleFunc("POST /api/v1/books", s.requireAuth(s.handleCreateBook))
+	mux.HandleFunc("GET /api/v1/books/{id}/accounts", s.requireAuth(s.handleListAccounts))
+	mux.HandleFunc("POST /api/v1/accounts", s.requireAuth(s.handleCreateAccount))
+	mux.HandleFunc("POST /api/v1/transactions", s.requireAuth(s.handlePostTransaction))
+	mux.HandleFunc("GET /api/v1/accounts/{id}/register", s.requireAuth(s.handleAccountRegister))
 	return mux
 }
 

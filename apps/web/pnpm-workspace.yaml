@@ -1,0 +1,4 @@
+# pnpm blocks dependency build scripts by default. esbuild (Vite's bundler)
+# needs its install script to fetch its platform binary, so allow it explicitly.
+allowBuilds:
+  esbuild: true

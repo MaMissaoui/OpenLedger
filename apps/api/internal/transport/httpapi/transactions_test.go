@@ -11,13 +11,58 @@ import (
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
 
-// fakeRepo implements both the transaction and ledger repository ports in
-// memory, so the HTTP layer can be tested without a database.
+// fakeRepo implements all repository ports in memory so the HTTP layer can be
+// tested without a database.
 type fakeRepo struct {
 	inserted     *domain.Transaction
 	exists       bool
 	registerRows []app.RegisterEntry
 	registerTot  int64
+
+	// Structure side.
+	commodities  []domain.Commodity
+	books        []domain.Book
+	accounts     []domain.Account
+	bookRoot     string // root returned by BookRootAccount
+	bookNotFound bool   // make BookRootAccount return ErrBookNotFound
+	listAccounts []domain.Account
+
+	// Provision side.
+	provisionedUserID string // returned by FindOrCreateLDAPUser (default "user-1")
+
+	// Authz side. The zero value grants owner access so most tests don't set it
+	// up; set role to test a specific permission level, or noMembership for 403.
+	noMembership    bool     // UserBookRole reports no membership row
+	role            app.Role // membership role (defaults to owner when empty)
+	accountUnknown  bool     // BookGUIDForAccount returns ErrAccountNotFound
+	accountBookGUID string   // book returned by BookGUIDForAccount (default "book-1")
+}
+
+func (f *fakeRepo) FindOrCreateLDAPUser(_ context.Context, _, _ string) (string, error) {
+	if f.provisionedUserID != "" {
+		return f.provisionedUserID, nil
+	}
+	return "user-1", nil
+}
+
+func (f *fakeRepo) UserBookRole(_ context.Context, _, _ string) (app.Role, bool, error) {
+	if f.noMembership {
+		return "", false, nil
+	}
+	if f.role != "" {
+		return f.role, true, nil
+	}
+	return app.RoleOwner, true, nil
+}
+
+func (f *fakeRepo) BookGUIDForAccount(_ context.Context, _ string) (string, error) {
+	if f.accountUnknown {
+		return "", app.ErrAccountNotFound
+	}
+	if f.accountBookGUID != "" {
+		return f.accountBookGUID, nil
+	}
+	return "book-1", nil
 }
 
 func (f *fakeRepo) InsertTransaction(_ context.Context, tx domain.Transaction, _ app.AuditActor) error {
@@ -34,13 +79,58 @@ func (f *fakeRepo) ListAccountRegister(_ context.Context, _ string, _, _ int) ([
 	return f.registerRows, f.registerTot, nil
 }
 
+func (f *fakeRepo) InsertCommodity(_ context.Context, c domain.Commodity) error {
+	f.commodities = append(f.commodities, c)
+	return nil
+}
+
+func (f *fakeRepo) InsertBook(_ context.Context, b domain.Book, _, _ domain.Account, _ string) error {
+	f.books = append(f.books, b)
+	return nil
+}
+
+func (f *fakeRepo) ListBooksForUser(_ context.Context, _ string) ([]domain.Book, error) {
+	return f.books, nil
+}
+
+func (f *fakeRepo) InsertAccount(_ context.Context, a domain.Account) error {
+	f.accounts = append(f.accounts, a)
+	return nil
+}
+
+func (f *fakeRepo) BookRootAccount(_ context.Context, _ string) (string, error) {
+	if f.bookNotFound {
+		return "", app.ErrBookNotFound
+	}
+	return f.bookRoot, nil
+}
+
+func (f *fakeRepo) ListAccountsUnderRoot(_ context.Context, _ string) ([]domain.Account, error) {
+	return f.listAccounts, nil
+}
+
 func newTestServer(repo *fakeRepo) http.Handler {
-	return NewServer(app.NewPostingService(repo), app.NewLedgerService(repo)).Routes()
+	return NewServer(
+		app.NewPostingService(repo),
+		app.NewLedgerService(repo),
+		app.NewStructureService(repo),
+		app.NewProvisionService(repo),
+		app.NewAuthzService(repo),
+	).Routes()
+}
+
+// withAuth sets the Authelia-forwarded identity headers so requests reach the
+// protected /api/v1 handlers. In production Traefik adds these after Authelia
+// verifies the session; in tests we set them directly.
+func withAuth(req *http.Request) *http.Request {
+	req.Header.Set("Remote-User", "test-user")
+	req.Header.Set("Remote-Email", "test@example.com")
+	return req
 }
 
 func post(h http.Handler, body string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/transactions", strings.NewReader(body))
+	req := withAuth(httptest.NewRequest(http.MethodPost, "/api/v1/transactions", strings.NewReader(body)))
 	h.ServeHTTP(rec, req)
 	return rec
 }

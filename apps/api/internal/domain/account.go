@@ -22,6 +22,19 @@ const (
 	AccountTrading    AccountType = "TRADING"
 )
 
+// IsValid reports whether t is a known GnuCash account type.
+func (t AccountType) IsValid() bool {
+	switch t {
+	case AccountRoot, AccountAsset, AccountBank, AccountCash, AccountCredit,
+		AccountLiability, AccountStock, AccountMutual, AccountCurrency,
+		AccountIncome, AccountExpense, AccountEquity, AccountReceivable,
+		AccountPayable, AccountTrading:
+		return true
+	default:
+		return false
+	}
+}
+
 // Account is a node in the chart-of-accounts tree, denominated in one
 // commodity. It corresponds to a row in GnuCash's accounts table.
 type Account struct {

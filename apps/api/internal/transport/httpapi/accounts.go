@@ -37,6 +37,9 @@ type registerPageDTO struct {
 
 func (s *Server) handleAccountRegister(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if !s.authorizeAccount(w, r, id, app.AccessRead) {
+		return
+	}
 	limit := clampQueryInt(r, "limit", defaultRegisterLimit, 1, maxRegisterLimit)
 	offset := clampQueryInt(r, "offset", 0, 0, 1<<31-1)
 

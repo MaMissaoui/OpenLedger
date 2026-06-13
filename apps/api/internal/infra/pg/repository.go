@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/openledger/openledger/apps/api/internal/app"
@@ -125,6 +127,233 @@ func (r *Repository) accountFractions(ctx context.Context, tx pgx.Tx, splits []d
 	return fractions, rows.Err()
 }
 
+// InsertCommodity writes a commodity row.
+func (r *Repository) InsertCommodity(ctx context.Context, c domain.Commodity) error {
+	if _, err := r.pool.Exec(ctx,
+		`INSERT INTO commodities (guid, namespace, mnemonic, fullname, fraction)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		c.GUID, c.Namespace, c.Mnemonic, nullable(c.Fullname), c.Fraction,
+	); err != nil {
+		return fmt.Errorf("insert commodity: %w", err)
+	}
+	return nil
+}
+
+// InsertBook writes the root account, the template root account, and the book
+// row in a single DB transaction so a book never exists without its roots. When
+// ownerUserID is non-empty it also inserts an owner membership.
+func (r *Repository) InsertBook(ctx context.Context, b domain.Book, root, templateRoot domain.Account, ownerUserID string) error {
+	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		for _, a := range []domain.Account{root, templateRoot} {
+			if err := insertAccount(ctx, tx, a); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO books (guid, root_account_guid, root_template_guid)
+			 VALUES ($1, $2, $3)`,
+			b.GUID, b.RootAccountGUID, b.RootTemplateGUID,
+		); err != nil {
+			return fmt.Errorf("insert book: %w", err)
+		}
+		if ownerUserID != "" {
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO memberships (user_id, book_guid, role) VALUES ($1, $2, 'owner')`,
+				ownerUserID, b.GUID,
+			); err != nil {
+				return fmt.Errorf("insert owner membership: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+// ListBooksForUser returns the books a user has a membership on, newest first.
+func (r *Repository) ListBooksForUser(ctx context.Context, userID string) ([]domain.Book, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT b.guid, b.root_account_guid, b.root_template_guid
+		   FROM books b
+		   JOIN memberships m ON m.book_guid = b.guid
+		  WHERE m.user_id = $1
+		  ORDER BY b.guid`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list books for user: %w", err)
+	}
+	defer rows.Close()
+
+	var books []domain.Book
+	for rows.Next() {
+		var b domain.Book
+		if err := rows.Scan(&b.GUID, &b.RootAccountGUID, &b.RootTemplateGUID); err != nil {
+			return nil, fmt.Errorf("scan book: %w", err)
+		}
+		books = append(books, b)
+	}
+	return books, rows.Err()
+}
+
+// InsertAccount writes a single account row.
+func (r *Repository) InsertAccount(ctx context.Context, a domain.Account) error {
+	return insertAccount(ctx, r.pool, a)
+}
+
+// querier is the subset of pgx used for inserts, satisfied by both *pgxpool.Pool
+// and pgx.Tx, so insertAccount works standalone or inside a transaction.
+type querier interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
+func insertAccount(ctx context.Context, q querier, a domain.Account) error {
+	if _, err := q.Exec(ctx,
+		`INSERT INTO accounts
+		   (guid, name, account_type, commodity_guid, commodity_scu,
+		    parent_guid, code, description, hidden, placeholder)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		a.GUID, a.Name, string(a.Type), nullable(a.CommodityGUID), 0,
+		nullable(a.ParentGUID), a.Code, a.Description,
+		boolToInt(a.Hidden), boolToInt(a.Placeholder),
+	); err != nil {
+		return fmt.Errorf("insert account %s: %w", a.GUID, err)
+	}
+	return nil
+}
+
+// BookRootAccount returns a book's root account GUID, or app.ErrBookNotFound.
+func (r *Repository) BookRootAccount(ctx context.Context, bookGUID string) (string, error) {
+	var root string
+	err := r.pool.QueryRow(ctx,
+		`SELECT root_account_guid FROM books WHERE guid = $1`, bookGUID,
+	).Scan(&root)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", app.ErrBookNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("lookup book root: %w", err)
+	}
+	return root, nil
+}
+
+// ListAccountsUnderRoot returns every descendant of rootGUID (root excluded)
+// via a recursive walk of the parent_guid tree, ordered by code then name.
+func (r *Repository) ListAccountsUnderRoot(ctx context.Context, rootGUID string) ([]domain.Account, error) {
+	const sql = `
+WITH RECURSIVE tree AS (
+    SELECT guid, name, account_type, commodity_guid, parent_guid, code, description, hidden, placeholder
+    FROM accounts WHERE parent_guid = $1
+    UNION ALL
+    SELECT a.guid, a.name, a.account_type, a.commodity_guid, a.parent_guid, a.code, a.description, a.hidden, a.placeholder
+    FROM accounts a JOIN tree t ON a.parent_guid = t.guid
+)
+SELECT guid, name, account_type, commodity_guid, parent_guid, code, description, hidden, placeholder
+FROM tree ORDER BY code, name`
+
+	rows, err := r.pool.Query(ctx, sql, rootGUID)
+	if err != nil {
+		return nil, fmt.Errorf("list accounts: %w", err)
+	}
+	defer rows.Close()
+
+	var accounts []domain.Account
+	for rows.Next() {
+		var (
+			a                   domain.Account
+			accountType         string
+			commodity, parent   *string
+			hidden, placeholder int
+		)
+		if err := rows.Scan(
+			&a.GUID, &a.Name, &accountType, &commodity, &parent,
+			&a.Code, &a.Description, &hidden, &placeholder,
+		); err != nil {
+			return nil, fmt.Errorf("scan account: %w", err)
+		}
+		a.Type = domain.AccountType(accountType)
+		if commodity != nil {
+			a.CommodityGUID = *commodity
+		}
+		if parent != nil {
+			a.ParentGUID = *parent
+		}
+		a.Hidden = hidden != 0
+		a.Placeholder = placeholder != 0
+		accounts = append(accounts, a)
+	}
+	return accounts, rows.Err()
+}
+
+// FindOrCreateLDAPUser returns the UUID for an LDAP-authenticated user. On the
+// first call for a given ldapUID it creates an organization and user row so the
+// rest of the membership/authz system has a stable identifier to work with.
+func (r *Repository) FindOrCreateLDAPUser(ctx context.Context, ldapUID, email string) (string, error) {
+	var userID string
+	err := r.pool.QueryRow(ctx,
+		`SELECT id FROM users WHERE ldap_uid = $1`, ldapUID,
+	).Scan(&userID)
+	if err == nil {
+		return userID, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("lookup LDAP user: %w", err)
+	}
+
+	if err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		var orgID string
+		if err := tx.QueryRow(ctx,
+			`INSERT INTO organizations (name) VALUES ($1) RETURNING id`, ldapUID,
+		).Scan(&orgID); err != nil {
+			return fmt.Errorf("create org for %s: %w", ldapUID, err)
+		}
+		return tx.QueryRow(ctx,
+			`INSERT INTO users (org_id, email, ldap_uid) VALUES ($1, $2, $3) RETURNING id`,
+			orgID, email, ldapUID,
+		).Scan(&userID)
+	}); err != nil {
+		return "", fmt.Errorf("provision LDAP user %s: %w", ldapUID, err)
+	}
+	return userID, nil
+}
+
+// UserBookRole returns the user's role on the book and whether a membership row
+// exists at all (false with no error means the user has no membership).
+func (r *Repository) UserBookRole(ctx context.Context, userID, bookGUID string) (app.Role, bool, error) {
+	var role string
+	err := r.pool.QueryRow(ctx,
+		`SELECT role FROM memberships WHERE user_id = $1 AND book_guid = $2`, userID, bookGUID,
+	).Scan(&role)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("check book role: %w", err)
+	}
+	return app.Role(role), true, nil
+}
+
+// BookGUIDForAccount returns the book an account belongs to by walking up the
+// parent_guid chain to the root account, which a book references via
+// root_account_guid. Returns app.ErrAccountNotFound if the account does not
+// exist (or, defensively, is not attached to any book's root).
+func (r *Repository) BookGUIDForAccount(ctx context.Context, accountGUID string) (string, error) {
+	const sql = `
+WITH RECURSIVE up AS (
+    SELECT guid, parent_guid FROM accounts WHERE guid = $1
+    UNION ALL
+    SELECT a.guid, a.parent_guid
+    FROM accounts a JOIN up ON a.guid = up.parent_guid
+)
+SELECT b.guid FROM books b JOIN up ON b.root_account_guid = up.guid`
+
+	var bookGUID string
+	err := r.pool.QueryRow(ctx, sql, accountGUID).Scan(&bookGUID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", app.ErrAccountNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("resolve book for account: %w", err)
+	}
+	return bookGUID, nil
+}
+
 // AccountExists reports whether an account with the given GUID exists.
 func (r *Repository) AccountExists(ctx context.Context, guid string) (bool, error) {
 	var one int
@@ -203,6 +432,116 @@ func (r *Repository) ListAccountRegister(ctx context.Context, guid string, limit
 	return entries, total, rows.Err()
 }
 
+// uniqueViolation is the Postgres SQLSTATE for a unique-constraint violation.
+const uniqueViolation = "23505"
+
+// CreateOrgAndUser creates an organization and its first user in one DB
+// transaction, returning their generated UUIDs. A duplicate email maps to
+// app.ErrEmailTaken.
+func (r *Repository) CreateOrgAndUser(ctx context.Context, orgName, email, passwordHash string) (string, string, error) {
+	var userID, orgID string
+	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx,
+			`INSERT INTO organizations (name) VALUES ($1) RETURNING id`, orgName,
+		).Scan(&orgID); err != nil {
+			return fmt.Errorf("insert organization: %w", err)
+		}
+		if err := tx.QueryRow(ctx,
+			`INSERT INTO users (org_id, email, password_hash) VALUES ($1, $2, $3) RETURNING id`,
+			orgID, email, passwordHash,
+		).Scan(&userID); err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+				return app.ErrEmailTaken
+			}
+			return fmt.Errorf("insert user: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", "", err
+	}
+	return userID, orgID, nil
+}
+
+// UserByEmail returns login credentials for an email (case-insensitive), or
+// app.ErrInvalidCredentials when no such user exists.
+func (r *Repository) UserByEmail(ctx context.Context, email string) (app.UserCredentials, error) {
+	var c app.UserCredentials
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, org_id, password_hash FROM users WHERE lower(email) = lower($1)`, email,
+	).Scan(&c.UserID, &c.OrgID, &c.PasswordHash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return app.UserCredentials{}, app.ErrInvalidCredentials
+	}
+	if err != nil {
+		return app.UserCredentials{}, fmt.Errorf("lookup user: %w", err)
+	}
+	return c, nil
+}
+
+// StoreRefreshToken records a hashed refresh token.
+func (r *Repository) StoreRefreshToken(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error {
+	if _, err := r.pool.Exec(ctx,
+		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+		userID, tokenHash, expiresAt,
+	); err != nil {
+		return fmt.Errorf("store refresh token: %w", err)
+	}
+	return nil
+}
+
+// RotateRefreshToken revokes oldHash (if active and unexpired) and stores
+// newHash for the same user, all in one transaction. The old row is locked
+// FOR UPDATE so concurrent reuse can't double-spend it. Returns
+// app.ErrInvalidRefresh if oldHash is not currently valid.
+func (r *Repository) RotateRefreshToken(ctx context.Context, oldHash, newHash string, newExpiresAt time.Time) (string, string, error) {
+	var userID, orgID string
+	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx,
+			`SELECT user_id FROM refresh_tokens
+			  WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > now()
+			  FOR UPDATE`, oldHash,
+		).Scan(&userID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return app.ErrInvalidRefresh
+		}
+		if err != nil {
+			return fmt.Errorf("lookup refresh token: %w", err)
+		}
+		if _, err := tx.Exec(ctx,
+			`UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1`, oldHash,
+		); err != nil {
+			return fmt.Errorf("revoke old refresh token: %w", err)
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+			userID, newHash, newExpiresAt,
+		); err != nil {
+			return fmt.Errorf("store rotated refresh token: %w", err)
+		}
+		if err := tx.QueryRow(ctx, `SELECT org_id FROM users WHERE id = $1`, userID).Scan(&orgID); err != nil {
+			return fmt.Errorf("lookup user org: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", "", err
+	}
+	return userID, orgID, nil
+}
+
+// RevokeRefreshToken marks a refresh token revoked. Idempotent.
+func (r *Repository) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
+	if _, err := r.pool.Exec(ctx,
+		`UPDATE refresh_tokens SET revoked_at = now() WHERE token_hash = $1 AND revoked_at IS NULL`,
+		tokenHash,
+	); err != nil {
+		return fmt.Errorf("revoke refresh token: %w", err)
+	}
+	return nil
+}
+
 // nullable maps an empty string to SQL NULL, so optional CHAR/UUID columns are
 // stored as NULL rather than an empty/invalid value.
 func nullable(s string) any {
@@ -210,4 +549,13 @@ func nullable(s string) any {
 		return nil
 	}
 	return s
+}
+
+// boolToInt maps Go bools to the 0/1 INTEGER columns GnuCash uses for flags
+// like hidden and placeholder.
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }

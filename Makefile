@@ -1,4 +1,4 @@
-.PHONY: test build run dev up down fmt vet web-install web-build
+.PHONY: test build run seed dev up down fmt vet lint web-install web-build
 
 # --- Go API ---
 test:
@@ -6,6 +6,9 @@ test:
 
 vet:
 	cd apps/api && go vet ./...
+
+lint:
+	cd apps/api && golangci-lint run
 
 fmt:
 	cd apps/api && gofmt -w .
@@ -15,6 +18,9 @@ build:
 
 run:
 	cd apps/api && go run ./cmd/server
+
+seed:
+	cd apps/api && go run ./cmd/seed
 
 # --- Web ---
 web-install:

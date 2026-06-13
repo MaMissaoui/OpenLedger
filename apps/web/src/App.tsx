@@ -1,26 +1,15 @@
-import { useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Ledger } from "./Ledger";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+// Authentication is handled by Authelia + Traefik at the proxy layer. By the
+// time a request reaches this SPA the user is already verified — no auth gate
+// or token management needed here.
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-// Placeholder shell: confirms the SPA can reach the API's health endpoint.
-// Replace with the account-tree + register UI per docs/ARCHITECTURE.md.
 export function App() {
-  const [status, setStatus] = useState<string>("checking…");
-
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/healthz`)
-      .then((r) => r.json())
-      .then((d: { status: string }) => setStatus(d.status))
-      .catch(() => setStatus("unreachable"));
-  }, []);
-
   return (
-    <main style={{ fontFamily: "system-ui", padding: "2rem" }}>
-      <h1>OpenLedger</h1>
-      <p>GnuCash-inspired double-entry accounting for the web.</p>
-      <p>
-        API health: <strong>{status}</strong>
-      </p>
-    </main>
+    <QueryClientProvider client={queryClient}>
+      <Ledger />
+    </QueryClientProvider>
   );
 }

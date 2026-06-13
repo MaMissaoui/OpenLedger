@@ -1,9 +1,37 @@
-# Postgres only, for host-side development with hot reload.
-#   docker compose -f docker-compose.dev.yml up
-# Then run the API and web on the host:
-#   cd apps/api && go run ./cmd/server
-#   cd apps/web && pnpm dev
+# Dev stack: Postgres + nginx auth shim.
+# API and Vite run on the host with hot-reload; nginx injects fake auth headers
+# so requireAuth passes without a real Authelia stack.
+#
+# Add to /etc/hosts before first run:
+#   127.0.0.1 openledger.localhost
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d
+#   go run ./apps/api/cmd/server           (PORT=8090, reads DATABASE_URL from env)
+#   pnpm --filter web dev                  (port 5173)
+#   open http://openledger.localhost
+#
+# On Linux, host.docker.internal is not automatic — uncomment extra_hosts below.
+
 services:
+  # ---------------------------------------------------------------------------
+  # Auth shim — nginx that injects Remote-User/Remote-Email headers so the Go
+  # API's requireAuth middleware is satisfied without a real Authelia.
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:stable-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx/dev.conf:/etc/nginx/conf.d/default.conf:ro
+    # On Linux uncomment:
+    # extra_hosts:
+    #   - host.docker.internal:host-gateway
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Database — exposed on host port 5432 for go run / goose migrations.
+  # ---------------------------------------------------------------------------
   db:
     image: postgres:16
     environment:
@@ -19,6 +47,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
 volumes:
   pgdata_dev:

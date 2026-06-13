@@ -1,0 +1,27 @@
+# golangci-lint v2 config for the OpenLedger API.
+# Install: https://golangci-lint.run/welcome/install/  — then `make lint`.
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  # "standard" = errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  enable:
+    - bodyclose      # HTTP/pgx rows left unclosed
+    - errorlint      # correct error wrapping / errors.Is usage
+    - gocritic       # opinionated correctness & style checks
+    - misspell       # comment/string typos
+    - revive         # fast, configurable golint replacement
+  exclusions:
+    rules:
+      # Test files may ignore errors and use looser patterns.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - gosec
+
+formatters:
+  enable:
+    - gofmt

@@ -8,7 +8,11 @@ info:
     TypeScript client. Money is always exact rational num/denom pairs, never a
     JSON float.
 servers:
-  - url: http://localhost:8080
+  - url: http://openledger.localhost
+# Authentication is handled at the proxy layer (Traefik + Authelia forward-auth).
+# Authelia sets Remote-User/Remote-Email headers that the API trusts; there are
+# no /auth/* endpoints and no JWT tokens in the API itself.
+# Users log in and out via http://auth.openledger.localhost.
 paths:
   /healthz:
     get:
@@ -21,6 +25,88 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+  /api/v1/commodities:
+    post:
+      summary: Create a commodity (currency or security)
+      operationId: createCommodity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewCommodity"
+      responses:
+        "201":
+          description: Commodity created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Commodity"
+  /api/v1/books:
+    get:
+      summary: List the authenticated user's books
+      operationId: listBooks
+      responses:
+        "200":
+          description: The user's books
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookList"
+    post:
+      summary: Create a book (ledger) with its root account
+      operationId: createBook
+      responses:
+        "201":
+          description: Book created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+  /api/v1/books/{id}/accounts:
+    get:
+      summary: List a book's chart of accounts
+      operationId: listAccounts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The book's accounts (root excluded)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountList"
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
+  /api/v1/accounts:
+    post:
+      summary: Create an account in a book
+      operationId: createAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewAccount"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        "400":
+          description: Invalid input (missing field or unknown account type)
+        "403":
+          description: The user has no membership on this book, or a role below editor
+        "404":
+          description: Book not found
   /api/v1/transactions:
     post:
       summary: Post a balanced transaction
@@ -34,6 +120,10 @@ paths:
       responses:
         "201":
           description: Transaction posted
+        "403":
+          description: The user has no membership, or a role below editor, on a book the splits touch
+        "404":
+          description: A split references an unknown account
         "422":
           description: Transaction does not balance to zero
   /api/v1/accounts/{id}/register:
@@ -64,6 +154,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RegisterPage"
+        "403":
+          description: The authenticated user has no membership on this account's book
         "404":
           description: Account not found
 components:
@@ -75,6 +167,101 @@ components:
         status:
           type: string
           example: ok
+    NewCommodity:
+      type: object
+      required: [mnemonic]
+      properties:
+        namespace:
+          type: string
+          description: Defaults to CURRENCY.
+        mnemonic:
+          type: string
+          example: USD
+        fullname:
+          type: string
+        fraction:
+          type: integer
+          format: int64
+          description: Smallest-unit denominator. Defaults to 100.
+          example: 100
+    Commodity:
+      type: object
+      properties:
+        guid:
+          type: string
+        namespace:
+          type: string
+        mnemonic:
+          type: string
+        fraction:
+          type: integer
+          format: int64
+    Book:
+      type: object
+      properties:
+        guid:
+          type: string
+        rootAccountGuid:
+          type: string
+          description: Parent for top-level accounts.
+    BookList:
+      type: object
+      properties:
+        books:
+          type: array
+          items:
+            $ref: "#/components/schemas/Book"
+    NewAccount:
+      type: object
+      required: [bookGuid, name, type]
+      properties:
+        bookGuid:
+          type: string
+        parentGuid:
+          type: string
+          description: Defaults to the book's root account when omitted.
+        name:
+          type: string
+        type:
+          type: string
+          description: GnuCash account type (ASSET, BANK, EXPENSE, EQUITY, …).
+        commodityGuid:
+          type: string
+          description: Required for non-ROOT accounts.
+        code:
+          type: string
+        description:
+          type: string
+        placeholder:
+          type: boolean
+    Account:
+      type: object
+      properties:
+        guid:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        commodityGuid:
+          type: string
+        parentGuid:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        placeholder:
+          type: boolean
+    AccountList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        accounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Account"
     Numeric:
       type: object
       description: Exact rational amount (numerator/denominator).

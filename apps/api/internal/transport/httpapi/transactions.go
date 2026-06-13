@@ -51,7 +51,15 @@ func (s *Server) handlePostTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posted, err := s.posting.Post(r.Context(), tx, app.AuditActor{})
+	accountGUIDs := make([]string, 0, len(tx.Splits))
+	for _, sp := range tx.Splits {
+		accountGUIDs = append(accountGUIDs, sp.AccountGUID)
+	}
+	if !s.authorizeAccounts(w, r, accountGUIDs, app.AccessWrite) {
+		return
+	}
+
+	posted, err := s.posting.Post(r.Context(), tx, actorFromContext(r.Context()))
 	switch {
 	case errors.Is(err, domain.ErrUnbalanced):
 		writeError(w, http.StatusUnprocessableEntity, err.Error())

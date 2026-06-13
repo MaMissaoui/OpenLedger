@@ -35,7 +35,11 @@ func main() {
 	repo := pg.NewRepository(pool)
 	posting := app.NewPostingService(repo)
 	ledger := app.NewLedgerService(repo)
-	server := httpapi.NewServer(posting, ledger)
+	structure := app.NewStructureService(repo)
+	provision := app.NewProvisionService(repo)
+	authz := app.NewAuthzService(repo)
+
+	server := httpapi.NewServer(posting, ledger, structure, provision, authz)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

@@ -12,7 +12,7 @@ import (
 
 func getRegister(h http.Handler, path string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req := withAuth(httptest.NewRequest(http.MethodGet, path, nil))
 	h.ServeHTTP(rec, req)
 	return rec
 }
