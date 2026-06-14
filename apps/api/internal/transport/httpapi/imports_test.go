@@ -11,9 +11,15 @@ import (
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
 
+// sqliteMagic is the SQLite file header, so an upload sniffs as the SQLite
+// backend. The fake reader ignores the rest of the bytes and returns canned
+// data; the prefix only has to satisfy the handler's format detection.
+var sqliteMagic = []byte("SQLite format 3\x00")
+
 // uploadGnuCash posts a multipart form with a "file" part to the import
-// endpoint. The bytes are irrelevant — the fake reader returns canned data — so
-// this exercises the handler's upload plumbing and status mapping.
+// endpoint. The leading bytes drive format detection; the fake reader returns
+// canned data, so this exercises the handler's upload plumbing and status
+// mapping.
 func uploadGnuCash(h http.Handler, content []byte) *httptest.ResponseRecorder {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
@@ -49,7 +55,7 @@ func importableData() app.GnuCashData {
 
 func TestImportGnuCash(t *testing.T) {
 	repo := &fakeRepo{readerData: importableData()}
-	rec := uploadGnuCash(newTestServer(repo), []byte("ignored sqlite bytes"))
+	rec := uploadGnuCash(newTestServer(repo), sqliteMagic)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
@@ -62,12 +68,36 @@ func TestImportGnuCash(t *testing.T) {
 	}
 }
 
+func TestImportGnuCashXML(t *testing.T) {
+	repo := &fakeRepo{readerData: importableData()}
+	// Content starting with '<' sniffs as XML, dispatching to ImportXML.
+	rec := uploadGnuCash(newTestServer(repo), []byte("<?xml version=\"1.0\"?><gnc-v2/>"))
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
+	}
+	if repo.importedData == nil || repo.importedData.Book.GUID != "book1" {
+		t.Errorf("XML import was not persisted: %+v", repo.importedData)
+	}
+}
+
+func TestImportGnuCashUnrecognisedFormatReturns400(t *testing.T) {
+	repo := &fakeRepo{readerData: importableData()}
+	rec := uploadGnuCash(newTestServer(repo), []byte("just some bytes"))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
+	}
+	if repo.importedData != nil {
+		t.Error("unrecognised upload must not be persisted")
+	}
+}
+
 func TestImportGnuCashUnbalancedReturns422(t *testing.T) {
 	data := importableData()
 	data.Transactions[0].Splits[1].Value = domain.MustFromNumDenom(-4000, 1) // breaks balance
 	repo := &fakeRepo{readerData: data}
 
-	rec := uploadGnuCash(newTestServer(repo), []byte("x"))
+	rec := uploadGnuCash(newTestServer(repo), sqliteMagic)
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422; body = %s", rec.Code, rec.Body.String())
 	}
@@ -78,7 +108,7 @@ func TestImportGnuCashUnbalancedReturns422(t *testing.T) {
 
 func TestImportGnuCashConflictReturns409(t *testing.T) {
 	repo := &fakeRepo{readerData: importableData(), importErr: app.ErrImportConflict}
-	rec := uploadGnuCash(newTestServer(repo), []byte("x"))
+	rec := uploadGnuCash(newTestServer(repo), sqliteMagic)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
 	}

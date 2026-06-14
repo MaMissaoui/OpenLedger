@@ -18,6 +18,10 @@ func (s stubReader) ReadGnuCashSQLite(_ context.Context, _ string) (GnuCashData,
 	return s.data, s.err
 }
 
+func (s stubReader) ReadGnuCashXML(_ context.Context, _ string) (GnuCashData, error) {
+	return s.data, s.err
+}
+
 // captureRepo records what ImportBook was asked to persist.
 type captureRepo struct {
 	got   *GnuCashData

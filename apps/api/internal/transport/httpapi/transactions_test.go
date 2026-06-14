@@ -183,6 +183,10 @@ func (f *fakeRepo) ReadGnuCashSQLite(_ context.Context, _ string) (app.GnuCashDa
 	return f.readerData, f.readerErr
 }
 
+func (f *fakeRepo) ReadGnuCashXML(_ context.Context, _ string) (app.GnuCashData, error) {
+	return f.readerData, f.readerErr
+}
+
 // LoadBook is the fake ExportRepository: it returns the canned book data/error
 // the test configured.
 func (f *fakeRepo) LoadBook(_ context.Context, _ string) (app.GnuCashData, error) {

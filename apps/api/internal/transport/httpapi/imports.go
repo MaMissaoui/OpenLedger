@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net/http"
@@ -45,8 +46,20 @@ func (s *Server) handleImportGnuCash(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	format, err := sniffGnuCashFormat(tmp.Name())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "file is not a recognised GnuCash SQLite or XML document")
+		return
+	}
+
 	userID := actorFromContext(r.Context()).UserID
-	result, err := s.importer.ImportSQLite(r.Context(), tmp.Name(), userID)
+	var result app.ImportResult
+	switch format {
+	case formatSQLite:
+		result, err = s.importer.ImportSQLite(r.Context(), tmp.Name(), userID)
+	case formatXML:
+		result, err = s.importer.ImportXML(r.Context(), tmp.Name(), userID)
+	}
 	switch {
 	case errors.Is(err, app.ErrImportParse):
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -68,4 +81,41 @@ func (s *Server) handleImportGnuCash(w http.ResponseWriter, r *http.Request) {
 		"accounts":     result.Accounts,
 		"transactions": result.Transactions,
 	})
+}
+
+// GnuCash file formats the import endpoint accepts.
+const (
+	formatSQLite = "sqlite"
+	formatXML    = "xml"
+)
+
+// sniffGnuCashFormat inspects the leading bytes of an uploaded file to decide
+// whether it is the SQLite backend (magic "SQLite format 3"), or the XML format
+// — either gzipped (GnuCash's default, magic 0x1f 0x8b) or plain ('<'). It
+// errors when the bytes match neither, so an unrelated upload is rejected before
+// any parsing.
+func sniffGnuCashFormat(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+
+	magic := make([]byte, 16)
+	n, err := io.ReadFull(f, magic)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+		return "", err
+	}
+	magic = magic[:n]
+
+	switch {
+	case bytes.HasPrefix(magic, []byte("SQLite format 3")):
+		return formatSQLite, nil
+	case len(magic) >= 2 && magic[0] == 0x1f && magic[1] == 0x8b:
+		return formatXML, nil // gzipped — the XML reader gunzips transparently
+	case bytes.HasPrefix(bytes.TrimLeft(magic, "\xef\xbb\xbf \t\r\n"), []byte("<")):
+		return formatXML, nil
+	default:
+		return "", errors.New("unrecognised file format")
+	}
 }
