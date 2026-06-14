@@ -75,6 +75,60 @@ func (s *Server) handlePostTransaction(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleGetTransaction returns a transaction with all its splits. The edit UI
+// needs every split, not just the one shown in a single account's register.
+func (s *Server) handleGetTransaction(w http.ResponseWriter, r *http.Request) {
+	guid := r.PathValue("id")
+
+	accounts, err := s.posting.TransactionAccounts(r.Context(), guid)
+	switch {
+	case errors.Is(err, app.ErrTransactionNotFound):
+		writeError(w, http.StatusNotFound, "transaction not found")
+		return
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "could not load transaction")
+		return
+	}
+	if !s.authorizeAccounts(w, r, accounts, app.AccessRead) {
+		return
+	}
+
+	tx, err := s.ledger.GetTransaction(r.Context(), guid)
+	switch {
+	case errors.Is(err, app.ErrTransactionNotFound):
+		writeError(w, http.StatusNotFound, "transaction not found")
+		return
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "could not load transaction")
+		return
+	}
+	writeJSON(w, http.StatusOK, transactionDTO(tx))
+}
+
+// transactionDTO renders a full transaction with its splits. Money fields use
+// the stored scale (currency fraction for value, account fraction for quantity).
+func transactionDTO(t domain.Transaction) map[string]any {
+	splits := make([]map[string]any, 0, len(t.Splits))
+	for _, s := range t.Splits {
+		splits = append(splits, map[string]any{
+			"guid":        s.GUID,
+			"accountGuid": s.AccountGUID,
+			"memo":        s.Memo,
+			"action":      s.Action,
+			"value":       numericAtScale(s.Value, 100),
+			"quantity":    numericAtScale(s.Quantity, 100),
+		})
+	}
+	return map[string]any{
+		"guid":         t.GUID,
+		"currencyGuid": t.CurrencyGUID,
+		"num":          t.Num,
+		"postDate":     t.PostDate,
+		"description":  t.Description,
+		"splits":       splits,
+	}
+}
+
 // handleUpdateTransaction replaces a transaction wholesale (its fields and all
 // splits) and re-validates the balance invariant. The request body has the same
 // shape as a new transaction.

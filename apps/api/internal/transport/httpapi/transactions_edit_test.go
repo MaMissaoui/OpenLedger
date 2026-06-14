@@ -1,10 +1,13 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/openledger/openledger/apps/api/internal/domain"
 )
 
 func sendJSON(h http.Handler, method, path, body string) *httptest.ResponseRecorder {
@@ -19,6 +22,47 @@ const balancedBody = `{
 		{"accountGuid":"checking","value":{"num":7500,"denom":100},"quantity":{"num":7500,"denom":100}},
 		{"accountGuid":"groceries","value":{"num":-7500,"denom":100},"quantity":{"num":-7500,"denom":100}}
 	]}`
+
+func TestGetTransaction(t *testing.T) {
+	repo := &fakeRepo{gotTx: &domain.Transaction{
+		CurrencyGUID: "USD",
+		Description:  "groceries",
+		Splits: []domain.Split{
+			{GUID: "s1", AccountGUID: "checking", Value: domain.MustFromNumDenom(7500, 100), Quantity: domain.MustFromNumDenom(7500, 100)},
+			{GUID: "s2", AccountGUID: "groceries", Value: domain.MustFromNumDenom(-7500, 100), Quantity: domain.MustFromNumDenom(-7500, 100)},
+		},
+	}}
+	rec := sendJSON(newTestServer(repo), http.MethodGet, "/api/v1/transactions/tx-1", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		GUID   string `json:"guid"`
+		Splits []struct {
+			AccountGUID string     `json:"accountGuid"`
+			Value       numericDTO `json:"value"`
+		} `json:"splits"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.GUID != "tx-1" {
+		t.Errorf("guid = %q, want tx-1 (from the path)", resp.GUID)
+	}
+	if len(resp.Splits) != 2 {
+		t.Fatalf("got %d splits, want 2", len(resp.Splits))
+	}
+	if resp.Splits[0].Value.Num != 7500 {
+		t.Errorf("split 0 value = %d, want 7500", resp.Splits[0].Value.Num)
+	}
+}
+
+func TestGetTransactionNotFoundReturns404(t *testing.T) {
+	rec := sendJSON(newTestServer(&fakeRepo{txNotFound: true}), http.MethodGet, "/api/v1/transactions/missing", "")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404; body = %s", rec.Code, rec.Body.String())
+	}
+}
 
 func TestUpdateTransaction(t *testing.T) {
 	repo := &fakeRepo{}

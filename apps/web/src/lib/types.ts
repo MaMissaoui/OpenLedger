@@ -87,6 +87,26 @@ export interface IncomeStatement {
   netIncome: Numeric;
 }
 
+export interface TransactionSplit {
+  guid: string;
+  accountGuid: string;
+  memo: string;
+  action: string;
+  value: Numeric;
+  quantity: Numeric;
+}
+
+// A full transaction with every split — what the edit UI loads (a single
+// account's register only carries that account's own split).
+export interface Transaction {
+  guid: string;
+  currencyGuid: string;
+  num: string;
+  postDate: string;
+  description: string;
+  splits: TransactionSplit[];
+}
+
 export interface RegisterEntry {
   splitGuid: string;
   txGuid: string;

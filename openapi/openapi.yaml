@@ -201,6 +201,26 @@ paths:
         "422":
           description: Transaction does not balance to zero
   /api/v1/transactions/{id}:
+    get:
+      summary: Fetch a transaction with all its splits
+      operationId: getTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The transaction and its splits
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+        "403":
+          description: The user has no membership on a book the splits touch
+        "404":
+          description: Transaction not found
     patch:
       summary: Replace a transaction and its splits
       description: >
@@ -600,6 +620,39 @@ components:
           minItems: 2
           items:
             $ref: "#/components/schemas/NewSplit"
+    Split:
+      type: object
+      properties:
+        guid:
+          type: string
+        accountGuid:
+          type: string
+        memo:
+          type: string
+        action:
+          type: string
+        value:
+          $ref: "#/components/schemas/Numeric"
+        quantity:
+          $ref: "#/components/schemas/Numeric"
+    Transaction:
+      type: object
+      properties:
+        guid:
+          type: string
+        currencyGuid:
+          type: string
+        num:
+          type: string
+        postDate:
+          type: string
+          format: date-time
+        description:
+          type: string
+        splits:
+          type: array
+          items:
+            $ref: "#/components/schemas/Split"
     RegisterEntry:
       type: object
       properties:

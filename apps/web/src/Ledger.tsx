@@ -5,7 +5,7 @@ import { SetupLedger } from "./SetupLedger";
 import { AccountTree } from "./components/AccountTree";
 import { RegisterView } from "./components/RegisterView";
 import { ReportsView } from "./components/ReportsView";
-import { NewTransactionDialog } from "./components/NewTransactionDialog";
+import { TransactionDialog } from "./components/TransactionDialog";
 import { NewAccountDialog } from "./components/NewAccountDialog";
 
 export function Ledger() {
@@ -20,6 +20,7 @@ export function Ledger() {
 
   const [selectedGuid, setSelectedGuid] = useState<string | null>(null);
   const [showNewTx, setShowNewTx] = useState(false);
+  const [editTxGuid, setEditTxGuid] = useState<string | null>(null);
   const [showNewAccount, setShowNewAccount] = useState(false);
   const [view, setView] = useState<"ledger" | "reports">("ledger");
 
@@ -92,7 +93,11 @@ export function Ledger() {
           />
 
           {selected ? (
-            <RegisterView account={selected} onNewTransaction={() => setShowNewTx(true)} />
+            <RegisterView
+              account={selected}
+              onNewTransaction={() => setShowNewTx(true)}
+              onEditTransaction={setEditTxGuid}
+            />
           ) : (
             <div className="empty" style={{ alignSelf: "center", margin: "auto" }}>
               {accounts.isLoading ? <span className="spinner" /> : "Add an account to begin."}
@@ -102,10 +107,18 @@ export function Ledger() {
       )}
 
       {showNewTx && selected && (
-        <NewTransactionDialog
+        <TransactionDialog
           accounts={postable}
           defaultToGuid={selected.guid}
           onClose={() => setShowNewTx(false)}
+        />
+      )}
+      {editTxGuid && (
+        <TransactionDialog
+          accounts={postable}
+          defaultToGuid={selected?.guid ?? null}
+          editGuid={editTxGuid}
+          onClose={() => setEditTxGuid(null)}
         />
       )}
       {showNewAccount && (

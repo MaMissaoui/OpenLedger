@@ -44,6 +44,9 @@ type RegisterPage struct {
 type LedgerRepository interface {
 	AccountExists(ctx context.Context, guid string) (bool, error)
 	ListAccountRegister(ctx context.Context, guid string, limit, offset int) ([]RegisterEntry, int64, error)
+	// GetTransaction returns a transaction with all its splits, or
+	// ErrTransactionNotFound if the GUID is unknown.
+	GetTransaction(ctx context.Context, guid string) (domain.Transaction, error)
 }
 
 // LedgerService serves read models over the ledger.
@@ -78,4 +81,11 @@ func (s *LedgerService) AccountRegister(ctx context.Context, guid string, limit,
 		Offset:      offset,
 		Entries:     entries,
 	}, nil
+}
+
+// GetTransaction returns a transaction with all its splits, or
+// ErrTransactionNotFound if the GUID is unknown. It backs the edit UI, which
+// needs every split (not just the one shown in a single account's register).
+func (s *LedgerService) GetTransaction(ctx context.Context, guid string) (domain.Transaction, error) {
+	return s.repo.GetTransaction(ctx, guid)
 }

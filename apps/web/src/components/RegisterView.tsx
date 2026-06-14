@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { Account, Numeric } from "../lib/types";
 import { formatMoney } from "../lib/money";
@@ -6,6 +6,7 @@ import { formatMoney } from "../lib/money";
 interface Props {
   account: Account;
   onNewTransaction: () => void;
+  onEditTransaction: (txGuid: string) => void;
 }
 
 function amountCell(n: Numeric) {
@@ -20,11 +21,28 @@ function formatDate(iso: string): string {
     : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "2-digit" });
 }
 
-export function RegisterView({ account, onNewTransaction }: Props) {
+export function RegisterView({ account, onNewTransaction, onEditTransaction }: Props) {
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["register", account.guid],
     queryFn: () => api.getRegister(account.guid),
   });
+
+  const del = useMutation({
+    mutationFn: (txGuid: string) => api.deleteTransaction(txGuid),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["register"] });
+      qc.invalidateQueries({ queryKey: ["accounts"] });
+      qc.invalidateQueries({ queryKey: ["balance-sheet"] });
+      qc.invalidateQueries({ queryKey: ["income-statement"] });
+    },
+  });
+
+  function confirmDelete(txGuid: string, description: string) {
+    if (window.confirm(`Delete "${description || "this transaction"}"? This cannot be undone.`)) {
+      del.mutate(txGuid);
+    }
+  }
 
   const entries = data?.entries ?? [];
   const currentBalance = entries.length > 0 ? entries[entries.length - 1].balance : null;
@@ -70,6 +88,7 @@ export function RegisterView({ account, onNewTransaction }: Props) {
               <th>Description</th>
               <th className="num">Amount</th>
               <th className="num">Balance</th>
+              <th className="row-actions__head" aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -83,6 +102,23 @@ export function RegisterView({ account, onNewTransaction }: Props) {
                 {amountCell(e.quantity)}
                 <td className={`num balance${e.balance.num < 0 ? " neg" : ""}`}>
                   {formatMoney(e.balance)}
+                </td>
+                <td className="row-actions">
+                  <button
+                    className="row-actions__btn"
+                    onClick={() => onEditTransaction(e.txGuid)}
+                    title="Edit transaction"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="row-actions__btn row-actions__btn--danger"
+                    onClick={() => confirmDelete(e.txGuid, e.description)}
+                    disabled={del.isPending}
+                    title="Delete transaction"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

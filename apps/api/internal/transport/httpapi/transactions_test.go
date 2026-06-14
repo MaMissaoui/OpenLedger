@@ -18,8 +18,9 @@ type fakeRepo struct {
 	inserted     *domain.Transaction
 	updated      *domain.Transaction
 	deletedGUID  string
-	txAccounts   []string // returned by TransactionAccountGUIDs
-	txNotFound   bool     // make TransactionAccountGUIDs return ErrTransactionNotFound
+	txAccounts   []string            // returned by TransactionAccountGUIDs
+	txNotFound   bool                // make TransactionAccountGUIDs / GetTransaction return ErrTransactionNotFound
+	gotTx        *domain.Transaction // returned by GetTransaction
 	exists       bool
 	registerRows []app.RegisterEntry
 	registerTot  int64
@@ -105,6 +106,15 @@ func (f *fakeRepo) AccountExists(_ context.Context, _ string) (bool, error) {
 
 func (f *fakeRepo) ListAccountRegister(_ context.Context, _ string, _, _ int) ([]app.RegisterEntry, int64, error) {
 	return f.registerRows, f.registerTot, nil
+}
+
+func (f *fakeRepo) GetTransaction(_ context.Context, guid string) (domain.Transaction, error) {
+	if f.txNotFound || f.gotTx == nil {
+		return domain.Transaction{}, app.ErrTransactionNotFound
+	}
+	tx := *f.gotTx
+	tx.GUID = guid
+	return tx, nil
 }
 
 func (f *fakeRepo) InsertCommodity(_ context.Context, c domain.Commodity) error {

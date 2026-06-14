@@ -7,6 +7,7 @@ import type {
   Numeric,
   Price,
   RegisterPage,
+  Transaction,
 } from "./types";
 
 // ApiError carries the HTTP status so callers can branch (e.g. 422 unbalanced)
@@ -87,6 +88,7 @@ export const api = {
     postDate?: string;
     splits: { accountGuid: string; value: Numeric; quantity: Numeric }[];
   }) => post<{ guid: string }>("/api/v1/transactions", input),
+  getTransaction: (guid: string) => request<Transaction>(`/api/v1/transactions/${guid}`),
   // Wholesale replacement of a transaction's fields and splits (PATCH), with the
   // same body shape as postTransaction; the server re-validates the balance.
   updateTransaction: (

@@ -666,6 +666,60 @@ func (r *Repository) ListAccountRegister(ctx context.Context, guid string, limit
 	return entries, total, rows.Err()
 }
 
+// GetTransaction loads a transaction and all its splits. It returns
+// app.ErrTransactionNotFound if the GUID is unknown.
+func (r *Repository) GetTransaction(ctx context.Context, guid string) (domain.Transaction, error) {
+	t := domain.Transaction{GUID: guid}
+	err := r.pool.QueryRow(ctx,
+		`SELECT currency_guid, num, post_date, enter_date, description
+		   FROM transactions WHERE guid = $1`, guid,
+	).Scan(&t.CurrencyGUID, &t.Num, &t.PostDate, &t.EnterDate, &t.Description)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Transaction{}, app.ErrTransactionNotFound
+	}
+	if err != nil {
+		return domain.Transaction{}, fmt.Errorf("get transaction: %w", err)
+	}
+
+	rows, err := r.pool.Query(ctx,
+		`SELECT guid, account_guid, memo, action, reconcile_state,
+		        value_num, value_denom, quantity_num, quantity_denom, lot_guid
+		   FROM splits WHERE tx_guid = $1 ORDER BY guid`, guid)
+	if err != nil {
+		return domain.Transaction{}, fmt.Errorf("get transaction splits: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			s                                      domain.Split
+			reconcile                              string
+			lot                                    *string
+			valueNum, valueDenom, qtyNum, qtyDenom int64
+		)
+		if err := rows.Scan(
+			&s.GUID, &s.AccountGUID, &s.Memo, &s.Action, &reconcile,
+			&valueNum, &valueDenom, &qtyNum, &qtyDenom, &lot,
+		); err != nil {
+			return domain.Transaction{}, fmt.Errorf("scan split: %w", err)
+		}
+		if reconcile != "" {
+			s.Reconcile = domain.ReconcileState([]rune(reconcile)[0])
+		}
+		if lot != nil {
+			s.LotGUID = *lot
+		}
+		if s.Value, err = domain.FromNumDenom(valueNum, valueDenom); err != nil {
+			return domain.Transaction{}, err
+		}
+		if s.Quantity, err = domain.FromNumDenom(qtyNum, qtyDenom); err != nil {
+			return domain.Transaction{}, err
+		}
+		t.Splits = append(t.Splits, s)
+	}
+	return t, rows.Err()
+}
+
 // uniqueViolation is the Postgres SQLSTATE for a unique-constraint violation.
 const uniqueViolation = "23505"
 
