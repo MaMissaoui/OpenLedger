@@ -44,15 +44,22 @@ func run() error {
 
 	repo := pg.NewRepository(pool)
 	structure := app.NewStructureService(repo)
-	posting := app.NewPostingService(repo)
+	posting := app.NewPostingService(repo).WithTrading(app.NewTradingService(repo))
+	price := app.NewPriceService(repo)
 	provision := app.NewProvisionService(repo)
 
-	// 1. Currency.
+	// 1. Currency + a security (AAPL, traded in whole shares).
 	usd, err := structure.CreateCommodity(ctx, domain.Commodity{
 		Mnemonic: "USD", Fullname: "US Dollar", Fraction: 100,
 	})
 	if err != nil {
 		return fmt.Errorf("create commodity: %w", err)
+	}
+	aapl, err := structure.CreateCommodity(ctx, domain.Commodity{
+		Namespace: "NASDAQ", Mnemonic: "AAPL", Fullname: "Apple Inc.", Fraction: 1,
+	})
+	if err != nil {
+		return fmt.Errorf("create AAPL commodity: %w", err)
 	}
 
 	// 2. JIT-provision the seed owner. Auth is handled by Authelia + lldap;
@@ -104,6 +111,18 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	brokerage, err := mk("Brokerage", "1100", domain.AccountAsset, assets.GUID, true)
+	if err != nil {
+		return err
+	}
+	// The stock account is denominated in AAPL, not USD — its quantity is shares.
+	aaplAcct, err := structure.CreateAccount(ctx, book.GUID, domain.Account{
+		Name: "AAPL", Code: "1110", Type: domain.AccountStock,
+		ParentGUID: brokerage.GUID, CommodityGUID: aapl.GUID,
+	})
+	if err != nil {
+		return fmt.Errorf("create AAPL account: %w", err)
+	}
 
 	// 5. Balanced transactions (same currency, so value == quantity).
 	usdAmount := func(cents int64) domain.GncNumeric { return domain.MustFromNumDenom(cents, 100) }
@@ -131,10 +150,36 @@ func run() error {
 		return fmt.Errorf("post groceries: %w", err)
 	}
 
+	// 6. A security purchase: 10 shares of AAPL for $1,500.00 ($150.00/share).
+	// The AAPL leg's quantity (10 shares) differs from its value ($1,500), and the
+	// trading engine balances the per-commodity quantities.
+	shares := func(n int64) domain.GncNumeric { return domain.MustFromNumDenom(n, 1) }
+	buyTx := domain.Transaction{
+		CurrencyGUID: usd.GUID,
+		PostDate:     time.Now().AddDate(0, 0, -3).UTC(),
+		Description:  "Buy 10 AAPL @ 150.00",
+		Splits: []domain.Split{
+			{AccountGUID: aaplAcct.GUID, Value: usdAmount(150000), Quantity: shares(10)},
+			{AccountGUID: checking.GUID, Value: usdAmount(-150000), Quantity: usdAmount(-150000)},
+		},
+	}
+	if _, err := posting.Post(ctx, buyTx, app.AuditActor{BookGUID: book.GUID}); err != nil {
+		return fmt.Errorf("post AAPL buy: %w", err)
+	}
+
+	// 7. A current AAPL quote ($180.00/share) so the portfolio shows a gain.
+	if _, err := price.CreatePrice(ctx, domain.Price{
+		CommodityGUID: aapl.GUID, CurrencyGUID: usd.GUID,
+		Date: time.Now().UTC(), Value: domain.MustFromNumDenom(18000, 100),
+	}); err != nil {
+		return fmt.Errorf("create AAPL price: %w", err)
+	}
+
 	fmt.Printf("Seeded demo book %s\n", book.GUID)
 	fmt.Printf("  Owner (lldap uid): %s\n", ownerUID)
-	fmt.Printf("  Checking account:  %s (balance $950.00)\n", checking.GUID)
+	fmt.Printf("  Checking account:  %s (balance $-550.00)\n", checking.GUID)
 	fmt.Printf("  Groceries account: %s (balance $50.00)\n", groceries.GUID)
+	fmt.Printf("  AAPL holding:      %s (10 shares, cost $1,500, last $1,800)\n", aaplAcct.GUID)
 	fmt.Printf("Log in via Authelia as %q, then browse to /api/v1/books\n", ownerUID)
 	return nil
 }
