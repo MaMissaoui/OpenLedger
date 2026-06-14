@@ -3,16 +3,8 @@ import { api } from "../lib/api";
 import { formatMoney, parseAmount } from "../lib/money";
 import type { Budget, BudgetAmount, BudgetReport, NewBudget, Numeric } from "../lib/types";
 
-// ── helpers ──────────────────────────────────────────────────────────────────
-
 function zero(): Numeric {
   return { num: 0, denom: 100 };
-}
-
-function varianceClass(v: Numeric): string {
-  if (v.num < 0) return "negative";
-  if (v.num > 0) return "positive";
-  return "";
 }
 
 // ── Budget form dialog ────────────────────────────────────────────────────────
@@ -42,7 +34,6 @@ function BudgetForm({ bookGuid, existing, onClose, onSaved }: BudgetFormProps) {
       setError("Name, start date, and a positive number of periods are required.");
       return;
     }
-
     const input: NewBudget = {
       name,
       description,
@@ -51,7 +42,6 @@ function BudgetForm({ bookGuid, existing, onClose, onSaved }: BudgetFormProps) {
       startDate,
       amounts: existing?.amounts ?? [],
     };
-
     setSaving(true);
     try {
       if (existing) {
@@ -69,48 +59,43 @@ function BudgetForm({ bookGuid, existing, onClose, onSaved }: BudgetFormProps) {
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
-        <h2>{existing ? "Edit Budget" : "New Budget"}</h2>
-        {error && <p className="error">{error}</p>}
-        <label>
-          Name
-          <input value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label>
-          Description
-          <input value={description} onChange={(e) => setDescription(e.target.value)} />
-        </label>
-        <label>
-          Period type
-          <select
-            value={periodType}
-            onChange={(e) => setPeriodType(e.target.value as typeof periodType)}
-          >
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="yearly">Yearly</option>
-          </select>
-        </label>
-        <label>
-          Number of periods
-          <input
-            type="number"
-            min={1}
-            value={numPeriods}
-            onChange={(e) => setNumPeriods(e.target.value)}
-          />
-        </label>
-        <label>
-          Start date
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-        </label>
-        <div className="dialog-actions">
-          <button onClick={onClose}>Cancel</button>
-          <button onClick={handleSave} disabled={saving}>
+      <div className="dialog" style={{ width: "min(480px, 100%)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="dialog__header">
+          <h2>{existing ? "Edit Budget" : "New Budget"}</h2>
+          <button className="dialog__close" onClick={onClose}>×</button>
+        </div>
+        <div className="dialog__body">
+          {error && <p className="error">{error}</p>}
+          <label className="field">
+            <span>Name</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. 2025 Annual Budget" />
+          </label>
+          <label className="field">
+            <span>Description</span>
+            <input value={description} onChange={(e) => setDescription(e.target.value)} />
+          </label>
+          <div className="dialog__row">
+            <label className="field">
+              <span>Period type</span>
+              <select value={periodType} onChange={(e) => setPeriodType(e.target.value as typeof periodType)}>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Number of periods</span>
+              <input type="number" min={1} value={numPeriods} onChange={(e) => setNumPeriods(e.target.value)} />
+            </label>
+          </div>
+          <label className="field">
+            <span>Start date</span>
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          </label>
+        </div>
+        <div className="dialog__footer">
+          <button className="btn btn--ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </button>
         </div>
@@ -119,7 +104,7 @@ function BudgetForm({ bookGuid, existing, onClose, onSaved }: BudgetFormProps) {
   );
 }
 
-// ── Budget amounts editor (per-account per-period amounts) ────────────────────
+// ── Budget amounts editor ─────────────────────────────────────────────────────
 
 interface AmountEditorProps {
   budget: Budget;
@@ -128,7 +113,6 @@ interface AmountEditorProps {
 }
 
 function AmountEditor({ budget, onClose, onSaved }: AmountEditorProps) {
-  // Build a period × account grid from existing amounts.
   const [rows, setRows] = useState<BudgetAmount[]>(budget.amounts ?? []);
   const [newAcct, setNewAcct] = useState("");
   const [newPeriod, setNewPeriod] = useState("0");
@@ -179,63 +163,76 @@ function AmountEditor({ budget, onClose, onSaved }: AmountEditorProps) {
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog" style={{ minWidth: 500 }} onClick={(e) => e.stopPropagation()}>
-        <h2>Budget amounts — {budget.name}</h2>
-        {error && <p className="error">{error}</p>}
-        <table className="report-table">
-          <thead>
-            <tr>
-              <th>Account GUID</th>
-              <th>Period #</th>
-              <th>Amount</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => (
-              <tr key={i}>
-                <td>{r.accountGuid}</td>
-                <td>{r.periodNum}</td>
-                <td className="amount">{formatMoney(r.value)}</td>
+      <div
+        className="dialog"
+        style={{ width: "min(560px, 100%)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="dialog__header">
+          <h2>Budget amounts — {budget.name}</h2>
+          <button className="dialog__close" onClick={onClose}>×</button>
+        </div>
+        <div className="dialog__body">
+          {error && <p className="error">{error}</p>}
+          <p className="sub" style={{ margin: 0, fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+            Enter planned amounts per account per period number (0-based).
+          </p>
+          <table className="report-table">
+            <thead>
+              <tr>
+                <th>Account GUID</th>
+                <th>Period #</th>
+                <th className="amount">Amount</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td className="mono" style={{ fontSize: "0.8rem" }}>{r.accountGuid}</td>
+                  <td>{r.periodNum}</td>
+                  <td className="amount">{formatMoney(r.value)}</td>
+                  <td>
+                    <button className="btn btn--ghost btn--xs" onClick={() => removeRow(i)}>Remove</button>
+                  </td>
+                </tr>
+              ))}
+              <tr>
                 <td>
-                  <button onClick={() => removeRow(i)}>×</button>
+                  <input
+                    style={{ width: "100%", fontFamily: "var(--mono)", fontSize: "0.8rem", padding: "0.3rem 0.4rem", border: "1px solid var(--rule-strong)", borderRadius: 2 }}
+                    placeholder="account GUID"
+                    value={newAcct}
+                    onChange={(e) => setNewAcct(e.target.value)}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min={0}
+                    style={{ width: 64, padding: "0.3rem 0.4rem", border: "1px solid var(--rule-strong)", borderRadius: 2 }}
+                    value={newPeriod}
+                    onChange={(e) => setNewPeriod(e.target.value)}
+                  />
+                </td>
+                <td>
+                  <input
+                    placeholder="0.00"
+                    style={{ width: 90, textAlign: "right", fontFamily: "var(--mono)", padding: "0.3rem 0.4rem", border: "1px solid var(--rule-strong)", borderRadius: 2 }}
+                    value={newVal}
+                    onChange={(e) => setNewVal(e.target.value)}
+                  />
+                </td>
+                <td>
+                  <button className="btn btn--ghost btn--xs" onClick={addRow}>+ Add</button>
                 </td>
               </tr>
-            ))}
-            <tr>
-              <td>
-                <input
-                  placeholder="account GUID"
-                  value={newAcct}
-                  onChange={(e) => setNewAcct(e.target.value)}
-                />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  min={0}
-                  value={newPeriod}
-                  onChange={(e) => setNewPeriod(e.target.value)}
-                  style={{ width: 60 }}
-                />
-              </td>
-              <td>
-                <input
-                  placeholder="0.00"
-                  value={newVal}
-                  onChange={(e) => setNewVal(e.target.value)}
-                  style={{ width: 80 }}
-                />
-              </td>
-              <td>
-                <button onClick={addRow}>+</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div className="dialog-actions">
-          <button onClick={onClose}>Cancel</button>
-          <button onClick={handleSave} disabled={saving}>
+            </tbody>
+          </table>
+        </div>
+        <div className="dialog__footer">
+          <button className="btn btn--ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Save amounts"}
           </button>
         </div>
@@ -274,74 +271,75 @@ function ReportPanel({ budgetGuid, onClose }: ReportPanelProps) {
     <div className="dialog-overlay" onClick={onClose}>
       <div
         className="dialog"
-        style={{ minWidth: 600, maxHeight: "80vh", overflowY: "auto" }}
+        style={{ width: "min(640px, 100%)", maxHeight: "80vh", display: "flex", flexDirection: "column" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2>Budget variance report</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-          <label>
-            As of
+        <div className="dialog__header">
+          <h2>Budget variance report</h2>
+          <button className="dialog__close" onClick={onClose}>×</button>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginBottom: 12, flexShrink: 0 }}>
+          <label className="field" style={{ margin: 0 }}>
+            <span>As of date</span>
             <input type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
           </label>
-          <button onClick={loadReport} disabled={loading}>
-            {loading ? "Loading…" : "Run report"}
+          <button className="btn btn--primary btn--sm" onClick={loadReport} disabled={loading}>
+            {loading ? <span className="spinner" /> : "Run report"}
           </button>
         </div>
+
         {error && <p className="error">{error}</p>}
-        {report && (
-          <>
-            <h3>
-              {report.periodLabel} ({report.periodStart} – {report.periodEnd})
-            </h3>
-            <table className="report-table">
-              <thead>
-                <tr>
-                  <th>Account</th>
-                  <th className="amount">Budgeted</th>
-                  <th className="amount">Actual</th>
-                  <th className="amount">Variance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.lines.length === 0 && (
+
+        <div style={{ overflowY: "auto", flex: 1 }}>
+          {report && (
+            <>
+              <p className="eyebrow" style={{ margin: "0 0 0.6rem" }}>
+                {report.periodLabel} &ensp;{report.periodStart} – {report.periodEnd}
+              </p>
+              <table className="report-table">
+                <thead>
                   <tr>
-                    <td colSpan={4} style={{ textAlign: "center", color: "#888" }}>
-                      No budget amounts for this period.
+                    <th>Account</th>
+                    <th className="amount">Budgeted</th>
+                    <th className="amount">Actual</th>
+                    <th className="amount">Variance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.lines.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="empty">No budget amounts for this period.</td>
+                    </tr>
+                  )}
+                  {report.lines.map((l, i) => (
+                    <tr key={i}>
+                      <td>{l.account.name}</td>
+                      <td className="amount mono">{formatMoney(l.budgeted)}</td>
+                      <td className="amount mono">{formatMoney(l.actual)}</td>
+                      <td className={`amount mono ${l.variance.num < 0 ? "neg" : ""}`}>
+                        {formatMoney(l.variance)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td><strong>Total</strong></td>
+                    <td className="amount mono"><strong>{formatMoney(report.totalBudgeted ?? zero())}</strong></td>
+                    <td className="amount mono"><strong>{formatMoney(report.totalActual ?? zero())}</strong></td>
+                    <td className={`amount mono ${(report.totalVariance?.num ?? 0) < 0 ? "neg" : ""}`}>
+                      <strong>{formatMoney(report.totalVariance ?? zero())}</strong>
                     </td>
                   </tr>
-                )}
-                {report.lines.map((l, i) => (
-                  <tr key={i}>
-                    <td>{l.account.name}</td>
-                    <td className="amount">{formatMoney(l.budgeted)}</td>
-                    <td className="amount">{formatMoney(l.actual)}</td>
-                    <td className={`amount ${varianceClass(l.variance)}`}>
-                      {formatMoney(l.variance)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>
-                    <strong>Total</strong>
-                  </td>
-                  <td className="amount">
-                    <strong>{formatMoney(report.totalBudgeted ?? zero())}</strong>
-                  </td>
-                  <td className="amount">
-                    <strong>{formatMoney(report.totalActual ?? zero())}</strong>
-                  </td>
-                  <td className={`amount ${varianceClass(report.totalVariance ?? zero())}`}>
-                    <strong>{formatMoney(report.totalVariance ?? zero())}</strong>
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </>
-        )}
-        <div className="dialog-actions">
-          <button onClick={onClose}>Close</button>
+                </tfoot>
+              </table>
+            </>
+          )}
+        </div>
+
+        <div className="dialog__footer">
+          <button className="btn btn--ghost" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>
@@ -381,7 +379,7 @@ export default function BudgetView({ bookGuid }: BudgetViewProps) {
   });
 
   async function handleDelete(guid: string) {
-    if (!confirm("Delete this budget?")) return;
+    if (!confirm("Delete this budget and all its amounts?")) return;
     try {
       await api.deleteBudget(guid);
       await load();
@@ -394,54 +392,63 @@ export default function BudgetView({ bookGuid }: BudgetViewProps) {
     <div className="budget-view">
       <div className="view-header">
         <h2>Budgets</h2>
-        <button onClick={() => setShowForm(true)}>+ New budget</button>
+        <button className="btn btn--primary btn--sm" onClick={() => setShowForm(true)}>
+          + New budget
+        </button>
       </div>
 
-      {loading && <p>Loading…</p>}
-      {error && <p className="error">{error}</p>}
+      <div style={{ padding: "1.2rem 2rem", overflowY: "auto", flex: 1 }}>
+        {error && <p className="error">{error}</p>}
 
-      {!loading && budgets.length === 0 && (
-        <p style={{ color: "#888" }}>No budgets yet. Create one to get started.</p>
-      )}
+        {loading && (
+          <div className="empty"><span className="spinner" /></div>
+        )}
 
-      {budgets.length > 0 && (
-        <table className="report-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Period</th>
-              <th>Periods</th>
-              <th>Start</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {budgets.map((b) => (
-              <tr key={b.guid}>
-                <td>{b.name}</td>
-                <td style={{ textTransform: "capitalize" }}>{b.periodType}</td>
-                <td>{b.numPeriods}</td>
-                <td>{b.startDate}</td>
-                <td style={{ display: "flex", gap: 6 }}>
-                  <button onClick={() => setReportTarget(b.guid)}>Report</button>
-                  <button onClick={() => setAmountsTarget(b)}>Amounts</button>
-                  <button onClick={() => setEditTarget(b)}>Edit</button>
-                  <button onClick={() => void handleDelete(b.guid)}>Delete</button>
-                </td>
+        {!loading && budgets.length === 0 && (
+          <div className="empty">No budgets yet. Create one to get started.</div>
+        )}
+
+        {budgets.length > 0 && (
+          <table className="report-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Period</th>
+                <th>Periods</th>
+                <th>Start date</th>
+                <th></th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {budgets.map((b) => (
+                <tr key={b.guid}>
+                  <td style={{ fontWeight: 600 }}>{b.name}</td>
+                  <td style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>{b.description || "—"}</td>
+                  <td style={{ textTransform: "capitalize" }}>{b.periodType}</td>
+                  <td>{b.numPeriods}</td>
+                  <td className="mono" style={{ fontSize: "0.85rem" }}>{b.startDate}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <button className="btn btn--ghost btn--xs" onClick={() => setReportTarget(b.guid)}>Report</button>
+                    {" "}
+                    <button className="btn btn--ghost btn--xs" onClick={() => setAmountsTarget(b)}>Amounts</button>
+                    {" "}
+                    <button className="btn btn--ghost btn--xs" onClick={() => setEditTarget(b)}>Edit</button>
+                    {" "}
+                    <button className="btn btn--ghost btn--xs" onClick={() => void handleDelete(b.guid)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
       {showForm && (
         <BudgetForm
           bookGuid={bookGuid}
           onClose={() => setShowForm(false)}
-          onSaved={() => {
-            setShowForm(false);
-            void load();
-          }}
+          onSaved={() => { setShowForm(false); void load(); }}
         />
       )}
       {editTarget && (
@@ -449,20 +456,14 @@ export default function BudgetView({ bookGuid }: BudgetViewProps) {
           bookGuid={bookGuid}
           existing={editTarget}
           onClose={() => setEditTarget(null)}
-          onSaved={() => {
-            setEditTarget(null);
-            void load();
-          }}
+          onSaved={() => { setEditTarget(null); void load(); }}
         />
       )}
       {amountsTarget && (
         <AmountEditor
           budget={amountsTarget}
           onClose={() => setAmountsTarget(null)}
-          onSaved={() => {
-            setAmountsTarget(null);
-            void load();
-          }}
+          onSaved={() => { setAmountsTarget(null); void load(); }}
         />
       )}
       {reportTarget && (
