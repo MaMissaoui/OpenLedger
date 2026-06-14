@@ -135,8 +135,10 @@ export const api = {
     const q = params.toString() ? `?${params}` : "";
     return request<IncomeStatement>(`/api/v1/books/${bookGuid}/reports/income-statement${q}`);
   },
-  // URL of the GnuCash SQLite export for a book. It's a plain authenticated GET,
-  // so the browser can download it directly via an <a download> (the same-origin
-  // Authelia session cookie is sent automatically).
-  exportGnuCashUrl: (bookGuid: string) => `/api/v1/books/${bookGuid}/export/gnucash`,
+  // URL of the GnuCash export for a book in the given format ("sqlite" by
+  // default, or "xml"). It's a plain authenticated GET, so the browser can
+  // download it directly via an <a download> (the same-origin Authelia session
+  // cookie is sent automatically).
+  exportGnuCashUrl: (bookGuid: string, format: "sqlite" | "xml" = "sqlite") =>
+    `/api/v1/books/${bookGuid}/export/gnucash${format === "xml" ? "?format=xml" : ""}`,
 };

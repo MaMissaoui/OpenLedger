@@ -76,7 +76,14 @@ export function Ledger() {
             href={api.exportGnuCashUrl(book.guid)}
             download={`${book.guid}.gnucash`}
           >
-            Export
+            Export SQLite
+          </a>
+          <a
+            className="btn btn--ghost btn--sm"
+            href={api.exportGnuCashUrl(book.guid, "xml")}
+            download={`${book.guid}.gnucash`}
+          >
+            Export XML
           </a>
           <a
             className="btn btn--ghost btn--sm"
