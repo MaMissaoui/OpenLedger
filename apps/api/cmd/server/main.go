@@ -44,8 +44,9 @@ func main() {
 	importer := app.NewImportService(gnucash.NewReader(), repo)
 	exporter := app.NewExportService(repo, gnucash.NewWriter())
 	reconciler := app.NewReconcileService(repo)
+	portfolio := app.NewPortfolioService(repo)
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer, exporter, reconciler)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer, exporter, reconciler, portfolio)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

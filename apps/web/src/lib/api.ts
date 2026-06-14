@@ -5,6 +5,7 @@ import type {
   Commodity,
   IncomeStatement,
   Numeric,
+  Portfolio,
   Price,
   RegisterPage,
   Transaction,
@@ -135,6 +136,8 @@ export const api = {
     const q = params.toString() ? `?${params}` : "";
     return request<IncomeStatement>(`/api/v1/books/${bookGuid}/reports/income-statement${q}`);
   },
+  getPortfolio: (bookGuid: string) =>
+    request<Portfolio>(`/api/v1/books/${bookGuid}/reports/portfolio`),
   // URL of the GnuCash export for a book in the given format ("sqlite" by
   // default, or "xml"). It's a plain authenticated GET, so the browser can
   // download it directly via an <a download> (the same-origin Authelia session

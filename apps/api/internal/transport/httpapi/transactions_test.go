@@ -36,6 +36,11 @@ type fakeRepo struct {
 	listAccounts []app.AccountWithBalance
 	reportRows   []app.AccountWithBalance // returned by AccountBalances
 
+	// Portfolio side. holdings is returned by SecurityHoldings; latestPrices maps
+	// a commodity GUID to its most recent quote (absent → no quote).
+	holdings     []app.HoldingBalance
+	latestPrices map[string]domain.Price
+
 	// Import side. readerData/readerErr drive the fake GnuCashReader;
 	// importedData captures what ImportBook persisted, and importErr forces a
 	// repository failure.
@@ -190,6 +195,15 @@ func (f *fakeRepo) BookRootAccount(_ context.Context, _ string) (string, error) 
 	return f.bookRoot, nil
 }
 
+func (f *fakeRepo) SecurityHoldings(_ context.Context, _ string) ([]app.HoldingBalance, error) {
+	return f.holdings, nil
+}
+
+func (f *fakeRepo) LatestPrice(_ context.Context, commodityGUID string) (domain.Price, bool, error) {
+	p, ok := f.latestPrices[commodityGUID]
+	return p, ok, nil
+}
+
 func (f *fakeRepo) ListAccountsUnderRoot(_ context.Context, _ string) ([]app.AccountWithBalance, error) {
 	return f.listAccounts, nil
 }
@@ -258,6 +272,7 @@ func newTestServer(repo *fakeRepo) http.Handler {
 		app.NewImportService(repo, repo),
 		app.NewExportService(repo, &fakeWriter{}),
 		app.NewReconcileService(repo),
+		app.NewPortfolioService(repo),
 	).Routes()
 }
 

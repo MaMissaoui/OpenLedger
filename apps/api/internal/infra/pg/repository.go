@@ -855,6 +855,117 @@ func scanAccountBalances(rows pgx.Rows) ([]app.AccountWithBalance, error) {
 	return accounts, rows.Err()
 }
 
+// securityHoldingsTree is the recursive CTE selecting every STOCK/MUTUAL
+// descendant of a root account; both the share-quantity and cost-basis queries
+// build on it so they cover the same set of security accounts.
+const securityHoldingsTree = `
+WITH RECURSIVE tree AS (
+    SELECT guid, name, account_type, commodity_guid, parent_guid, code, description, hidden, placeholder
+    FROM accounts WHERE parent_guid = $1
+    UNION ALL
+    SELECT a.guid, a.name, a.account_type, a.commodity_guid, a.parent_guid, a.code, a.description, a.hidden, a.placeholder
+    FROM accounts a JOIN tree t ON a.parent_guid = t.guid
+)`
+
+// SecurityHoldings returns every STOCK/MUTUAL descendant of rootGUID with its
+// share quantity (summed at the account's commodity fraction) and its cost
+// basis. Cost basis is the sum of split values; because value is stored at each
+// transaction's currency fraction, the values are summed per denominator in SQL
+// and combined exactly with GncNumeric, so a mixed-currency cost basis stays
+// exact rather than collapsing onto one denominator.
+func (r *Repository) SecurityHoldings(ctx context.Context, rootGUID string) ([]app.HoldingBalance, error) {
+	shareRows, err := r.pool.Query(ctx, securityHoldingsTree+`
+SELECT t.guid, t.name, t.account_type, t.commodity_guid, t.parent_guid, t.code, t.description, t.hidden, t.placeholder,
+       COALESCE(SUM(s.quantity_num), 0) AS shares_num,
+       COALESCE(c.fraction, 1)          AS shares_denom
+FROM tree t
+LEFT JOIN commodities c ON c.guid = t.commodity_guid
+LEFT JOIN splits s      ON s.account_guid = t.guid
+WHERE t.account_type IN ('STOCK', 'MUTUAL')
+GROUP BY t.guid, t.name, t.account_type, t.commodity_guid, t.parent_guid, t.code, t.description, t.hidden, t.placeholder, c.fraction
+ORDER BY t.code, t.name`, rootGUID)
+	if err != nil {
+		return nil, fmt.Errorf("security holdings: %w", err)
+	}
+	balances, err := scanAccountBalances(shareRows)
+	if err != nil {
+		return nil, err
+	}
+
+	// Cost basis: one row per (account, value_denom); fold them into an exact
+	// per-account total.
+	costRows, err := r.pool.Query(ctx, securityHoldingsTree+`
+SELECT s.account_guid, s.value_denom, COALESCE(SUM(s.value_num), 0)
+FROM tree t
+JOIN splits s ON s.account_guid = t.guid
+WHERE t.account_type IN ('STOCK', 'MUTUAL')
+GROUP BY s.account_guid, s.value_denom`, rootGUID)
+	if err != nil {
+		return nil, fmt.Errorf("security cost basis: %w", err)
+	}
+	defer costRows.Close()
+
+	cost := make(map[string]domain.GncNumeric)
+	for costRows.Next() {
+		var (
+			accountGUID string
+			denom, num  int64
+		)
+		if err := costRows.Scan(&accountGUID, &denom, &num); err != nil {
+			return nil, fmt.Errorf("scan cost basis: %w", err)
+		}
+		part, err := domain.FromNumDenom(num, denom)
+		if err != nil {
+			return nil, fmt.Errorf("cost basis for %s: %w", accountGUID, err)
+		}
+		cost[accountGUID] = cost[accountGUID].Add(part)
+	}
+	if err := costRows.Err(); err != nil {
+		return nil, err
+	}
+
+	holdings := make([]app.HoldingBalance, 0, len(balances))
+	for _, b := range balances {
+		holdings = append(holdings, app.HoldingBalance{
+			Account:    b.Account,
+			Shares:     b.Balance,
+			ShareScale: b.BalanceScale,
+			CostBasis:  cost[b.Account.GUID],
+		})
+	}
+	return holdings, nil
+}
+
+// LatestPrice returns a commodity's most recent quote, or ok=false when the
+// commodity has no quotes.
+func (r *Repository) LatestPrice(ctx context.Context, commodityGUID string) (domain.Price, bool, error) {
+	var (
+		p                 domain.Price
+		source, priceType *string
+		valueNum, valDen  int64
+	)
+	err := r.pool.QueryRow(ctx,
+		`SELECT guid, commodity_guid, currency_guid, date, source, type, value_num, value_denom
+		 FROM prices WHERE commodity_guid = $1 ORDER BY date DESC LIMIT 1`, commodityGUID,
+	).Scan(&p.GUID, &p.CommodityGUID, &p.CurrencyGUID, &p.Date, &source, &priceType, &valueNum, &valDen)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Price{}, false, nil
+	}
+	if err != nil {
+		return domain.Price{}, false, fmt.Errorf("latest price: %w", err)
+	}
+	if source != nil {
+		p.Source = *source
+	}
+	if priceType != nil {
+		p.Type = *priceType
+	}
+	if p.Value, err = domain.FromNumDenom(valueNum, valDen); err != nil {
+		return domain.Price{}, false, fmt.Errorf("price %s value: %w", p.GUID, err)
+	}
+	return p, true, nil
+}
+
 // FindOrCreateLDAPUser returns the UUID for an LDAP-authenticated user. On the
 // first call for a given ldapUID it creates an organization and user row so the
 // rest of the membership/authz system has a stable identifier to work with.

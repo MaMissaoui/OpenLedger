@@ -158,6 +158,33 @@ paths:
           description: The authenticated user has no membership on this book
         "404":
           description: Book not found
+  /api/v1/books/{id}/reports/portfolio:
+    get:
+      summary: Portfolio (security holdings) report
+      description: >
+        Lists every STOCK/MUTUAL account in the book with its share quantity and
+        cost basis, plus a market valuation derived from each commodity's most
+        recent price quote. Holdings without a quote omit the market-value fields
+        (hasPrice is false). Market values are not converted across currencies, so
+        a holding is valued only in its own quote's currency.
+      operationId: getPortfolio
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The portfolio report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Portfolio"
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
   /api/v1/accounts:
     post:
       summary: Create an account in a book
@@ -703,6 +730,40 @@ components:
           allOf:
             - $ref: "#/components/schemas/Numeric"
           description: Total income minus total expense.
+    Portfolio:
+      type: object
+      description: Security-holdings report for a book.
+      properties:
+        bookGuid:
+          type: string
+        holdings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Holding"
+    Holding:
+      type: object
+      description: >-
+        One security position. shares is in the account's commodity; costBasis,
+        price, marketValue and unrealizedGain are in the quote currency. When
+        hasPrice is false the market-value fields are absent.
+      required: [account, shares, costBasis, hasPrice]
+      properties:
+        account:
+          $ref: "#/components/schemas/Account"
+        shares:
+          $ref: "#/components/schemas/Numeric"
+        costBasis:
+          $ref: "#/components/schemas/Numeric"
+        hasPrice:
+          type: boolean
+        price:
+          $ref: "#/components/schemas/Numeric"
+        priceCurrencyGuid:
+          type: string
+        marketValue:
+          $ref: "#/components/schemas/Numeric"
+        unrealizedGain:
+          $ref: "#/components/schemas/Numeric"
     Numeric:
       type: object
       description: Exact rational amount (numerator/denominator).

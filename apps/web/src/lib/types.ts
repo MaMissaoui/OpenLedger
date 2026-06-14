@@ -87,6 +87,25 @@ export interface IncomeStatement {
   netIncome: Numeric;
 }
 
+// One security position in the portfolio report. shares is in the account's
+// commodity; the money fields are in the quote currency. When hasPrice is false
+// the holding has no quote and the market-value fields are absent.
+export interface Holding {
+  account: Account;
+  shares: Numeric;
+  costBasis: Numeric;
+  hasPrice: boolean;
+  price?: Numeric;
+  priceCurrencyGuid?: string;
+  marketValue?: Numeric;
+  unrealizedGain?: Numeric;
+}
+
+export interface Portfolio {
+  bookGuid: string;
+  holdings: Holding[];
+}
+
 export interface TransactionSplit {
   guid: string;
   accountGuid: string;
@@ -139,6 +158,8 @@ export const ACCOUNT_TYPES = [
   "EQUITY",
   "RECEIVABLE",
   "PAYABLE",
+  "STOCK",
+  "MUTUAL",
 ] as const;
 
 // The five top-level buckets a chart of accounts rolls up into, in the order a

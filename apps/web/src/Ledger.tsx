@@ -5,7 +5,9 @@ import { SetupLedger } from "./SetupLedger";
 import { AccountTree } from "./components/AccountTree";
 import { RegisterView } from "./components/RegisterView";
 import { ReportsView } from "./components/ReportsView";
+import { PortfolioView } from "./components/PortfolioView";
 import { TransactionDialog } from "./components/TransactionDialog";
+import { TradeSecurityDialog } from "./components/TradeSecurityDialog";
 import { NewAccountDialog } from "./components/NewAccountDialog";
 
 export function Ledger() {
@@ -22,7 +24,8 @@ export function Ledger() {
   const [showNewTx, setShowNewTx] = useState(false);
   const [editTxGuid, setEditTxGuid] = useState<string | null>(null);
   const [showNewAccount, setShowNewAccount] = useState(false);
-  const [view, setView] = useState<"ledger" | "reports">("ledger");
+  const [showTrade, setShowTrade] = useState(false);
+  const [view, setView] = useState<"ledger" | "reports" | "portfolio">("ledger");
 
   const postable = (accounts.data ?? []).filter((a) => !a.placeholder && a.type !== "ROOT");
 
@@ -68,6 +71,12 @@ export function Ledger() {
           >
             Reports
           </button>
+          <button
+            className={`topbar__tab${view === "portfolio" ? " topbar__tab--active" : ""}`}
+            onClick={() => setView("portfolio")}
+          >
+            Portfolio
+          </button>
         </nav>
         <div className="topbar__right">
           <span className="topbar__user mono">book {book.guid.slice(0, 8)}…</span>
@@ -96,6 +105,8 @@ export function Ledger() {
 
       {view === "reports" ? (
         <ReportsView book={book} />
+      ) : view === "portfolio" ? (
+        <PortfolioView book={book} onTrade={() => setShowTrade(true)} />
       ) : (
         <div className="workspace">
           <AccountTree
@@ -141,6 +152,9 @@ export function Ledger() {
           accounts={accounts.data ?? []}
           onClose={() => setShowNewAccount(false)}
         />
+      )}
+      {showTrade && (
+        <TradeSecurityDialog accounts={postable} onClose={() => setShowTrade(false)} />
       )}
     </div>
   );
