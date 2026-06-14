@@ -420,11 +420,14 @@ paths:
           description: The file contains one or more unbalanced transactions
   /api/v1/books/{id}/export/gnucash:
     get:
-      summary: Export a book as a GnuCash SQLite file
+      summary: Export a book as a GnuCash file
       description: >
-        Streams the book back as a GnuCash SQLite database, preserving GnuCash
-        GUIDs and storing each amount at its commodity's fraction, so the file
-        can be re-imported by GnuCash or OpenLedger.
+        Streams the book back as a GnuCash file, preserving GnuCash GUIDs and
+        storing each amount at its commodity's fraction, so the file can be
+        re-imported by GnuCash or OpenLedger. The on-disk format is chosen by the
+        `format` query parameter: `sqlite` (the default, highest-fidelity target)
+        or `xml` (the portable, human-readable form; commodity GUIDs and the
+        template root are not preserved in XML).
       operationId: exportGnuCash
       parameters:
         - name: id
@@ -432,14 +435,28 @@ paths:
           required: true
           schema:
             type: string
+        - name: format
+          in: query
+          required: false
+          description: The on-disk GnuCash format to export.
+          schema:
+            type: string
+            enum: [sqlite, xml]
+            default: sqlite
       responses:
         "200":
-          description: The book as a GnuCash SQLite database
+          description: The book as a GnuCash file in the requested format
           content:
             application/x-sqlite3:
               schema:
                 type: string
                 format: binary
+            application/xml:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Unsupported format value
         "403":
           description: The authenticated user has no membership on this book
         "404":

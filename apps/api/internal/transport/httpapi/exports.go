@@ -9,12 +9,24 @@ import (
 	"github.com/openledger/openledger/apps/api/internal/app"
 )
 
-// handleExportGnuCash exports a book as a GnuCash SQLite file and streams it
-// back as a download. The writer needs a path, so the database is built in a
-// temp file which is removed once it has been sent.
+// handleExportGnuCash exports a book as a GnuCash file and streams it back as a
+// download. The on-disk format is chosen by the optional ?format= query
+// parameter: "sqlite" (the default, highest-fidelity target) or "xml" (the
+// portable, human-readable form). The writer needs a path, so the file is built
+// in a temp file which is removed once it has been sent.
 func (s *Server) handleExportGnuCash(w http.ResponseWriter, r *http.Request) {
 	bookGUID := r.PathValue("id")
 	if !s.authorizeBook(w, r, bookGUID, app.AccessRead) {
+		return
+	}
+
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "sqlite"
+	}
+	contentType, ok := exportContentTypes[format]
+	if !ok {
+		writeError(w, http.StatusBadRequest, `format must be "sqlite" or "xml"`)
 		return
 	}
 
@@ -29,16 +41,30 @@ func (s *Server) handleExportGnuCash(w http.ResponseWriter, r *http.Request) {
 	_ = tmp.Close()
 	defer func() { _ = os.Remove(path) }()
 
-	switch err := s.exporter.ExportSQLite(r.Context(), bookGUID, path); {
-	case errors.Is(err, app.ErrBookNotFound):
+	var exportErr error
+	switch format {
+	case "xml":
+		exportErr = s.exporter.ExportXML(r.Context(), bookGUID, path)
+	default:
+		exportErr = s.exporter.ExportSQLite(r.Context(), bookGUID, path)
+	}
+	switch {
+	case errors.Is(exportErr, app.ErrBookNotFound):
 		writeError(w, http.StatusNotFound, "book not found")
 		return
-	case err != nil:
+	case exportErr != nil:
 		writeError(w, http.StatusInternalServerError, "could not export book")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/x-sqlite3")
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.gnucash"`, bookGUID))
 	http.ServeFile(w, r, path)
+}
+
+// exportContentTypes maps each supported export format to its MIME type, and
+// doubles as the allow-list of valid ?format= values.
+var exportContentTypes = map[string]string{
+	"sqlite": "application/x-sqlite3",
+	"xml":    "application/xml",
 }

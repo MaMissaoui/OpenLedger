@@ -215,15 +215,26 @@ func (f *fakeRepo) LoadBook(_ context.Context, _ string) (app.GnuCashData, error
 }
 
 // fakeWriter is a stub GnuCashWriter that records what it was asked to write and
-// creates a placeholder file at the path so the handler can stream it back.
+// creates a placeholder file at the path so the handler can stream it back. The
+// file content carries the format token so handler dispatch can be asserted.
 type fakeWriter struct {
-	wrote *app.GnuCashData
+	wrote  *app.GnuCashData
+	format string
 }
 
 func (fw *fakeWriter) WriteGnuCashSQLite(_ context.Context, path string, data app.GnuCashData) error {
+	return fw.record("sqlite", path, data)
+}
+
+func (fw *fakeWriter) WriteGnuCashXML(_ context.Context, path string, data app.GnuCashData) error {
+	return fw.record("xml", path, data)
+}
+
+func (fw *fakeWriter) record(format, path string, data app.GnuCashData) error {
 	cp := data
 	fw.wrote = &cp
-	return os.WriteFile(path, []byte("gnucash-export"), 0o600)
+	fw.format = format
+	return os.WriteFile(path, []byte("gnucash-export:"+format), 0o600)
 }
 
 func (f *fakeRepo) ImportBook(_ context.Context, data app.GnuCashData, _ string) error {

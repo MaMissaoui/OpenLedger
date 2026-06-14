@@ -2,11 +2,13 @@ package app
 
 import "context"
 
-// GnuCashWriter writes a parsed book out as a GnuCash file. The SQLite
-// implementation lives in internal/infra/gnucash; defining the port here keeps
-// the use-case independent of the file format.
+// GnuCashWriter writes a parsed book out as a GnuCash file. Implementations live
+// in internal/infra/gnucash; defining the port here keeps the use-case
+// independent of the on-disk format. SQLite is the higher-fidelity target; XML
+// is the portable, human-readable alternative.
 type GnuCashWriter interface {
 	WriteGnuCashSQLite(ctx context.Context, path string, data GnuCashData) error
+	WriteGnuCashXML(ctx context.Context, path string, data GnuCashData) error
 }
 
 // ExportRepository loads a whole book — its accounts (including roots), the
@@ -36,4 +38,14 @@ func (s *ExportService) ExportSQLite(ctx context.Context, bookGUID, path string)
 		return err
 	}
 	return s.writer.WriteGnuCashSQLite(ctx, path, data)
+}
+
+// ExportXML loads the book and writes it as a GnuCash XML document at path. It
+// returns ErrBookNotFound if the book does not exist.
+func (s *ExportService) ExportXML(ctx context.Context, bookGUID, path string) error {
+	data, err := s.repo.LoadBook(ctx, bookGUID)
+	if err != nil {
+		return err
+	}
+	return s.writer.WriteGnuCashXML(ctx, path, data)
 }
