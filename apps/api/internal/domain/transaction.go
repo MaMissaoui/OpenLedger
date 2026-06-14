@@ -14,6 +14,23 @@ const (
 	ReconcileVoid    ReconcileState = 'v'
 )
 
+// IsValid reports whether r is a known GnuCash reconcile-state flag.
+func (r ReconcileState) IsValid() bool {
+	switch r {
+	case ReconcileNew, ReconcileCleared, ReconcileYes, ReconcileFrozen, ReconcileVoid:
+		return true
+	default:
+		return false
+	}
+}
+
+// SetsReconcileDate reports whether moving a split to this state records a
+// reconcile timestamp. Cleared and reconciled splits carry a date; an unmarked
+// (new) split does not.
+func (r ReconcileState) SetsReconcileDate() bool {
+	return r == ReconcileCleared || r == ReconcileYes
+}
+
 // Transaction is a dated economic event denominated in one currency. Its splits
 // must balance to zero in that currency (see ValidateBalanced). It corresponds
 // to a row in GnuCash's transactions table plus its child splits.

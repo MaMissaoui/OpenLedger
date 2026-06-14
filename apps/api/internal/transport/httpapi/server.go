@@ -10,20 +10,21 @@ import (
 
 // Server holds the dependencies the HTTP handlers need.
 type Server struct {
-	posting   *app.PostingService
-	ledger    *app.LedgerService
-	structure *app.StructureService
-	price     *app.PriceService
-	report    *app.ReportService
-	provision *app.ProvisionService
-	authz     *app.AuthzService
-	importer  *app.ImportService
-	exporter  *app.ExportService
+	posting    *app.PostingService
+	ledger     *app.LedgerService
+	structure  *app.StructureService
+	price      *app.PriceService
+	report     *app.ReportService
+	provision  *app.ProvisionService
+	authz      *app.AuthzService
+	importer   *app.ImportService
+	exporter   *app.ExportService
+	reconciler *app.ReconcileService
 }
 
 // NewServer builds a Server from its service dependencies.
-func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService) *Server {
-	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, report: report, provision: provision, authz: authz, importer: importer, exporter: exporter}
+func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService, reconciler *app.ReconcileService) *Server {
+	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, report: report, provision: provision, authz: authz, importer: importer, exporter: exporter, reconciler: reconciler}
 }
 
 // Routes returns the configured HTTP handler. /healthz is public; every
@@ -45,6 +46,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("PATCH /api/v1/transactions/{id}", s.requireAuth(s.handleUpdateTransaction))
 	mux.HandleFunc("DELETE /api/v1/transactions/{id}", s.requireAuth(s.handleDeleteTransaction))
 	mux.HandleFunc("GET /api/v1/accounts/{id}/register", s.requireAuth(s.handleAccountRegister))
+	mux.HandleFunc("PATCH /api/v1/splits/{id}/reconcile", s.requireAuth(s.handleReconcileSplit))
 	mux.HandleFunc("GET /api/v1/prices", s.requireAuth(s.handleListPrices))
 	mux.HandleFunc("POST /api/v1/prices", s.requireAuth(s.handleCreatePrice))
 	mux.HandleFunc("POST /api/v1/imports/gnucash", s.requireAuth(s.handleImportGnuCash))
