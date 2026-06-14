@@ -73,6 +73,13 @@ export function Ledger() {
           <span className="topbar__user mono">book {book.guid.slice(0, 8)}…</span>
           <a
             className="btn btn--ghost btn--sm"
+            href={api.exportGnuCashUrl(book.guid)}
+            download={`${book.guid}.gnucash`}
+          >
+            Export
+          </a>
+          <a
+            className="btn btn--ghost btn--sm"
             href={`${import.meta.env.VITE_AUTHELIA_PORTAL_URL ?? "http://auth.openledger.localhost"}/logout`}
           >
             Sign out
