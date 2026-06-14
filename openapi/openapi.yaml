@@ -200,6 +200,52 @@ paths:
           description: A split references an unknown account
         "422":
           description: Transaction does not balance to zero
+  /api/v1/transactions/{id}:
+    patch:
+      summary: Replace a transaction and its splits
+      description: >
+        Wholesale replacement: the body has the same shape as a new
+        transaction and overwrites the existing fields and all splits. The
+        balance invariant is re-checked (422 on imbalance). The original
+        enter_date is preserved.
+      operationId: updateTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewTransaction"
+      responses:
+        "200":
+          description: Transaction updated
+        "403":
+          description: The user lacks editor+ on a book the old or new splits touch
+        "404":
+          description: Transaction not found, or a split references an unknown account
+        "422":
+          description: Transaction does not balance to zero
+    delete:
+      summary: Delete a transaction and its splits
+      operationId: deleteTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Transaction deleted
+        "403":
+          description: The user lacks editor+ on a book the transaction's splits touch
+        "404":
+          description: Transaction not found
   /api/v1/accounts/{id}/register:
     get:
       summary: Paginated account register with running balances

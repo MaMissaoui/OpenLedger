@@ -75,6 +75,98 @@ func (s *Server) handlePostTransaction(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleUpdateTransaction replaces a transaction wholesale (its fields and all
+// splits) and re-validates the balance invariant. The request body has the same
+// shape as a new transaction.
+func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request) {
+	guid := r.PathValue("id")
+
+	// Authorize against the transaction's *current* accounts first (404 if it
+	// does not exist), so a caller can only edit transactions in books they may
+	// write to.
+	existing, err := s.posting.TransactionAccounts(r.Context(), guid)
+	switch {
+	case errors.Is(err, app.ErrTransactionNotFound):
+		writeError(w, http.StatusNotFound, "transaction not found")
+		return
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "could not load transaction")
+		return
+	}
+	if !s.authorizeAccounts(w, r, existing, app.AccessWrite) {
+		return
+	}
+
+	var dto newTransactionDTO
+	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	tx, err := dto.toDomain()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	tx.GUID = guid
+
+	// Also authorize against the new accounts, so splits cannot be moved into a
+	// book the caller may not write to.
+	newAccounts := make([]string, 0, len(tx.Splits))
+	for _, sp := range tx.Splits {
+		newAccounts = append(newAccounts, sp.AccountGUID)
+	}
+	if !s.authorizeAccounts(w, r, newAccounts, app.AccessWrite) {
+		return
+	}
+
+	updated, err := s.posting.Update(r.Context(), tx, actorFromContext(r.Context()))
+	switch {
+	case errors.Is(err, domain.ErrUnbalanced):
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	case errors.Is(err, app.ErrTransactionNotFound):
+		writeError(w, http.StatusNotFound, "transaction not found")
+		return
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "could not update transaction")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"guid":   updated.GUID,
+		"splits": len(updated.Splits),
+	})
+}
+
+// handleDeleteTransaction removes a transaction and its splits.
+func (s *Server) handleDeleteTransaction(w http.ResponseWriter, r *http.Request) {
+	guid := r.PathValue("id")
+
+	existing, err := s.posting.TransactionAccounts(r.Context(), guid)
+	switch {
+	case errors.Is(err, app.ErrTransactionNotFound):
+		writeError(w, http.StatusNotFound, "transaction not found")
+		return
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "could not load transaction")
+		return
+	}
+	if !s.authorizeAccounts(w, r, existing, app.AccessWrite) {
+		return
+	}
+
+	switch err := s.posting.Delete(r.Context(), guid, actorFromContext(r.Context())); {
+	case errors.Is(err, app.ErrTransactionNotFound):
+		writeError(w, http.StatusNotFound, "transaction not found")
+		return
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "could not delete transaction")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // toDomain validates request-shape requirements and maps the DTO to a domain
 // transaction. The accounting balance check happens later in PostingService.
 func (dto newTransactionDTO) toDomain() (domain.Transaction, error) {

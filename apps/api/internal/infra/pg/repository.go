@@ -36,18 +36,6 @@ func NewRepository(pool *pgxpool.Pool) *Repository { return &Repository{pool: po
 // which is the correct rejection for, say, $50.001.
 func (r *Repository) InsertTransaction(ctx context.Context, t domain.Transaction, actor app.AuditActor) error {
 	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
-		var currencyFraction int64
-		if err := tx.QueryRow(ctx,
-			`SELECT fraction FROM commodities WHERE guid = $1`, t.CurrencyGUID,
-		).Scan(&currencyFraction); err != nil {
-			return fmt.Errorf("lookup currency fraction for %s: %w", t.CurrencyGUID, err)
-		}
-
-		accountFractions, err := r.accountFractions(ctx, tx, t.Splits)
-		if err != nil {
-			return err
-		}
-
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO transactions (guid, currency_guid, num, post_date, enter_date, description)
 			 VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -55,48 +43,156 @@ func (r *Repository) InsertTransaction(ctx context.Context, t domain.Transaction
 		); err != nil {
 			return fmt.Errorf("insert transaction: %w", err)
 		}
-
-		for _, s := range t.Splits {
-			valueNum, err := s.Value.AtDenom(currencyFraction)
-			if err != nil {
-				return fmt.Errorf("split %s value: %w", s.GUID, err)
-			}
-			accFraction, ok := accountFractions[s.AccountGUID]
-			if !ok {
-				return fmt.Errorf("split %s: unknown account %s", s.GUID, s.AccountGUID)
-			}
-			qtyNum, err := s.Quantity.AtDenom(accFraction)
-			if err != nil {
-				return fmt.Errorf("split %s quantity: %w", s.GUID, err)
-			}
-			if _, err := tx.Exec(ctx,
-				`INSERT INTO splits
-				   (guid, tx_guid, account_guid, memo, action, reconcile_state,
-				    value_num, value_denom, quantity_num, quantity_denom, lot_guid)
-				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-				s.GUID, t.GUID, s.AccountGUID, s.Memo, s.Action, string(s.Reconcile),
-				valueNum, currencyFraction, qtyNum, accFraction, nullable(s.LotGUID),
-			); err != nil {
-				return fmt.Errorf("insert split %s: %w", s.GUID, err)
-			}
+		if err := r.insertSplits(ctx, tx, t); err != nil {
+			return err
 		}
+		return r.writeTxnAudit(ctx, tx, t, actor, "post")
+	})
+}
 
-		detail, err := json.Marshal(map[string]any{
-			"currency": t.CurrencyGUID,
-			"splits":   len(t.Splits),
-		})
+// UpdateTransaction replaces a transaction's fields and splits in one DB
+// transaction. The original enter_date is left untouched. It returns
+// app.ErrTransactionNotFound if the GUID is unknown.
+func (r *Repository) UpdateTransaction(ctx context.Context, t domain.Transaction, actor app.AuditActor) error {
+	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`UPDATE transactions SET currency_guid = $2, num = $3, post_date = $4, description = $5
+			 WHERE guid = $1`,
+			t.GUID, t.CurrencyGUID, t.Num, t.PostDate, t.Description,
+		)
+		if err != nil {
+			return fmt.Errorf("update transaction: %w", err)
+		}
+		if ct.RowsAffected() == 0 {
+			return app.ErrTransactionNotFound
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM splits WHERE tx_guid = $1`, t.GUID); err != nil {
+			return fmt.Errorf("delete old splits: %w", err)
+		}
+		if err := r.insertSplits(ctx, tx, t); err != nil {
+			return err
+		}
+		return r.writeTxnAudit(ctx, tx, t, actor, "edit")
+	})
+}
+
+// DeleteTransaction removes a transaction and its splits in one DB transaction.
+// It returns app.ErrTransactionNotFound if the GUID is unknown.
+func (r *Repository) DeleteTransaction(ctx context.Context, guid string, actor app.AuditActor) error {
+	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `DELETE FROM splits WHERE tx_guid = $1`, guid); err != nil {
+			return fmt.Errorf("delete splits: %w", err)
+		}
+		ct, err := tx.Exec(ctx, `DELETE FROM transactions WHERE guid = $1`, guid)
+		if err != nil {
+			return fmt.Errorf("delete transaction: %w", err)
+		}
+		if ct.RowsAffected() == 0 {
+			return app.ErrTransactionNotFound
+		}
+		detail, err := json.Marshal(map[string]any{"guid": guid})
 		if err != nil {
 			return fmt.Errorf("marshal audit detail: %w", err)
 		}
 		if _, err := tx.Exec(ctx,
 			`INSERT INTO audit_log (actor_user_id, book_guid, action, entity_type, entity_guid, detail)
 			 VALUES ($1, $2, $3, $4, $5, $6)`,
-			nullable(actor.UserID), nullable(actor.BookGUID), "post", "transaction", t.GUID, detail,
+			nullable(actor.UserID), nullable(actor.BookGUID), "delete", "transaction", guid, detail,
 		); err != nil {
 			return fmt.Errorf("insert audit log: %w", err)
 		}
 		return nil
 	})
+}
+
+// TransactionAccountGUIDs returns the distinct accounts a transaction's splits
+// post to, or app.ErrTransactionNotFound when the transaction has no splits
+// (i.e. does not exist).
+func (r *Repository) TransactionAccountGUIDs(ctx context.Context, guid string) ([]string, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT DISTINCT account_guid FROM splits WHERE tx_guid = $1`, guid)
+	if err != nil {
+		return nil, fmt.Errorf("transaction accounts: %w", err)
+	}
+	defer rows.Close()
+
+	var guids []string
+	for rows.Next() {
+		var g string
+		if err := rows.Scan(&g); err != nil {
+			return nil, fmt.Errorf("scan account guid: %w", err)
+		}
+		guids = append(guids, g)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(guids) == 0 {
+		return nil, app.ErrTransactionNotFound
+	}
+	return guids, nil
+}
+
+// insertSplits writes all of a transaction's splits, converting each amount to
+// its commodity fraction (value in the transaction currency, quantity in the
+// account commodity). It assumes the parent transaction row already exists.
+func (r *Repository) insertSplits(ctx context.Context, tx pgx.Tx, t domain.Transaction) error {
+	var currencyFraction int64
+	if err := tx.QueryRow(ctx,
+		`SELECT fraction FROM commodities WHERE guid = $1`, t.CurrencyGUID,
+	).Scan(&currencyFraction); err != nil {
+		return fmt.Errorf("lookup currency fraction for %s: %w", t.CurrencyGUID, err)
+	}
+
+	accountFractions, err := r.accountFractions(ctx, tx, t.Splits)
+	if err != nil {
+		return err
+	}
+
+	for _, s := range t.Splits {
+		valueNum, err := s.Value.AtDenom(currencyFraction)
+		if err != nil {
+			return fmt.Errorf("split %s value: %w", s.GUID, err)
+		}
+		accFraction, ok := accountFractions[s.AccountGUID]
+		if !ok {
+			return fmt.Errorf("split %s: unknown account %s", s.GUID, s.AccountGUID)
+		}
+		qtyNum, err := s.Quantity.AtDenom(accFraction)
+		if err != nil {
+			return fmt.Errorf("split %s quantity: %w", s.GUID, err)
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO splits
+			   (guid, tx_guid, account_guid, memo, action, reconcile_state,
+			    value_num, value_denom, quantity_num, quantity_denom, lot_guid)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+			s.GUID, t.GUID, s.AccountGUID, s.Memo, s.Action, string(s.Reconcile),
+			valueNum, currencyFraction, qtyNum, accFraction, nullable(s.LotGUID),
+		); err != nil {
+			return fmt.Errorf("insert split %s: %w", s.GUID, err)
+		}
+	}
+	return nil
+}
+
+// writeTxnAudit appends an audit_log row describing a transaction write.
+func (r *Repository) writeTxnAudit(ctx context.Context, tx pgx.Tx, t domain.Transaction, actor app.AuditActor, action string) error {
+	detail, err := json.Marshal(map[string]any{
+		"currency": t.CurrencyGUID,
+		"splits":   len(t.Splits),
+	})
+	if err != nil {
+		return fmt.Errorf("marshal audit detail: %w", err)
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO audit_log (actor_user_id, book_guid, action, entity_type, entity_guid, detail)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		nullable(actor.UserID), nullable(actor.BookGUID), action, "transaction", t.GUID, detail,
+	); err != nil {
+		return fmt.Errorf("insert audit log: %w", err)
+	}
+	return nil
 }
 
 // accountFractions returns the commodity fraction for each split's account.

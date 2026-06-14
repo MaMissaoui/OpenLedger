@@ -16,6 +16,10 @@ import (
 // tested without a database.
 type fakeRepo struct {
 	inserted     *domain.Transaction
+	updated      *domain.Transaction
+	deletedGUID  string
+	txAccounts   []string // returned by TransactionAccountGUIDs
+	txNotFound   bool     // make TransactionAccountGUIDs return ErrTransactionNotFound
 	exists       bool
 	registerRows []app.RegisterEntry
 	registerTot  int64
@@ -72,6 +76,27 @@ func (f *fakeRepo) InsertTransaction(_ context.Context, tx domain.Transaction, _
 	cp := tx
 	f.inserted = &cp
 	return nil
+}
+
+func (f *fakeRepo) UpdateTransaction(_ context.Context, tx domain.Transaction, _ app.AuditActor) error {
+	cp := tx
+	f.updated = &cp
+	return nil
+}
+
+func (f *fakeRepo) DeleteTransaction(_ context.Context, guid string, _ app.AuditActor) error {
+	f.deletedGUID = guid
+	return nil
+}
+
+func (f *fakeRepo) TransactionAccountGUIDs(_ context.Context, _ string) ([]string, error) {
+	if f.txNotFound {
+		return nil, app.ErrTransactionNotFound
+	}
+	if f.txAccounts != nil {
+		return f.txAccounts, nil
+	}
+	return []string{"checking", "groceries"}, nil
 }
 
 func (f *fakeRepo) AccountExists(_ context.Context, _ string) (bool, error) {

@@ -87,6 +87,23 @@ export const api = {
     postDate?: string;
     splits: { accountGuid: string; value: Numeric; quantity: Numeric }[];
   }) => post<{ guid: string }>("/api/v1/transactions", input),
+  // Wholesale replacement of a transaction's fields and splits (PATCH), with the
+  // same body shape as postTransaction; the server re-validates the balance.
+  updateTransaction: (
+    guid: string,
+    input: {
+      currencyGuid: string;
+      description: string;
+      postDate?: string;
+      splits: { accountGuid: string; value: Numeric; quantity: Numeric }[];
+    },
+  ) =>
+    request<{ guid: string; splits: number }>(`/api/v1/transactions/${guid}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+  deleteTransaction: (guid: string) =>
+    request<void>(`/api/v1/transactions/${guid}`, { method: "DELETE" }),
   listPrices: (commodityGuid: string) =>
     request<{ prices: Price[] }>(
       `/api/v1/prices?commodity=${encodeURIComponent(commodityGuid)}`,
