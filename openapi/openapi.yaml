@@ -370,6 +370,32 @@ paths:
           description: The book has already been imported (GUID collision)
         "422":
           description: The file contains one or more unbalanced transactions
+  /api/v1/books/{id}/export/gnucash:
+    get:
+      summary: Export a book as a GnuCash SQLite file
+      description: >
+        Streams the book back as a GnuCash SQLite database, preserving GnuCash
+        GUIDs and storing each amount at its commodity's fraction, so the file
+        can be re-imported by GnuCash or OpenLedger.
+      operationId: exportGnuCash
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The book as a GnuCash SQLite database
+          content:
+            application/x-sqlite3:
+              schema:
+                type: string
+                format: binary
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
 components:
   schemas:
     Health:

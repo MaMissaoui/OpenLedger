@@ -42,8 +42,9 @@ func main() {
 	provision := app.NewProvisionService(repo)
 	authz := app.NewAuthzService(repo)
 	importer := app.NewImportService(gnucash.NewReader(), repo)
+	exporter := app.NewExportService(repo, gnucash.NewWriter())
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer, exporter)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

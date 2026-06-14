@@ -1,0 +1,39 @@
+package app
+
+import "context"
+
+// GnuCashWriter writes a parsed book out as a GnuCash file. The SQLite
+// implementation lives in internal/infra/gnucash; defining the port here keeps
+// the use-case independent of the file format.
+type GnuCashWriter interface {
+	WriteGnuCashSQLite(ctx context.Context, path string, data GnuCashData) error
+}
+
+// ExportRepository loads a whole book — its accounts (including roots), the
+// commodities those accounts and transactions use, and every transaction with
+// its splits — for export. It returns ErrBookNotFound for an unknown book.
+type ExportRepository interface {
+	LoadBook(ctx context.Context, bookGUID string) (GnuCashData, error)
+}
+
+// ExportService reads a book from the repository and writes it to a GnuCash
+// file. It is the read counterpart of ImportService.
+type ExportService struct {
+	repo   ExportRepository
+	writer GnuCashWriter
+}
+
+// NewExportService builds an ExportService from a repository and a writer.
+func NewExportService(repo ExportRepository, writer GnuCashWriter) *ExportService {
+	return &ExportService{repo: repo, writer: writer}
+}
+
+// ExportSQLite loads the book and writes it as a GnuCash SQLite database at path.
+// It returns ErrBookNotFound if the book does not exist.
+func (s *ExportService) ExportSQLite(ctx context.Context, bookGUID, path string) error {
+	data, err := s.repo.LoadBook(ctx, bookGUID)
+	if err != nil {
+		return err
+	}
+	return s.writer.WriteGnuCashSQLite(ctx, path, data)
+}

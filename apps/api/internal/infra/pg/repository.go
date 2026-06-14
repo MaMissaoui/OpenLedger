@@ -444,6 +444,249 @@ func importErr(context string, err error) error {
 	return fmt.Errorf("%s: %w", context, err)
 }
 
+// LoadBook reads an entire book for export: the book row, its account tree
+// (the regular and template roots and all their descendants), every
+// transaction that touches one of those accounts together with its splits, and
+// the commodities those accounts and transactions reference. It returns
+// app.ErrBookNotFound for an unknown book. It is the read counterpart of
+// ImportBook.
+func (r *Repository) LoadBook(ctx context.Context, bookGUID string) (app.GnuCashData, error) {
+	// A read-only RepeatableRead transaction gives the export a single
+	// consistent snapshot, so a concurrent write between the separate account /
+	// transaction / split / commodity queries can't be partially observed.
+	var data app.GnuCashData
+	err := pgx.BeginTxFunc(ctx, r.pool,
+		pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly},
+		func(tx pgx.Tx) error {
+			var book domain.Book
+			err := tx.QueryRow(ctx,
+				`SELECT guid, root_account_guid, root_template_guid FROM books WHERE guid = $1`, bookGUID,
+			).Scan(&book.GUID, &book.RootAccountGUID, &book.RootTemplateGUID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return app.ErrBookNotFound
+			}
+			if err != nil {
+				return fmt.Errorf("load book: %w", err)
+			}
+
+			accounts, err := loadBookAccounts(ctx, tx, book.RootAccountGUID, book.RootTemplateGUID)
+			if err != nil {
+				return err
+			}
+			accountGUIDs := make([]string, len(accounts))
+			for i, a := range accounts {
+				accountGUIDs[i] = a.GUID
+			}
+
+			transactions, err := loadBookTransactions(ctx, tx, accountGUIDs)
+			if err != nil {
+				return err
+			}
+
+			commodities, err := loadCommodities(ctx, tx, referencedCommodities(accounts, transactions))
+			if err != nil {
+				return err
+			}
+
+			data = app.GnuCashData{
+				Book:         book,
+				Commodities:  commodities,
+				Accounts:     accounts,
+				Transactions: transactions,
+			}
+			return nil
+		})
+	if err != nil {
+		return app.GnuCashData{}, err
+	}
+	return data, nil
+}
+
+// loadBookAccounts reads the account tree anchored at the book's two roots
+// (the regular root and the template root), including the roots themselves.
+func loadBookAccounts(ctx context.Context, tx pgx.Tx, rootGUID, templateRootGUID string) ([]domain.Account, error) {
+	const sql = `
+WITH RECURSIVE tree AS (
+    SELECT guid, name, account_type, commodity_guid, parent_guid, code, description, hidden, placeholder
+    FROM accounts WHERE guid = $1 OR guid = $2
+    UNION ALL
+    SELECT a.guid, a.name, a.account_type, a.commodity_guid, a.parent_guid, a.code, a.description, a.hidden, a.placeholder
+    FROM accounts a JOIN tree t ON a.parent_guid = t.guid
+)
+SELECT guid, name, account_type, commodity_guid, parent_guid, code, description, hidden, placeholder
+FROM tree
+ORDER BY guid`
+
+	rows, err := tx.Query(ctx, sql, rootGUID, templateRootGUID)
+	if err != nil {
+		return nil, fmt.Errorf("load accounts: %w", err)
+	}
+	defer rows.Close()
+
+	var accounts []domain.Account
+	for rows.Next() {
+		var (
+			a                   domain.Account
+			accountType         string
+			commodity, parent   *string
+			hidden, placeholder int
+		)
+		if err := rows.Scan(
+			&a.GUID, &a.Name, &accountType, &commodity, &parent,
+			&a.Code, &a.Description, &hidden, &placeholder,
+		); err != nil {
+			return nil, fmt.Errorf("scan account: %w", err)
+		}
+		a.Type = domain.AccountType(accountType)
+		if commodity != nil {
+			a.CommodityGUID = *commodity
+		}
+		if parent != nil {
+			a.ParentGUID = *parent
+		}
+		a.Hidden = hidden != 0
+		a.Placeholder = placeholder != 0
+		accounts = append(accounts, a)
+	}
+	return accounts, rows.Err()
+}
+
+// loadBookTransactions reads every transaction with at least one split posted to
+// one of accountGUIDs, together with all of each transaction's splits.
+func loadBookTransactions(ctx context.Context, tx pgx.Tx, accountGUIDs []string) ([]domain.Transaction, error) {
+	if len(accountGUIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx,
+		`SELECT guid, currency_guid, num, post_date, enter_date, description
+		   FROM transactions
+		  WHERE guid IN (SELECT DISTINCT tx_guid FROM splits WHERE account_guid = ANY($1))
+		  ORDER BY post_date, guid`, accountGUIDs)
+	if err != nil {
+		return nil, fmt.Errorf("load transactions: %w", err)
+	}
+
+	var txns []domain.Transaction
+	for rows.Next() {
+		var t domain.Transaction
+		if err := rows.Scan(&t.GUID, &t.CurrencyGUID, &t.Num, &t.PostDate, &t.EnterDate, &t.Description); err != nil {
+			rows.Close()
+			return nil, fmt.Errorf("scan transaction: %w", err)
+		}
+		txns = append(txns, t)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Index by GUID after the slice is fully built so the pointers are stable.
+	byGUID := make(map[string]*domain.Transaction, len(txns))
+	txGUIDs := make([]string, len(txns))
+	for i := range txns {
+		byGUID[txns[i].GUID] = &txns[i]
+		txGUIDs[i] = txns[i].GUID
+	}
+	if err := attachBookSplits(ctx, tx, byGUID, txGUIDs); err != nil {
+		return nil, err
+	}
+	return txns, nil
+}
+
+func attachBookSplits(ctx context.Context, tx pgx.Tx, byGUID map[string]*domain.Transaction, txGUIDs []string) error {
+	rows, err := tx.Query(ctx,
+		`SELECT guid, tx_guid, account_guid, memo, action, reconcile_state,
+		        value_num, value_denom, quantity_num, quantity_denom, lot_guid
+		   FROM splits WHERE tx_guid = ANY($1) ORDER BY tx_guid, guid`, txGUIDs)
+	if err != nil {
+		return fmt.Errorf("load splits: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			s                                      domain.Split
+			txGUID                                 string
+			reconcile                              string
+			lot                                    *string
+			valueNum, valueDenom, qtyNum, qtyDenom int64
+		)
+		if err := rows.Scan(
+			&s.GUID, &txGUID, &s.AccountGUID, &s.Memo, &s.Action, &reconcile,
+			&valueNum, &valueDenom, &qtyNum, &qtyDenom, &lot,
+		); err != nil {
+			return fmt.Errorf("scan split: %w", err)
+		}
+		if reconcile != "" {
+			s.Reconcile = domain.ReconcileState([]rune(reconcile)[0])
+		}
+		if lot != nil {
+			s.LotGUID = *lot
+		}
+		if s.Value, err = domain.FromNumDenom(valueNum, valueDenom); err != nil {
+			return fmt.Errorf("split %s value: %w", s.GUID, err)
+		}
+		if s.Quantity, err = domain.FromNumDenom(qtyNum, qtyDenom); err != nil {
+			return fmt.Errorf("split %s quantity: %w", s.GUID, err)
+		}
+		if t, ok := byGUID[txGUID]; ok {
+			t.Splits = append(t.Splits, s)
+		}
+	}
+	return rows.Err()
+}
+
+// loadCommodities reads the commodities with the given GUIDs.
+func loadCommodities(ctx context.Context, tx pgx.Tx, guids []string) ([]domain.Commodity, error) {
+	if len(guids) == 0 {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx,
+		`SELECT guid, namespace, mnemonic, fullname, fraction
+		   FROM commodities WHERE guid = ANY($1) ORDER BY namespace, mnemonic`, guids)
+	if err != nil {
+		return nil, fmt.Errorf("load commodities: %w", err)
+	}
+	defer rows.Close()
+
+	var commodities []domain.Commodity
+	for rows.Next() {
+		var (
+			c        domain.Commodity
+			fullname *string
+		)
+		if err := rows.Scan(&c.GUID, &c.Namespace, &c.Mnemonic, &fullname, &c.Fraction); err != nil {
+			return nil, fmt.Errorf("scan commodity: %w", err)
+		}
+		if fullname != nil {
+			c.Fullname = *fullname
+		}
+		commodities = append(commodities, c)
+	}
+	return commodities, rows.Err()
+}
+
+// referencedCommodities returns the distinct commodity GUIDs used by the given
+// accounts (their denomination) and transactions (their currency), in first-seen
+// order.
+func referencedCommodities(accounts []domain.Account, txns []domain.Transaction) []string {
+	seen := make(map[string]bool)
+	var guids []string
+	add := func(g string) {
+		if g != "" && !seen[g] {
+			seen[g] = true
+			guids = append(guids, g)
+		}
+	}
+	for _, a := range accounts {
+		add(a.CommodityGUID)
+	}
+	for _, t := range txns {
+		add(t.CurrencyGUID)
+	}
+	return guids
+}
+
 // ListBooksForUser returns the books a user has a membership on, newest first.
 func (r *Repository) ListBooksForUser(ctx context.Context, userID string) ([]domain.Book, error) {
 	rows, err := r.pool.Query(ctx,
