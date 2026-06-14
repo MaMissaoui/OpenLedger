@@ -27,6 +27,7 @@ type GnuCashData struct {
 	Commodities  []domain.Commodity
 	Accounts     []domain.Account
 	Transactions []domain.Transaction
+	Lots         []domain.Lot
 }
 
 // GnuCashReader reads a GnuCash file from disk into domain types. Both the

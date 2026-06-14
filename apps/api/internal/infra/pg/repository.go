@@ -384,6 +384,19 @@ func (r *Repository) ImportBook(ctx context.Context, data app.GnuCashData, owner
 			}
 		}
 
+		for _, l := range data.Lots {
+			closed := 0
+			if l.IsClosed {
+				closed = 1
+			}
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO lots (guid, account_guid, is_closed) VALUES ($1, $2, $3)`,
+				l.GUID, l.AccountGUID, closed,
+			); err != nil {
+				return importErr("insert lot", err)
+			}
+		}
+
 		for _, t := range data.Transactions {
 			if _, err := tx.Exec(ctx,
 				`INSERT INTO transactions (guid, currency_guid, num, post_date, enter_date, description)
@@ -488,11 +501,17 @@ func (r *Repository) LoadBook(ctx context.Context, bookGUID string) (app.GnuCash
 				return err
 			}
 
+			lots, err := loadBookLots(ctx, tx, accountGUIDs)
+			if err != nil {
+				return err
+			}
+
 			data = app.GnuCashData{
 				Book:         book,
 				Commodities:  commodities,
 				Accounts:     accounts,
 				Transactions: transactions,
+				Lots:         lots,
 			}
 			return nil
 		})
@@ -500,6 +519,35 @@ func (r *Repository) LoadBook(ctx context.Context, bookGUID string) (app.GnuCash
 		return app.GnuCashData{}, err
 	}
 	return data, nil
+}
+
+// loadBookLots reads the lots belonging to any of the book's accounts, so cost
+// basis groupings survive export/import.
+func loadBookLots(ctx context.Context, tx pgx.Tx, accountGUIDs []string) ([]domain.Lot, error) {
+	if len(accountGUIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx,
+		`SELECT guid, account_guid, is_closed FROM lots WHERE account_guid = ANY($1) ORDER BY guid`,
+		accountGUIDs)
+	if err != nil {
+		return nil, fmt.Errorf("load lots: %w", err)
+	}
+	defer rows.Close()
+
+	var lots []domain.Lot
+	for rows.Next() {
+		var (
+			l      domain.Lot
+			closed int
+		)
+		if err := rows.Scan(&l.GUID, &l.AccountGUID, &closed); err != nil {
+			return nil, fmt.Errorf("scan lot: %w", err)
+		}
+		l.IsClosed = closed != 0
+		lots = append(lots, l)
+	}
+	return lots, rows.Err()
 }
 
 // loadBookAccounts reads the account tree anchored at the book's two roots
@@ -1161,6 +1209,168 @@ func findOrCreateTradingChild(ctx context.Context, tx pgx.Tx, parentGUID, name, 
 		CommodityGUID: commodityGUID,
 		ParentGUID:    parentGUID,
 	}); err != nil {
+		return "", err
+	}
+	return guid, nil
+}
+
+// CreateLot inserts a new, open lot for a security account.
+func (r *Repository) CreateLot(ctx context.Context, lotGUID, accountGUID string) error {
+	if _, err := r.pool.Exec(ctx,
+		`INSERT INTO lots (guid, account_guid, is_closed) VALUES ($1, $2, 0)`,
+		lotGUID, accountGUID,
+	); err != nil {
+		return fmt.Errorf("create lot: %w", err)
+	}
+	return nil
+}
+
+// SetLotClosed marks a lot closed (its shares have been fully sold).
+func (r *Repository) SetLotClosed(ctx context.Context, lotGUID string) error {
+	if _, err := r.pool.Exec(ctx, `UPDATE lots SET is_closed = 1 WHERE guid = $1`, lotGUID); err != nil {
+		return fmt.Errorf("close lot: %w", err)
+	}
+	return nil
+}
+
+// OpenLotsForAccount returns the account's open lots in FIFO order (oldest split
+// first), each with its remaining shares and the cost basis still attached. A
+// lot's remaining shares are the sum of its splits' quantities and its remaining
+// cost the sum of their values; lots that net to zero shares are excluded. The
+// quantity and value denominators are uniform within an account/currency, so the
+// sums are exact.
+func (r *Repository) OpenLotsForAccount(ctx context.Context, accountGUID string) ([]domain.OpenLot, error) {
+	rows, err := r.pool.Query(ctx, `
+SELECT l.guid,
+       COALESCE(SUM(s.quantity_num), 0) AS qty_num,
+       COALESCE(MAX(s.quantity_denom), 1) AS qty_denom,
+       COALESCE(SUM(s.value_num), 0) AS val_num,
+       COALESCE(MAX(s.value_denom), 1) AS val_denom
+FROM lots l
+LEFT JOIN splits s       ON s.lot_guid = l.guid
+LEFT JOIN transactions t ON t.guid = s.tx_guid
+WHERE l.account_guid = $1 AND l.is_closed = 0
+GROUP BY l.guid
+HAVING COALESCE(SUM(s.quantity_num), 0) > 0
+ORDER BY MIN(t.post_date), l.guid`, accountGUID)
+	if err != nil {
+		return nil, fmt.Errorf("open lots: %w", err)
+	}
+	defer rows.Close()
+
+	var lots []domain.OpenLot
+	for rows.Next() {
+		var (
+			guid             string
+			qtyNum, qtyDenom int64
+			valNum, valDenom int64
+		)
+		if err := rows.Scan(&guid, &qtyNum, &qtyDenom, &valNum, &valDenom); err != nil {
+			return nil, fmt.Errorf("scan lot: %w", err)
+		}
+		remaining, err := domain.FromNumDenom(qtyNum, qtyDenom)
+		if err != nil {
+			return nil, fmt.Errorf("lot %s shares: %w", guid, err)
+		}
+		cost, err := domain.FromNumDenom(valNum, valDenom)
+		if err != nil {
+			return nil, fmt.Errorf("lot %s cost: %w", guid, err)
+		}
+		lots = append(lots, domain.OpenLot{GUID: guid, Remaining: remaining, Cost: cost})
+	}
+	return lots, rows.Err()
+}
+
+// RealizedGainRows returns every split posted to a "Capital Gains" INCOME
+// account under rootGUID within [from, to], one row per split (oldest first),
+// for the capital-gains report.
+func (r *Repository) RealizedGainRows(ctx context.Context, rootGUID string, from, to *time.Time) ([]app.RealizedGainRow, error) {
+	rows, err := r.pool.Query(ctx, `
+WITH RECURSIVE tree AS (
+    SELECT guid, name, account_type, commodity_guid
+    FROM accounts WHERE parent_guid = $1
+    UNION ALL
+    SELECT a.guid, a.name, a.account_type, a.commodity_guid
+    FROM accounts a JOIN tree t ON a.parent_guid = t.guid
+)
+SELECT t.post_date, t.description, a.guid, a.name,
+       s.value_num, s.value_denom, COALESCE(c.fraction, 1)
+FROM tree a
+JOIN splits s        ON s.account_guid = a.guid
+JOIN transactions t  ON t.guid = s.tx_guid
+LEFT JOIN commodities c ON c.guid = a.commodity_guid
+WHERE a.account_type = 'INCOME' AND a.name = 'Capital Gains'
+  AND ($2::timestamptz IS NULL OR t.post_date >= $2)
+  AND ($3::timestamptz IS NULL OR t.post_date <= $3)
+ORDER BY t.post_date, s.guid`, rootGUID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("realized gains: %w", err)
+	}
+	defer rows.Close()
+
+	var out []app.RealizedGainRow
+	for rows.Next() {
+		var (
+			row              app.RealizedGainRow
+			description      *string
+			acctGUID, name   string
+			valNum, valDenom int64
+		)
+		if err := rows.Scan(&row.Date, &description, &acctGUID, &name, &valNum, &valDenom, &row.Scale); err != nil {
+			return nil, fmt.Errorf("scan realized gain: %w", err)
+		}
+		if description != nil {
+			row.Description = *description
+		}
+		row.Account = domain.Account{GUID: acctGUID, Name: name, Type: domain.AccountIncome}
+		if row.Value, err = domain.FromNumDenom(valNum, valDenom); err != nil {
+			return nil, fmt.Errorf("realized gain value: %w", err)
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+// FindOrCreateCapitalGainsAccount returns the GUID of the book's "Capital Gains"
+// INCOME account for the given currency, creating it under the book root if
+// missing. Realized gains and losses on security sales post here, so they flow
+// into the income statement. Keyed by name and commodity, so a multi-currency
+// book gets one gains account per currency.
+func (r *Repository) FindOrCreateCapitalGainsAccount(ctx context.Context, anchorAccountGUID string, currency domain.Commodity) (string, error) {
+	bookGUID, err := r.BookGUIDForAccount(ctx, anchorAccountGUID)
+	if err != nil {
+		return "", err
+	}
+	var guid string
+	err = pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		var root string
+		if err := tx.QueryRow(ctx,
+			`SELECT root_account_guid FROM books WHERE guid = $1`, bookGUID,
+		).Scan(&root); err != nil {
+			return fmt.Errorf("lookup book root: %w", err)
+		}
+		err := tx.QueryRow(ctx,
+			`SELECT guid FROM accounts
+			  WHERE parent_guid = $1 AND name = 'Capital Gains'
+			    AND account_type = 'INCOME' AND commodity_guid = $2`,
+			root, currency.GUID,
+		).Scan(&guid)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("lookup capital gains account: %w", err)
+		}
+		guid = app.NewGUID()
+		return insertAccount(ctx, tx, domain.Account{
+			GUID:          guid,
+			Name:          "Capital Gains",
+			Type:          domain.AccountIncome,
+			CommodityGUID: currency.GUID,
+			ParentGUID:    root,
+		})
+	})
+	if err != nil {
 		return "", err
 	}
 	return guid, nil

@@ -3,12 +3,15 @@ import type {
   BalanceSheet,
   Book,
   Commodity,
+  CapitalGainsReport,
   IncomeStatement,
   Numeric,
   Portfolio,
   Price,
   RegisterPage,
   Transaction,
+  TradeInput,
+  TradeResult,
 } from "./types";
 
 // ApiError carries the HTTP status so callers can branch (e.g. 422 unbalanced)
@@ -138,6 +141,18 @@ export const api = {
   },
   getPortfolio: (bookGuid: string) =>
     request<Portfolio>(`/api/v1/books/${bookGuid}/reports/portfolio`),
+  getCapitalGains: (bookGuid: string, from?: string, to?: string) => {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const q = params.toString() ? `?${params}` : "";
+    return request<CapitalGainsReport>(`/api/v1/books/${bookGuid}/reports/capital-gains${q}`);
+  },
+  // Buy/sell a security. shares is in the security's commodity, cash in the cash
+  // account's currency; the server opens/consumes cost-basis lots and (on a sell)
+  // realizes a FIFO capital gain.
+  buySecurity: (input: TradeInput) => post<TradeResult>("/api/v1/securities/buy", input),
+  sellSecurity: (input: TradeInput) => post<TradeResult>("/api/v1/securities/sell", input),
   // URL of the GnuCash export for a book in the given format ("sqlite" by
   // default, or "xml"). It's a plain authenticated GET, so the browser can
   // download it directly via an <a download> (the same-origin Authelia session

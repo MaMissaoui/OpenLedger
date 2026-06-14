@@ -41,6 +41,17 @@ type fakeRepo struct {
 	holdings     []app.HoldingBalance
 	latestPrices map[string]domain.Price
 
+	// Trade side. accountCommodities maps an account GUID to its commodity info;
+	// openLots drives FIFO matching; createdLots/closedLots capture lot lifecycle;
+	// capGainsAccount is the find-or-created gains account; realizedGainRows backs
+	// the capital-gains report.
+	accountCommodities map[string]app.AccountCommodityInfo
+	openLots           []domain.OpenLot
+	createdLots        []string
+	closedLots         []string
+	capGainsAccount    string
+	realizedGainRows   []app.RealizedGainRow
+
 	// Import side. readerData/readerErr drive the fake GnuCashReader;
 	// importedData captures what ImportBook persisted, and importErr forces a
 	// repository failure.
@@ -199,6 +210,41 @@ func (f *fakeRepo) SecurityHoldings(_ context.Context, _ string) ([]app.HoldingB
 	return f.holdings, nil
 }
 
+func (f *fakeRepo) AccountCommodity(_ context.Context, accountGUID string) (app.AccountCommodityInfo, error) {
+	if info, ok := f.accountCommodities[accountGUID]; ok {
+		return info, nil
+	}
+	if f.accountUnknown {
+		return app.AccountCommodityInfo{}, app.ErrAccountNotFound
+	}
+	return app.AccountCommodityInfo{}, nil
+}
+
+func (f *fakeRepo) CreateLot(_ context.Context, lotGUID, _ string) error {
+	f.createdLots = append(f.createdLots, lotGUID)
+	return nil
+}
+
+func (f *fakeRepo) OpenLotsForAccount(_ context.Context, _ string) ([]domain.OpenLot, error) {
+	return f.openLots, nil
+}
+
+func (f *fakeRepo) SetLotClosed(_ context.Context, lotGUID string) error {
+	f.closedLots = append(f.closedLots, lotGUID)
+	return nil
+}
+
+func (f *fakeRepo) FindOrCreateCapitalGainsAccount(_ context.Context, _ string, _ domain.Commodity) (string, error) {
+	if f.capGainsAccount == "" {
+		f.capGainsAccount = "capgains"
+	}
+	return f.capGainsAccount, nil
+}
+
+func (f *fakeRepo) RealizedGainRows(_ context.Context, _ string, _, _ *time.Time) ([]app.RealizedGainRow, error) {
+	return f.realizedGainRows, nil
+}
+
 func (f *fakeRepo) LatestPrice(_ context.Context, commodityGUID string) (domain.Price, bool, error) {
 	p, ok := f.latestPrices[commodityGUID]
 	return p, ok, nil
@@ -261,8 +307,9 @@ func (f *fakeRepo) ImportBook(_ context.Context, data app.GnuCashData, _ string)
 }
 
 func newTestServer(repo *fakeRepo) http.Handler {
+	posting := app.NewPostingService(repo)
 	return NewServer(
-		app.NewPostingService(repo),
+		posting,
 		app.NewLedgerService(repo),
 		app.NewStructureService(repo),
 		app.NewPriceService(repo),
@@ -273,6 +320,8 @@ func newTestServer(repo *fakeRepo) http.Handler {
 		app.NewExportService(repo, &fakeWriter{}),
 		app.NewReconcileService(repo),
 		app.NewPortfolioService(repo),
+		app.NewTradeService(repo, posting),
+		app.NewCapitalGainsService(repo),
 	).Routes()
 }
 

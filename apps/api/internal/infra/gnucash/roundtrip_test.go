@@ -24,10 +24,11 @@ func sampleData() app.GnuCashData {
 		Transactions: []domain.Transaction{{
 			GUID: "tx1", CurrencyGUID: "usd", Description: "Paycheck",
 			Splits: []domain.Split{
-				{GUID: "s1", AccountGUID: "chk", Value: domain.MustFromNumDenom(5000, 1), Quantity: domain.MustFromNumDenom(5000, 1)},
+				{GUID: "s1", AccountGUID: "chk", Value: domain.MustFromNumDenom(5000, 1), Quantity: domain.MustFromNumDenom(5000, 1), LotGUID: "lot1"},
 				{GUID: "s2", AccountGUID: "sal", Value: domain.MustFromNumDenom(-5000, 1), Quantity: domain.MustFromNumDenom(-5000, 1)},
 			},
 		}},
+		Lots: []domain.Lot{{GUID: "lot1", AccountGUID: "chk", IsClosed: false}},
 	}
 }
 
@@ -55,6 +56,10 @@ func TestRoundTrip(t *testing.T) {
 	}
 	if len(got.Accounts) != len(src.Accounts) {
 		t.Fatalf("accounts = %d, want %d", len(got.Accounts), len(src.Accounts))
+	}
+
+	if len(got.Lots) != 1 || got.Lots[0] != src.Lots[0] {
+		t.Errorf("lots = %+v, want %+v", got.Lots, src.Lots)
 	}
 
 	if len(got.Transactions) != 1 {

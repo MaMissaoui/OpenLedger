@@ -45,6 +45,7 @@ func run() error {
 	repo := pg.NewRepository(pool)
 	structure := app.NewStructureService(repo)
 	posting := app.NewPostingService(repo).WithTrading(app.NewTradingService(repo))
+	trade := app.NewTradeService(repo, posting)
 	price := app.NewPriceService(repo)
 	provision := app.NewProvisionService(repo)
 
@@ -150,21 +151,18 @@ func run() error {
 		return fmt.Errorf("post groceries: %w", err)
 	}
 
-	// 6. A security purchase: 10 shares of AAPL for $1,500.00 ($150.00/share).
-	// The AAPL leg's quantity (10 shares) differs from its value ($1,500), and the
-	// trading engine balances the per-commodity quantities.
-	shares := func(n int64) domain.GncNumeric { return domain.MustFromNumDenom(n, 1) }
-	buyTx := domain.Transaction{
-		CurrencyGUID: usd.GUID,
-		PostDate:     time.Now().AddDate(0, 0, -3).UTC(),
-		Description:  "Buy 10 AAPL @ 150.00",
-		Splits: []domain.Split{
-			{AccountGUID: aaplAcct.GUID, Value: usdAmount(150000), Quantity: shares(10)},
-			{AccountGUID: checking.GUID, Value: usdAmount(-150000), Quantity: usdAmount(-150000)},
-		},
-	}
-	if _, err := posting.Post(ctx, buyTx, app.AuditActor{BookGUID: book.GUID}); err != nil {
-		return fmt.Errorf("post AAPL buy: %w", err)
+	// 6. A security purchase through the trade use-case: 10 shares of AAPL for
+	// $1,500.00. This opens a cost-basis lot and tags the buy split to it, so the
+	// holding can later be sold with a realized FIFO gain.
+	if _, err := trade.Buy(ctx, app.Trade{
+		SecurityAccountGUID: aaplAcct.GUID,
+		CashAccountGUID:     checking.GUID,
+		Shares:              domain.MustFromNumDenom(10, 1),
+		Cash:                usdAmount(150000),
+		Description:         "Buy 10 AAPL @ 150.00",
+		PostDate:            time.Now().AddDate(0, 0, -3).UTC(),
+	}, app.AuditActor{BookGUID: book.GUID}); err != nil {
+		return fmt.Errorf("buy AAPL: %w", err)
 	}
 
 	// 7. A current AAPL quote ($180.00/share) so the portfolio shows a gain.
