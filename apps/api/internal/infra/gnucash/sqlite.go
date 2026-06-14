@@ -65,13 +65,45 @@ func (Reader) ReadGnuCashSQLite(ctx context.Context, path string) (app.GnuCashDa
 	if err != nil {
 		return app.GnuCashData{}, err
 	}
+	lots, err := readLots(ctx, db)
+	if err != nil {
+		return app.GnuCashData{}, err
+	}
 
 	return app.GnuCashData{
 		Book:         book,
 		Commodities:  commodities,
 		Accounts:     accounts,
 		Transactions: transactions,
+		Lots:         lots,
 	}, nil
+}
+
+// readLots reads the lots table, tolerating its absence (older GnuCash files and
+// books exported before lots existed have no such table).
+func readLots(ctx context.Context, db *sql.DB) ([]domain.Lot, error) {
+	rows, err := db.QueryContext(ctx, `SELECT guid, account_guid, is_closed FROM lots`)
+	if err != nil {
+		// No lots table — not all GnuCash files carry one.
+		return nil, nil
+	}
+	defer func() { _ = rows.Close() }()
+
+	var lots []domain.Lot
+	for rows.Next() {
+		var (
+			l       domain.Lot
+			account sql.NullString
+			closed  sql.NullInt64
+		)
+		if err := rows.Scan(&l.GUID, &account, &closed); err != nil {
+			return nil, fmt.Errorf("scan lot: %w", err)
+		}
+		l.AccountGUID = account.String
+		l.IsClosed = closed.Int64 != 0
+		lots = append(lots, l)
+	}
+	return lots, rows.Err()
 }
 
 func readBook(ctx context.Context, db *sql.DB) (domain.Book, error) {

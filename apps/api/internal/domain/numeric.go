@@ -78,6 +78,15 @@ func (n GncNumeric) Neg() GncNumeric {
 	return GncNumeric{r: new(big.Rat).Neg(n.rat())}
 }
 
+// Div returns n / other as an exact rational. It errors when other is zero.
+// Used to apportion a lot's cost basis across a partial sale.
+func (n GncNumeric) Div(other GncNumeric) (GncNumeric, error) {
+	if other.IsZero() {
+		return GncNumeric{}, fmt.Errorf("gncnumeric: division by zero")
+	}
+	return GncNumeric{r: new(big.Rat).Quo(n.rat(), other.rat())}, nil
+}
+
 // Cmp compares n and other, returning -1, 0, or +1.
 func (n GncNumeric) Cmp(other GncNumeric) int { return n.rat().Cmp(other.rat()) }
 

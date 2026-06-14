@@ -16,6 +16,10 @@ export function PortfolioView({ book, onTrade }: Props) {
     queryKey: ["portfolio", book.guid],
     queryFn: () => api.getPortfolio(book.guid),
   });
+  const gains = useQuery({
+    queryKey: ["capital-gains", book.guid],
+    queryFn: () => api.getCapitalGains(book.guid),
+  });
 
   return (
     <section className="register report">
@@ -72,6 +76,38 @@ export function PortfolioView({ book, onTrade }: Props) {
             ))}
           </tbody>
         </table>
+      )}
+
+      {gains.data && gains.data.lines.length > 0 && (
+        <>
+          <h2 style={{ marginTop: "1.5rem" }}>Realized gains</h2>
+          <table className="ledger-table report-section">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th className="num">Gain / loss</th>
+              </tr>
+            </thead>
+            <tbody>
+              {gains.data.lines.map((l, i) => (
+                <tr key={`${l.date}-${i}`}>
+                  <td className="desc">{new Date(l.date).toLocaleDateString()}</td>
+                  <td className="desc">{l.description}</td>
+                  <td className={`num${l.amount.num < 0 ? " neg" : ""}`}>{formatMoney(l.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="report-total">
+                <td colSpan={2}>Total realized</td>
+                <td className={`num${gains.data.total.num < 0 ? " neg" : ""}`}>
+                  {formatMoney(gains.data.total)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </>
       )}
 
       <p className="report__note">

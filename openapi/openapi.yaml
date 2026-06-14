@@ -185,6 +185,103 @@ paths:
           description: The authenticated user has no membership on this book
         "404":
           description: Book not found
+  /api/v1/books/{id}/reports/capital-gains:
+    get:
+      summary: Realized capital-gains report
+      description: >
+        Itemizes the realized gains and losses posted to the book's Capital Gains
+        accounts over a date range, oldest first, with their total. Amounts are in
+        natural sign (positive is a gain).
+      operationId: getCapitalGains
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: Start of the period (inclusive). Omit for an open lower bound.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End of the period (inclusive). Defaults to now.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: The capital-gains report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapitalGainsReport"
+        "400":
+          description: Malformed from/to timestamp
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
+  /api/v1/securities/buy:
+    post:
+      summary: Buy a security
+      description: >
+        Posts a purchase: opens a cost-basis lot, tags the security split to it,
+        and books the cash outflow. The security split's quantity is in shares and
+        its value in the cash currency; the trading engine balances the
+        commodities.
+      operationId: buySecurity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Trade"
+      responses:
+        "201":
+          description: The trade was posted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeResult"
+        "400":
+          description: Missing/invalid fields (e.g. non-positive shares or cash)
+        "403":
+          description: The user lacks editor+ on a book the accounts touch
+        "404":
+          description: An account does not exist
+  /api/v1/securities/sell:
+    post:
+      summary: Sell a security
+      description: >
+        Posts a sale: matches the shares against the account's open lots FIFO,
+        removes their cost basis, books the cash proceeds, and posts the realized
+        gain (proceeds − cost) to the Capital Gains account so the transaction
+        balances. Fully-consumed lots are closed.
+      operationId: sellSecurity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Trade"
+      responses:
+        "201":
+          description: The trade was posted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TradeResult"
+        "400":
+          description: Missing/invalid fields
+        "403":
+          description: The user lacks editor+ on a book the accounts touch
+        "404":
+          description: An account does not exist
+        "422":
+          description: Selling more shares than the account holds
   /api/v1/accounts:
     post:
       summary: Create an account in a book
@@ -764,6 +861,66 @@ components:
           $ref: "#/components/schemas/Numeric"
         unrealizedGain:
           $ref: "#/components/schemas/Numeric"
+    CapitalGainsReport:
+      type: object
+      description: Realized gains/losses over [from, to], in natural sign.
+      properties:
+        bookGuid:
+          type: string
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        lines:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date-time
+              description:
+                type: string
+              account:
+                type: string
+              amount:
+                $ref: "#/components/schemas/Numeric"
+        total:
+          $ref: "#/components/schemas/Numeric"
+    Trade:
+      type: object
+      description: A security buy or sell request.
+      required: [securityAccountGuid, cashAccountGuid, shares, cash]
+      properties:
+        securityAccountGuid:
+          type: string
+        cashAccountGuid:
+          type: string
+        shares:
+          allOf:
+            - $ref: "#/components/schemas/Numeric"
+          description: Quantity of shares, in the security's commodity.
+        cash:
+          allOf:
+            - $ref: "#/components/schemas/Numeric"
+          description: Total cash paid (buy) or received (sell), in the cash currency.
+        description:
+          type: string
+        postDate:
+          type: string
+          format: date-time
+    TradeResult:
+      type: object
+      required: [transactionGuid, realizedGain]
+      properties:
+        transactionGuid:
+          type: string
+        realizedGain:
+          allOf:
+            - $ref: "#/components/schemas/Numeric"
+          description: Realized gain for a sale (zero for a buy).
     Numeric:
       type: object
       description: Exact rational amount (numerator/denominator).

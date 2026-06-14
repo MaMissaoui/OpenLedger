@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../lib/api";
 import type { Account } from "../lib/types";
-import { negate, parseAmount, toFloat } from "../lib/money";
+import { parseAmount, toFloat } from "../lib/money";
 
 interface Props {
   accounts: Account[]; // postable accounts
@@ -55,25 +55,22 @@ export function TradeSecurityDialog({ accounts, onClose }: Props) {
 
   const save = useMutation({
     mutationFn: async () => {
-      const shareQty = parsedShares!; // in the security's commodity
-      const cashVal = parsedCash!; // in the cash currency
-      // Buy: shares in (+), cash out (−). Sell: the reverse.
-      const secQuantity = side === "buy" ? shareQty : negate(shareQty);
-      const secValue = side === "buy" ? cashVal : negate(cashVal);
-      const cashValue = side === "buy" ? negate(cashVal) : cashVal;
-      return api.postTransaction({
-        currencyGuid: cashAcct!.commodityGuid,
-        description: description.trim() || (side === "buy" ? "Buy security" : "Sell security"),
-        splits: [
-          { accountGuid: securityGuid, value: secValue, quantity: secQuantity },
-          { accountGuid: cashGuid, value: cashValue, quantity: cashValue },
-        ],
-      });
+      // The server opens/consumes cost-basis lots and builds the balanced splits;
+      // the dialog just sends shares and total cash.
+      const input = {
+        securityAccountGuid: securityGuid,
+        cashAccountGuid: cashGuid,
+        shares: parsedShares!,
+        cash: parsedCash!,
+        description: description.trim(),
+      };
+      return side === "buy" ? api.buySecurity(input) : api.sellSecurity(input);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["register"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
       qc.invalidateQueries({ queryKey: ["portfolio"] });
+      qc.invalidateQueries({ queryKey: ["capital-gains"] });
       qc.invalidateQueries({ queryKey: ["balance-sheet"] });
       qc.invalidateQueries({ queryKey: ["income-statement"] });
       onClose();

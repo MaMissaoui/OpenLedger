@@ -45,8 +45,10 @@ func main() {
 	exporter := app.NewExportService(repo, gnucash.NewWriter())
 	reconciler := app.NewReconcileService(repo)
 	portfolio := app.NewPortfolioService(repo)
+	trade := app.NewTradeService(repo, posting)
+	capitalGains := app.NewCapitalGainsService(repo)
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer, exporter, reconciler, portfolio)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

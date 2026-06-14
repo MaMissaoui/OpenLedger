@@ -60,6 +60,41 @@ func (s *Server) handleIncomeStatement(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleCapitalGains(w http.ResponseWriter, r *http.Request) {
+	bookGUID := r.PathValue("id")
+	if !s.authorizeBook(w, r, bookGUID, app.AccessRead) {
+		return
+	}
+	from, ok := queryTime(w, r, "from", time.Time{})
+	if !ok {
+		return
+	}
+	to, ok := queryTime(w, r, "to", time.Now())
+	if !ok {
+		return
+	}
+	cg, err := s.capitalGains.CapitalGains(r.Context(), bookGUID, from, to)
+	if writeStructureError(w, err) {
+		return
+	}
+	lines := make([]map[string]any, 0, len(cg.Lines))
+	for _, l := range cg.Lines {
+		lines = append(lines, map[string]any{
+			"date":        l.Date,
+			"description": l.Description,
+			"account":     l.Account,
+			"amount":      numericAtScale(l.Amount, l.Scale),
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"bookGuid": bookGUID,
+		"from":     cg.From,
+		"to":       cg.To,
+		"lines":    lines,
+		"total":    numericAtScale(cg.Total, 100),
+	})
+}
+
 // queryTime parses an RFC 3339 timestamp from query parameter key, returning def
 // when it is absent. On a malformed value it writes a 400 and returns ok=false.
 func queryTime(w http.ResponseWriter, r *http.Request, key string, def time.Time) (time.Time, bool) {

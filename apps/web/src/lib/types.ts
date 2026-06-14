@@ -106,6 +106,37 @@ export interface Portfolio {
   holdings: Holding[];
 }
 
+// A security buy/sell request. shares is in the security's commodity; cash is the
+// total paid (buy) or received (sell) in the cash account's currency.
+export interface TradeInput {
+  securityAccountGuid: string;
+  cashAccountGuid: string;
+  shares: Numeric;
+  cash: Numeric;
+  description?: string;
+}
+
+export interface TradeResult {
+  transactionGuid: string;
+  realizedGain: Numeric;
+}
+
+// One realized gain/loss line (natural sign: positive is a gain).
+export interface CapitalGainLine {
+  date: string;
+  description: string;
+  account: string;
+  amount: Numeric;
+}
+
+export interface CapitalGainsReport {
+  bookGuid: string;
+  from: string;
+  to: string;
+  lines: CapitalGainLine[];
+  total: Numeric;
+}
+
 export interface TransactionSplit {
   guid: string;
   accountGuid: string;

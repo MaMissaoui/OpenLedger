@@ -72,6 +72,10 @@ var schemaDDL = []string{
 	    quantity_num BIGINT NOT NULL,
 	    quantity_denom BIGINT NOT NULL,
 	    lot_guid CHAR(32))`,
+	`CREATE TABLE lots (
+	    guid CHAR(32) PRIMARY KEY NOT NULL,
+	    account_guid CHAR(32),
+	    is_closed INTEGER NOT NULL)`,
 	`CREATE TABLE slots (
 	    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
 	    obj_guid CHAR(32) NOT NULL,
@@ -140,6 +144,9 @@ func (Writer) WriteGnuCashSQLite(ctx context.Context, path string, data app.GnuC
 	if err = writeTransactions(ctx, tx, data.Transactions, fraction, acctCommodity); err != nil {
 		return err
 	}
+	if err = writeLots(ctx, tx, data.Lots); err != nil {
+		return err
+	}
 
 	if err = tx.Commit(); err != nil {
 		return fmt.Errorf("commit: %w", err)
@@ -153,6 +160,18 @@ func writeBook(ctx context.Context, tx *sql.Tx, data app.GnuCashData) error {
 		data.Book.GUID, data.Book.RootAccountGUID, data.Book.RootTemplateGUID)
 	if err != nil {
 		return fmt.Errorf("write book: %w", err)
+	}
+	return nil
+}
+
+func writeLots(ctx context.Context, tx *sql.Tx, lots []domain.Lot) error {
+	for _, l := range lots {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO lots (guid, account_guid, is_closed) VALUES (?, ?, ?)`,
+			l.GUID, nullStr(l.AccountGUID), boolToInt(l.IsClosed),
+		); err != nil {
+			return fmt.Errorf("write lot %s: %w", l.GUID, err)
+		}
 	}
 	return nil
 }
