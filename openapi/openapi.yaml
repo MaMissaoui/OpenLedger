@@ -585,6 +585,142 @@ paths:
           description: The authenticated user has no membership on this book
         "404":
           description: Book not found
+  /api/v1/books/{id}/scheduled-transactions:
+    get:
+      summary: List scheduled transactions for a book
+      operationId: listScheduledTransactions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: All scheduled transactions for the book
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTransactionList"
+        "403":
+          description: No membership on this book
+        "404":
+          description: Book not found
+    post:
+      summary: Create a scheduled transaction
+      operationId: createScheduledTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewScheduledTransaction"
+      responses:
+        "201":
+          description: Scheduled transaction created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTransaction"
+        "400":
+          description: Invalid input
+        "422":
+          description: Template splits do not balance to zero
+  /api/v1/books/{id}/scheduled-transactions/post-due:
+    post:
+      summary: Post all due scheduled transactions
+      description: >
+        Posts every enabled scheduled transaction whose next due date is on or
+        before `asOf` (defaults to now). Returns the list of transactions created.
+      operationId: postDueScheduledTransactions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: asOf
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: List of transactions that were posted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostDueResult"
+        "403":
+          description: No membership on this book
+  /api/v1/scheduled-transactions/{id}:
+    get:
+      summary: Get a scheduled transaction
+      operationId: getScheduledTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The scheduled transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTransaction"
+        "404":
+          description: Scheduled transaction not found
+    patch:
+      summary: Update a scheduled transaction
+      operationId: updateScheduledTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewScheduledTransaction"
+      responses:
+        "200":
+          description: Updated scheduled transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScheduledTransaction"
+        "400":
+          description: Invalid input
+        "404":
+          description: Scheduled transaction not found
+        "422":
+          description: Template splits do not balance to zero
+    delete:
+      summary: Delete a scheduled transaction
+      operationId: deleteScheduledTransaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Scheduled transaction not found
 components:
   schemas:
     Health:
@@ -1052,3 +1188,93 @@ components:
         transactions:
           type: integer
           description: Number of transactions imported.
+    ScheduledSplit:
+      type: object
+      required: [accountGuid, value]
+      properties:
+        guid:
+          type: string
+        accountGuid:
+          type: string
+        memo:
+          type: string
+        value:
+          $ref: "#/components/schemas/Numeric"
+    NewScheduledTransaction:
+      type: object
+      required: [name, currencyGuid, period, startDate, splits]
+      properties:
+        name:
+          type: string
+          example: Monthly Rent
+        description:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+        currencyGuid:
+          type: string
+        period:
+          type: string
+          enum: [once, daily, weekly, monthly, yearly]
+        every:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Multiplier on period (e.g. every=2 + period=weekly → biweekly).
+        startDate:
+          type: string
+          format: date
+          example: "2024-01-01"
+        endDate:
+          type: string
+          format: date
+          description: Optional end date; omit for indefinite recurrence.
+        splits:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/ScheduledSplit"
+    ScheduledTransaction:
+      allOf:
+        - $ref: "#/components/schemas/NewScheduledTransaction"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+            lastPostedDate:
+              type: string
+              format: date
+            nextDueDate:
+              type: string
+              format: date
+    ScheduledTransactionList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        scheduledTransactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduledTransaction"
+    PostDueResult:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        posted:
+          type: array
+          items:
+            type: object
+            properties:
+              scheduleGuid:
+                type: string
+              name:
+                type: string
+              postDate:
+                type: string
+                format: date
+              txGuid:
+                type: string

@@ -1627,6 +1627,235 @@ func nullable(s string) any {
 	return s
 }
 
+// schedDate formats a time.Time as a "YYYY-MM-DD" string (UTC) for storage in
+// scheduled_transactions date columns, or nil for the zero time.
+func schedDate(t time.Time) any {
+	if t.IsZero() {
+		return nil
+	}
+	return t.UTC().Format("2006-01-02")
+}
+
+// parseSchedDate parses a nullable "YYYY-MM-DD" string into a time.Time (UTC
+// midnight), returning the zero time for a NULL/empty value.
+func parseSchedDate(s *string) time.Time {
+	if s == nil || *s == "" {
+		return time.Time{}
+	}
+	t, err := time.ParseInLocation("2006-01-02", *s, time.UTC)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+// CreateScheduledTransaction inserts a scheduled transaction and its template
+// splits, assigning GUIDs when they are missing.
+func (r *Repository) CreateScheduledTransaction(ctx context.Context, s domain.ScheduledTransaction) (domain.ScheduledTransaction, error) {
+	return s, pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO scheduled_transactions
+			    (guid, book_guid, name, description, enabled, currency_guid, period, every,
+			     start_date, end_date, last_posted)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+			s.GUID, s.BookGUID, s.Name, s.Description, boolToInt(s.Enabled),
+			s.CurrencyGUID, string(s.Period), s.Every,
+			schedDate(s.StartDate), schedDate(s.EndDate), schedDate(s.LastPostedDate),
+		); err != nil {
+			return fmt.Errorf("insert scheduled transaction: %w", err)
+		}
+		return insertScheduledSplits(ctx, tx, s.GUID, s.Splits)
+	})
+}
+
+func insertScheduledSplits(ctx context.Context, tx pgx.Tx, schedGUID string, splits []domain.ScheduledSplit) error {
+	for _, sp := range splits {
+		vNum, vDenom, err := sp.Value.NumDenom()
+		if err != nil {
+			return fmt.Errorf("scheduled split %s value: %w", sp.GUID, err)
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO scheduled_splits (guid, schedtx_guid, account_guid, memo, value_num, value_denom)
+			 VALUES ($1,$2,$3,$4,$5,$6)`,
+			sp.GUID, schedGUID, sp.AccountGUID, sp.Memo, vNum, vDenom,
+		); err != nil {
+			return fmt.Errorf("insert scheduled split %s: %w", sp.GUID, err)
+		}
+	}
+	return nil
+}
+
+// ListScheduledTransactions returns all scheduled transactions for a book,
+// including their template splits.
+func (r *Repository) ListScheduledTransactions(ctx context.Context, bookGUID string) ([]domain.ScheduledTransaction, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT guid, book_guid, name, description, enabled, currency_guid, period, every,
+		        start_date, end_date, last_posted
+		   FROM scheduled_transactions WHERE book_guid = $1 ORDER BY name`, bookGUID)
+	if err != nil {
+		return nil, fmt.Errorf("list scheduled transactions: %w", err)
+	}
+	defer rows.Close()
+
+	var scheds []domain.ScheduledTransaction
+	for rows.Next() {
+		s, err := scanScheduledTransaction(rows)
+		if err != nil {
+			return nil, err
+		}
+		scheds = append(scheds, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range scheds {
+		splits, err := r.loadScheduledSplits(ctx, scheds[i].GUID)
+		if err != nil {
+			return nil, err
+		}
+		scheds[i].Splits = splits
+	}
+	return scheds, nil
+}
+
+// GetScheduledTransaction returns one scheduled transaction by GUID, or
+// app.ErrScheduleNotFound if it does not exist.
+func (r *Repository) GetScheduledTransaction(ctx context.Context, guid string) (domain.ScheduledTransaction, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT guid, book_guid, name, description, enabled, currency_guid, period, every,
+		        start_date, end_date, last_posted
+		   FROM scheduled_transactions WHERE guid = $1`, guid)
+	s, err := scanScheduledTransaction(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ScheduledTransaction{}, app.ErrScheduleNotFound
+	}
+	if err != nil {
+		return domain.ScheduledTransaction{}, err
+	}
+	s.Splits, err = r.loadScheduledSplits(ctx, guid)
+	return s, err
+}
+
+// UpdateScheduledTransaction replaces a scheduled transaction's fields and
+// splits. Returns app.ErrScheduleNotFound if the GUID is unknown.
+func (r *Repository) UpdateScheduledTransaction(ctx context.Context, s domain.ScheduledTransaction) (domain.ScheduledTransaction, error) {
+	return s, pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`UPDATE scheduled_transactions
+			    SET name=$2, description=$3, enabled=$4, currency_guid=$5, period=$6, every=$7,
+			        start_date=$8, end_date=$9, last_posted=$10
+			  WHERE guid=$1`,
+			s.GUID, s.Name, s.Description, boolToInt(s.Enabled),
+			s.CurrencyGUID, string(s.Period), s.Every,
+			schedDate(s.StartDate), schedDate(s.EndDate), schedDate(s.LastPostedDate),
+		)
+		if err != nil {
+			return fmt.Errorf("update scheduled transaction: %w", err)
+		}
+		if ct.RowsAffected() == 0 {
+			return app.ErrScheduleNotFound
+		}
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM scheduled_splits WHERE schedtx_guid = $1`, s.GUID,
+		); err != nil {
+			return fmt.Errorf("delete old scheduled splits: %w", err)
+		}
+		return insertScheduledSplits(ctx, tx, s.GUID, s.Splits)
+	})
+}
+
+// DeleteScheduledTransaction removes a scheduled transaction and its splits.
+// Returns app.ErrScheduleNotFound if the GUID is unknown.
+func (r *Repository) DeleteScheduledTransaction(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx,
+		`DELETE FROM scheduled_transactions WHERE guid = $1`, guid)
+	if err != nil {
+		return fmt.Errorf("delete scheduled transaction: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return app.ErrScheduleNotFound
+	}
+	return nil
+}
+
+// BookGUIDForSchedule returns the book a schedule belongs to, for authz checks.
+func (r *Repository) BookGUIDForSchedule(ctx context.Context, guid string) (string, error) {
+	var bookGUID string
+	err := r.pool.QueryRow(ctx,
+		`SELECT book_guid FROM scheduled_transactions WHERE guid = $1`, guid,
+	).Scan(&bookGUID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", app.ErrScheduleNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("book for schedule: %w", err)
+	}
+	return bookGUID, nil
+}
+
+// MarkSchedulePosted updates last_posted to date for the given schedule.
+func (r *Repository) MarkSchedulePosted(ctx context.Context, guid string, date time.Time) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE scheduled_transactions SET last_posted = $2 WHERE guid = $1`,
+		guid, schedDate(date),
+	)
+	return err
+}
+
+// scanScheduledTransaction scans one row from scheduled_transactions.
+type scannable interface {
+	Scan(dest ...any) error
+}
+
+func scanScheduledTransaction(row scannable) (domain.ScheduledTransaction, error) {
+	var (
+		s          domain.ScheduledTransaction
+		enabled    int
+		period     string
+		startDate  *string
+		endDate    *string
+		lastPosted *string
+	)
+	if err := row.Scan(
+		&s.GUID, &s.BookGUID, &s.Name, &s.Description, &enabled, &s.CurrencyGUID,
+		&period, &s.Every, &startDate, &endDate, &lastPosted,
+	); err != nil {
+		return domain.ScheduledTransaction{}, err
+	}
+	s.Enabled = enabled != 0
+	s.Period = domain.RecurrencePeriod(period)
+	s.StartDate = parseSchedDate(startDate)
+	s.EndDate = parseSchedDate(endDate)
+	s.LastPostedDate = parseSchedDate(lastPosted)
+	return s, nil
+}
+
+func (r *Repository) loadScheduledSplits(ctx context.Context, schedGUID string) ([]domain.ScheduledSplit, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT guid, account_guid, memo, value_num, value_denom
+		   FROM scheduled_splits WHERE schedtx_guid = $1 ORDER BY guid`, schedGUID)
+	if err != nil {
+		return nil, fmt.Errorf("load scheduled splits: %w", err)
+	}
+	defer rows.Close()
+
+	var splits []domain.ScheduledSplit
+	for rows.Next() {
+		var (
+			sp             domain.ScheduledSplit
+			valueNum, valD int64
+		)
+		if err := rows.Scan(&sp.GUID, &sp.AccountGUID, &sp.Memo, &valueNum, &valD); err != nil {
+			return nil, fmt.Errorf("scan scheduled split: %w", err)
+		}
+		if sp.Value, err = domain.FromNumDenom(valueNum, valD); err != nil {
+			return nil, fmt.Errorf("scheduled split %s value: %w", sp.GUID, err)
+		}
+		splits = append(splits, sp)
+	}
+	return splits, rows.Err()
+}
+
 // boolToInt maps Go bools to the 0/1 INTEGER columns GnuCash uses for flags
 // like hidden and placeholder.
 func boolToInt(b bool) int {
