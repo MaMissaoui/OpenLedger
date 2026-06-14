@@ -157,6 +157,52 @@ export interface Transaction {
   splits: TransactionSplit[];
 }
 
+// One template split in a scheduled transaction.
+export interface ScheduledSplit {
+  guid?: string;
+  accountGuid: string;
+  memo: string;
+  value: Numeric;
+}
+
+// A recurring posting template. nextDueDate is computed server-side.
+export interface ScheduledTransaction {
+  guid: string;
+  bookGuid: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  currencyGuid: string;
+  period: "once" | "daily" | "weekly" | "monthly" | "yearly";
+  every: number;
+  startDate: string;
+  endDate?: string;
+  lastPostedDate?: string;
+  nextDueDate?: string;
+  splits: ScheduledSplit[];
+}
+
+// Request body to create/update a scheduled transaction.
+export interface NewScheduledTransaction {
+  name: string;
+  description?: string;
+  enabled: boolean;
+  currencyGuid: string;
+  period: "once" | "daily" | "weekly" | "monthly" | "yearly";
+  every: number;
+  startDate: string;
+  endDate?: string;
+  splits: ScheduledSplit[];
+}
+
+// One entry in the post-due result.
+export interface PostedSchedule {
+  scheduleGuid: string;
+  name: string;
+  postDate: string;
+  txGuid: string;
+}
+
 export interface RegisterEntry {
   splitGuid: string;
   txGuid: string;

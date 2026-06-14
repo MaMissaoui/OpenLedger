@@ -47,8 +47,9 @@ func main() {
 	portfolio := app.NewPortfolioService(repo)
 	trade := app.NewTradeService(repo, posting)
 	capitalGains := app.NewCapitalGainsService(repo)
+	schedule := app.NewScheduleService(repo, posting)
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

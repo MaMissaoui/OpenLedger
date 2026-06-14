@@ -5,10 +5,13 @@ import type {
   Commodity,
   CapitalGainsReport,
   IncomeStatement,
+  NewScheduledTransaction,
   Numeric,
   Portfolio,
+  PostedSchedule,
   Price,
   RegisterPage,
+  ScheduledTransaction,
   Transaction,
   TradeInput,
   TradeResult,
@@ -153,6 +156,26 @@ export const api = {
   // realizes a FIFO capital gain.
   buySecurity: (input: TradeInput) => post<TradeResult>("/api/v1/securities/buy", input),
   sellSecurity: (input: TradeInput) => post<TradeResult>("/api/v1/securities/sell", input),
+  listScheduledTransactions: (bookGuid: string) =>
+    request<{ bookGuid: string; scheduledTransactions: ScheduledTransaction[] }>(
+      `/api/v1/books/${bookGuid}/scheduled-transactions`,
+    ).then((r) => r.scheduledTransactions),
+  createScheduledTransaction: (bookGuid: string, input: NewScheduledTransaction) =>
+    post<ScheduledTransaction>(`/api/v1/books/${bookGuid}/scheduled-transactions`, input),
+  updateScheduledTransaction: (guid: string, input: NewScheduledTransaction) =>
+    request<ScheduledTransaction>(`/api/v1/scheduled-transactions/${guid}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+  deleteScheduledTransaction: (guid: string) =>
+    request<void>(`/api/v1/scheduled-transactions/${guid}`, { method: "DELETE" }),
+  postDueSchedules: (bookGuid: string, asOf?: string) => {
+    const q = asOf ? `?asOf=${encodeURIComponent(asOf)}` : "";
+    return post<{ bookGuid: string; posted: PostedSchedule[] }>(
+      `/api/v1/books/${bookGuid}/scheduled-transactions/post-due${q}`,
+      {},
+    );
+  },
   // URL of the GnuCash export for a book in the given format ("sqlite" by
   // default, or "xml"). It's a plain authenticated GET, so the browser can
   // download it directly via an <a download> (the same-origin Authelia session

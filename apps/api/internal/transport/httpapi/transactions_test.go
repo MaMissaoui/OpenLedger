@@ -306,8 +306,12 @@ func (f *fakeRepo) ImportBook(_ context.Context, data app.GnuCashData, _ string)
 	return nil
 }
 
-func newTestServer(repo *fakeRepo) http.Handler {
+func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handler {
 	posting := app.NewPostingService(repo)
+	var svc *app.ScheduleService
+	if len(schedSvc) > 0 {
+		svc = schedSvc[0]
+	}
 	return NewServer(
 		posting,
 		app.NewLedgerService(repo),
@@ -322,6 +326,7 @@ func newTestServer(repo *fakeRepo) http.Handler {
 		app.NewPortfolioService(repo),
 		app.NewTradeService(repo, posting),
 		app.NewCapitalGainsService(repo),
+		svc,
 	).Routes()
 }
 
