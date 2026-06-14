@@ -298,6 +298,52 @@ paths:
           description: The authenticated user has no membership on this account's book
         "404":
           description: Account not found
+  /api/v1/splits/{id}/reconcile:
+    patch:
+      summary: Set a split's reconcile state
+      description: >
+        Marks a single split with a GnuCash reconcile flag — "n" (unmarked),
+        "c" (cleared), or "y" (reconciled) — stamping a reconcile date for
+        cleared/reconciled and clearing it for unmarked. This only annotates the
+        split; it never changes any amount, so it does not go through the posting
+        service. Requires editor access to the split's book.
+      operationId: reconcileSplit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state:
+                  type: string
+                  description: Single-character GnuCash reconcile flag.
+                  enum: ["n", "c", "y"]
+      responses:
+        "200":
+          description: The split's new reconcile state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  splitGuid:
+                    type: string
+                  state:
+                    type: string
+        "400":
+          description: Missing or invalid reconcile state
+        "403":
+          description: The user's role does not permit editing this book
+        "404":
+          description: Split not found
   /api/v1/prices:
     get:
       summary: List a commodity's price quotes (shared reference data)

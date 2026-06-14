@@ -82,6 +82,12 @@ export const api = {
   }) => post<Account>("/api/v1/accounts", input),
   getRegister: (accountGuid: string) =>
     request<RegisterPage>(`/api/v1/accounts/${accountGuid}/register?limit=200`),
+  // Set a split's reconcile flag ("n" unmarked, "c" cleared, "y" reconciled).
+  reconcileSplit: (splitGuid: string, state: string) =>
+    request<{ splitGuid: string; state: string }>(`/api/v1/splits/${splitGuid}/reconcile`, {
+      method: "PATCH",
+      body: JSON.stringify({ state }),
+    }),
   postTransaction: (input: {
     currencyGuid: string;
     description: string;

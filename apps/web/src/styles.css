@@ -560,6 +560,44 @@ a {
   cursor: not-allowed;
 }
 
+.recon-col {
+  text-align: center;
+  width: 1%;
+  white-space: nowrap;
+}
+.recon {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--ui);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  color: var(--ink-soft);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.recon:hover {
+  background: rgba(34, 29, 22, 0.06);
+  color: var(--ink);
+}
+.recon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* Unreconciled is muted; cleared is amber; reconciled is green. */
+.recon--n {
+  color: var(--ink-faint, #b3a999);
+}
+.recon--c {
+  color: #b8860b;
+}
+.recon--y {
+  color: #2e7d32;
+}
+
 .empty {
   text-align: center;
   padding: 3rem 1rem;

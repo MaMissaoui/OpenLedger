@@ -928,6 +928,39 @@ SELECT b.guid FROM books b JOIN up ON b.root_account_guid = up.guid`
 	return bookGUID, nil
 }
 
+// AccountGUIDForSplit returns the account a split is posted to, or
+// app.ErrSplitNotFound if the split does not exist.
+func (r *Repository) AccountGUIDForSplit(ctx context.Context, splitGUID string) (string, error) {
+	var accountGUID string
+	err := r.pool.QueryRow(ctx,
+		`SELECT account_guid FROM splits WHERE guid = $1`, splitGUID,
+	).Scan(&accountGUID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", app.ErrSplitNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("lookup split account: %w", err)
+	}
+	return accountGUID, nil
+}
+
+// SetSplitReconcile sets a split's reconcile state and date, returning
+// app.ErrSplitNotFound if no split has that GUID. It writes only the two
+// reconcile columns; amounts are untouched.
+func (r *Repository) SetSplitReconcile(ctx context.Context, splitGUID string, state domain.ReconcileState, date *time.Time) error {
+	ct, err := r.pool.Exec(ctx,
+		`UPDATE splits SET reconcile_state = $1, reconcile_date = $2 WHERE guid = $3`,
+		string(state), date, splitGUID,
+	)
+	if err != nil {
+		return fmt.Errorf("set split reconcile: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return app.ErrSplitNotFound
+	}
+	return nil
+}
+
 // AccountExists reports whether an account with the given GUID exists.
 func (r *Repository) AccountExists(ctx context.Context, guid string) (bool, error) {
 	var one int

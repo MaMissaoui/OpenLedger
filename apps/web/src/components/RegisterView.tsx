@@ -14,6 +14,16 @@ function amountCell(n: Numeric) {
   return <td className={cls}>{n.num === 0 ? "—" : formatMoney(n)}</td>;
 }
 
+// Reconcile flags cycle unmarked → cleared → reconciled on click. Each maps to
+// a compact glyph and a title, matching GnuCash's n/c/y states.
+const RECONCILE_CYCLE: Record<string, string> = { n: "c", c: "y", y: "n" };
+const RECONCILE_GLYPH: Record<string, string> = { n: "○", c: "c", y: "✓" };
+const RECONCILE_TITLE: Record<string, string> = {
+  n: "Unreconciled — click to mark cleared",
+  c: "Cleared — click to mark reconciled",
+  y: "Reconciled — click to unmark",
+};
+
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
@@ -36,6 +46,12 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
       qc.invalidateQueries({ queryKey: ["balance-sheet"] });
       qc.invalidateQueries({ queryKey: ["income-statement"] });
     },
+  });
+
+  const recon = useMutation({
+    mutationFn: ({ splitGuid, state }: { splitGuid: string; state: string }) =>
+      api.reconcileSplit(splitGuid, state),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["register", account.guid] }),
   });
 
   function confirmDelete(txGuid: string, description: string) {
@@ -88,6 +104,7 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
               <th>Description</th>
               <th className="num">Amount</th>
               <th className="num">Balance</th>
+              <th className="recon-col" title="Reconciled">R</th>
               <th className="row-actions__head" aria-label="Actions" />
             </tr>
           </thead>
@@ -102,6 +119,21 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
                 {amountCell(e.quantity)}
                 <td className={`num balance${e.balance.num < 0 ? " neg" : ""}`}>
                   {formatMoney(e.balance)}
+                </td>
+                <td className="recon-col">
+                  <button
+                    className={`recon recon--${e.reconcile}`}
+                    onClick={() =>
+                      recon.mutate({
+                        splitGuid: e.splitGuid,
+                        state: RECONCILE_CYCLE[e.reconcile] ?? "c",
+                      })
+                    }
+                    disabled={recon.isPending}
+                    title={RECONCILE_TITLE[e.reconcile] ?? "Set reconcile state"}
+                  >
+                    {RECONCILE_GLYPH[e.reconcile] ?? e.reconcile}
+                  </button>
                 </td>
                 <td className="row-actions">
                   <button
