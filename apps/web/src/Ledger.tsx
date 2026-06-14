@@ -4,6 +4,7 @@ import { api } from "./lib/api";
 import { SetupLedger } from "./SetupLedger";
 import { AccountTree } from "./components/AccountTree";
 import { RegisterView } from "./components/RegisterView";
+import { ReportsView } from "./components/ReportsView";
 import { NewTransactionDialog } from "./components/NewTransactionDialog";
 import { NewAccountDialog } from "./components/NewAccountDialog";
 
@@ -20,6 +21,7 @@ export function Ledger() {
   const [selectedGuid, setSelectedGuid] = useState<string | null>(null);
   const [showNewTx, setShowNewTx] = useState(false);
   const [showNewAccount, setShowNewAccount] = useState(false);
+  const [view, setView] = useState<"ledger" | "reports">("ledger");
 
   const postable = (accounts.data ?? []).filter((a) => !a.placeholder && a.type !== "ROOT");
 
@@ -52,6 +54,20 @@ export function Ledger() {
           <span className="name">OpenLedger</span>
           <span className="tag">double-entry</span>
         </div>
+        <nav className="topbar__nav">
+          <button
+            className={`topbar__tab${view === "ledger" ? " topbar__tab--active" : ""}`}
+            onClick={() => setView("ledger")}
+          >
+            Ledger
+          </button>
+          <button
+            className={`topbar__tab${view === "reports" ? " topbar__tab--active" : ""}`}
+            onClick={() => setView("reports")}
+          >
+            Reports
+          </button>
+        </nav>
         <div className="topbar__right">
           <span className="topbar__user mono">book {book.guid.slice(0, 8)}…</span>
           <a
@@ -63,23 +79,27 @@ export function Ledger() {
         </div>
       </header>
 
-      <div className="workspace">
-        <AccountTree
-          accounts={accounts.data ?? []}
-          rootGuid={book.rootAccountGuid}
-          selectedGuid={selectedGuid}
-          onSelect={setSelectedGuid}
-          onAddAccount={() => setShowNewAccount(true)}
-        />
+      {view === "reports" ? (
+        <ReportsView book={book} />
+      ) : (
+        <div className="workspace">
+          <AccountTree
+            accounts={accounts.data ?? []}
+            rootGuid={book.rootAccountGuid}
+            selectedGuid={selectedGuid}
+            onSelect={setSelectedGuid}
+            onAddAccount={() => setShowNewAccount(true)}
+          />
 
-        {selected ? (
-          <RegisterView account={selected} onNewTransaction={() => setShowNewTx(true)} />
-        ) : (
-          <div className="empty" style={{ alignSelf: "center", margin: "auto" }}>
-            {accounts.isLoading ? <span className="spinner" /> : "Add an account to begin."}
-          </div>
-        )}
-      </div>
+          {selected ? (
+            <RegisterView account={selected} onNewTransaction={() => setShowNewTx(true)} />
+          ) : (
+            <div className="empty" style={{ alignSelf: "center", margin: "auto" }}>
+              {accounts.isLoading ? <span className="spinner" /> : "Add an account to begin."}
+            </div>
+          )}
+        </div>
+      )}
 
       {showNewTx && selected && (
         <NewTransactionDialog

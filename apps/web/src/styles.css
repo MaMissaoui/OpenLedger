@@ -302,6 +302,28 @@ a {
   text-transform: uppercase;
   color: var(--ink-faint);
 }
+.topbar__nav {
+  display: flex;
+  gap: 0.4rem;
+}
+.topbar__tab {
+  border: none;
+  background: none;
+  font-family: var(--ui);
+  font-weight: 600;
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  padding: 0.4rem 0.2rem;
+  border-bottom: 2px solid transparent;
+}
+.topbar__tab:hover {
+  color: var(--ink);
+}
+.topbar__tab--active {
+  color: var(--ink);
+  border-bottom-color: var(--oxblood);
+}
 .topbar__right {
   display: flex;
   align-items: center;
@@ -509,6 +531,82 @@ a {
   text-align: center;
   padding: 3rem 1rem;
   color: var(--ink-soft);
+}
+
+/* ---------- reports ---------- */
+
+.report__tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+.report__controls {
+  display: flex;
+  gap: 1.2rem;
+  margin: 1.2rem 0 0.4rem;
+}
+.report__controls .field input {
+  min-width: 11rem;
+}
+.report-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem 2.5rem;
+  align-items: start;
+  margin-top: 1rem;
+}
+@media (max-width: 880px) {
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.report-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+.report-section {
+  margin: 0;
+}
+.report-section tfoot .report-total td {
+  border-top: 2px solid var(--ink);
+  border-bottom: none;
+  padding-top: 0.7rem;
+  font-weight: 700;
+}
+.report-summary {
+  margin: 2.4rem 0 0;
+  margin-left: auto;
+  width: min(420px, 100%);
+  border-top: 3px double var(--ink);
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.report-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+.report-line--strong {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.report-line .mono {
+  font-weight: 600;
+}
+.report-summary .balance-pill {
+  align-self: flex-end;
+  margin-top: 0.4rem;
+}
+.report__note {
+  margin-top: 2.5rem;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
 }
 
 /* ---------- setup / empty ledger ---------- */
