@@ -961,6 +961,100 @@ func (r *Repository) SetSplitReconcile(ctx context.Context, splitGUID string, st
 	return nil
 }
 
+// AccountCommodity returns the commodity an account is denominated in and
+// whether the account is itself a trading account, or app.ErrAccountNotFound if
+// the account is unknown (or has no commodity, which a postable account always
+// does).
+func (r *Repository) AccountCommodity(ctx context.Context, accountGUID string) (app.AccountCommodityInfo, error) {
+	var (
+		acctType string
+		c        domain.Commodity
+		fullname *string
+	)
+	err := r.pool.QueryRow(ctx,
+		`SELECT a.account_type, c.guid, c.namespace, c.mnemonic, c.fullname, c.fraction
+		   FROM accounts a JOIN commodities c ON c.guid = a.commodity_guid
+		  WHERE a.guid = $1`, accountGUID,
+	).Scan(&acctType, &c.GUID, &c.Namespace, &c.Mnemonic, &fullname, &c.Fraction)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return app.AccountCommodityInfo{}, app.ErrAccountNotFound
+	}
+	if err != nil {
+		return app.AccountCommodityInfo{}, fmt.Errorf("lookup account commodity: %w", err)
+	}
+	if fullname != nil {
+		c.Fullname = *fullname
+	}
+	return app.AccountCommodityInfo{
+		Commodity: c,
+		IsTrading: acctType == string(domain.AccountTrading),
+	}, nil
+}
+
+// FindOrCreateTradingAccount returns the GUID of the Trading:NAMESPACE:MNEMONIC
+// account for commodity c in the book anchorAccountGUID belongs to, creating any
+// missing level of the Trading hierarchy under the book's root. The three levels
+// (Trading, the namespace, the mnemonic leaf) are all TRADING accounts; only the
+// leaf carries the commodity, and it is the account splits post to. The lookups
+// and inserts run in one transaction.
+func (r *Repository) FindOrCreateTradingAccount(ctx context.Context, anchorAccountGUID string, c domain.Commodity) (string, error) {
+	bookGUID, err := r.BookGUIDForAccount(ctx, anchorAccountGUID)
+	if err != nil {
+		return "", err
+	}
+	var leaf string
+	err = pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		var root string
+		if err := tx.QueryRow(ctx,
+			`SELECT root_account_guid FROM books WHERE guid = $1`, bookGUID,
+		).Scan(&root); err != nil {
+			return fmt.Errorf("lookup book root: %w", err)
+		}
+		trading, err := findOrCreateTradingChild(ctx, tx, root, "Trading", "")
+		if err != nil {
+			return err
+		}
+		ns, err := findOrCreateTradingChild(ctx, tx, trading, c.Namespace, "")
+		if err != nil {
+			return err
+		}
+		leaf, err = findOrCreateTradingChild(ctx, tx, ns, c.Mnemonic, c.GUID)
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return leaf, nil
+}
+
+// findOrCreateTradingChild returns the GUID of the TRADING account named name
+// directly under parentGUID, creating it (with the given commodity, which may be
+// empty for the intermediate levels) if it does not exist.
+func findOrCreateTradingChild(ctx context.Context, tx pgx.Tx, parentGUID, name, commodityGUID string) (string, error) {
+	var guid string
+	err := tx.QueryRow(ctx,
+		`SELECT guid FROM accounts WHERE parent_guid = $1 AND name = $2 AND account_type = 'TRADING'`,
+		parentGUID, name,
+	).Scan(&guid)
+	if err == nil {
+		return guid, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("lookup trading account %q: %w", name, err)
+	}
+	guid = app.NewGUID()
+	if err := insertAccount(ctx, tx, domain.Account{
+		GUID:          guid,
+		Name:          name,
+		Type:          domain.AccountTrading,
+		CommodityGUID: commodityGUID,
+		ParentGUID:    parentGUID,
+	}); err != nil {
+		return "", err
+	}
+	return guid, nil
+}
+
 // AccountExists reports whether an account with the given GUID exists.
 func (r *Repository) AccountExists(ctx context.Context, guid string) (bool, error) {
 	var one int

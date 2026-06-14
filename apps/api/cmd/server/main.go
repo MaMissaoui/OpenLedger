@@ -34,7 +34,7 @@ func main() {
 	defer pool.Close()
 
 	repo := pg.NewRepository(pool)
-	posting := app.NewPostingService(repo)
+	posting := app.NewPostingService(repo).WithTrading(app.NewTradingService(repo))
 	ledger := app.NewLedgerService(repo)
 	structure := app.NewStructureService(repo)
 	price := app.NewPriceService(repo)

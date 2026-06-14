@@ -48,11 +48,35 @@ type PostingService struct {
 	repo    TransactionRepository
 	now     func() time.Time
 	newGUID func() string
+	trading TradingBalancer
 }
 
 // NewPostingService builds a PostingService backed by repo.
 func NewPostingService(repo TransactionRepository) *PostingService {
 	return &PostingService{repo: repo, now: time.Now, newGUID: NewGUID}
+}
+
+// WithTrading enables GnuCash-style trading-account balancing and returns the
+// service, so it can be chained onto the constructor.
+func (s *PostingService) WithTrading(b TradingBalancer) *PostingService {
+	s.trading = b
+	return s
+}
+
+// applyTrading adds trading-account splits so the book balances in every
+// commodity. It must run only after the value balance is validated, so it never
+// masks a real imbalance — it only zeroes out each commodity's net quantity and
+// value.
+func (s *PostingService) applyTrading(ctx context.Context, tx *domain.Transaction) error {
+	if s.trading == nil {
+		return nil
+	}
+	splits, err := s.trading.Balance(ctx, *tx)
+	if err != nil {
+		return err
+	}
+	tx.Splits = splits
+	return nil
 }
 
 // Post fills in missing GUIDs/dates, enforces the double-entry balance
@@ -78,6 +102,9 @@ func (s *PostingService) Post(ctx context.Context, tx domain.Transaction, actor 
 	}
 
 	if err := tx.ValidateBalanced(); err != nil {
+		return domain.Transaction{}, err
+	}
+	if err := s.applyTrading(ctx, &tx); err != nil {
 		return domain.Transaction{}, err
 	}
 	if err := s.repo.InsertTransaction(ctx, tx, actor); err != nil {
@@ -108,6 +135,9 @@ func (s *PostingService) Update(ctx context.Context, tx domain.Transaction, acto
 	}
 
 	if err := tx.ValidateBalanced(); err != nil {
+		return domain.Transaction{}, err
+	}
+	if err := s.applyTrading(ctx, &tx); err != nil {
 		return domain.Transaction{}, err
 	}
 	if err := s.repo.UpdateTransaction(ctx, tx, actor); err != nil {
