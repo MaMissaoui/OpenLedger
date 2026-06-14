@@ -1864,3 +1864,167 @@ func boolToInt(b bool) int {
 	}
 	return 0
 }
+
+// CreateBudget inserts a budget and all its amounts in one transaction.
+func (r *Repository) CreateBudget(ctx context.Context, b domain.Budget) (domain.Budget, error) {
+	return b, pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO budgets (guid, book_guid, name, description, period_type, num_periods, start_date)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+			b.GUID, b.BookGUID, b.Name, b.Description, string(b.PeriodType), b.NumPeriods,
+			schedDate(b.StartDate),
+		); err != nil {
+			return fmt.Errorf("insert budget: %w", err)
+		}
+		return insertBudgetAmounts(ctx, tx, b.GUID, b.Amounts)
+	})
+}
+
+func insertBudgetAmounts(ctx context.Context, tx pgx.Tx, budgetGUID string, amounts []domain.BudgetAmount) error {
+	for _, amt := range amounts {
+		vNum, vDenom, err := amt.Value.NumDenom()
+		if err != nil {
+			return fmt.Errorf("budget amount for %s: %w", amt.AccountGUID, err)
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO budget_amounts (budget_guid, account_guid, period_num, value_num, value_denom)
+			 VALUES ($1,$2,$3,$4,$5)
+			 ON CONFLICT (budget_guid, account_guid, period_num)
+			 DO UPDATE SET value_num = EXCLUDED.value_num, value_denom = EXCLUDED.value_denom`,
+			budgetGUID, amt.AccountGUID, amt.PeriodNum, vNum, vDenom,
+		); err != nil {
+			return fmt.Errorf("upsert budget amount: %w", err)
+		}
+	}
+	return nil
+}
+
+// ListBudgets returns all budgets for a book without amounts.
+func (r *Repository) ListBudgets(ctx context.Context, bookGUID string) ([]domain.Budget, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT guid, book_guid, name, description, period_type, num_periods, start_date
+		   FROM budgets WHERE book_guid = $1 ORDER BY name`, bookGUID)
+	if err != nil {
+		return nil, fmt.Errorf("list budgets: %w", err)
+	}
+	defer rows.Close()
+	var budgets []domain.Budget
+	for rows.Next() {
+		b, err := scanBudget(rows)
+		if err != nil {
+			return nil, err
+		}
+		budgets = append(budgets, b)
+	}
+	return budgets, rows.Err()
+}
+
+// GetBudget returns a budget with its amounts, or app.ErrBudgetNotFound.
+func (r *Repository) GetBudget(ctx context.Context, guid string) (domain.Budget, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT guid, book_guid, name, description, period_type, num_periods, start_date
+		   FROM budgets WHERE guid = $1`, guid)
+	b, err := scanBudget(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Budget{}, domain.ErrBudgetNotFound
+	}
+	if err != nil {
+		return domain.Budget{}, err
+	}
+	b.Amounts, err = r.loadBudgetAmounts(ctx, guid)
+	return b, err
+}
+
+// UpdateBudget replaces a budget's fields and amounts.
+func (r *Repository) UpdateBudget(ctx context.Context, b domain.Budget) (domain.Budget, error) {
+	return b, pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`UPDATE budgets SET name=$2, description=$3, period_type=$4, num_periods=$5, start_date=$6
+			  WHERE guid=$1`,
+			b.GUID, b.Name, b.Description, string(b.PeriodType), b.NumPeriods, schedDate(b.StartDate),
+		)
+		if err != nil {
+			return fmt.Errorf("update budget: %w", err)
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrBudgetNotFound
+		}
+		// Delete existing amounts and re-insert so stale entries are removed.
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM budget_amounts WHERE budget_guid = $1`, b.GUID,
+		); err != nil {
+			return fmt.Errorf("clear budget amounts: %w", err)
+		}
+		return insertBudgetAmounts(ctx, tx, b.GUID, b.Amounts)
+	})
+}
+
+// DeleteBudget removes a budget and its amounts.
+func (r *Repository) DeleteBudget(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM budgets WHERE guid = $1`, guid)
+	if err != nil {
+		return fmt.Errorf("delete budget: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrBudgetNotFound
+	}
+	return nil
+}
+
+// BookGUIDForBudget returns the book a budget belongs to.
+func (r *Repository) BookGUIDForBudget(ctx context.Context, guid string) (string, error) {
+	var bookGUID string
+	err := r.pool.QueryRow(ctx,
+		`SELECT book_guid FROM budgets WHERE guid = $1`, guid,
+	).Scan(&bookGUID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrBudgetNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("book for budget: %w", err)
+	}
+	return bookGUID, nil
+}
+
+func scanBudget(row scannable) (domain.Budget, error) {
+	var (
+		b         domain.Budget
+		period    string
+		startDate *string
+	)
+	if err := row.Scan(
+		&b.GUID, &b.BookGUID, &b.Name, &b.Description, &period, &b.NumPeriods, &startDate,
+	); err != nil {
+		return domain.Budget{}, err
+	}
+	b.PeriodType = domain.BudgetPeriodType(period)
+	b.StartDate = parseSchedDate(startDate)
+	return b, nil
+}
+
+func (r *Repository) loadBudgetAmounts(ctx context.Context, budgetGUID string) ([]domain.BudgetAmount, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT account_guid, period_num, value_num, value_denom
+		   FROM budget_amounts WHERE budget_guid = $1 ORDER BY period_num, account_guid`, budgetGUID)
+	if err != nil {
+		return nil, fmt.Errorf("load budget amounts: %w", err)
+	}
+	defer rows.Close()
+	var amounts []domain.BudgetAmount
+	for rows.Next() {
+		var (
+			amt          domain.BudgetAmount
+			vNum, vDenom int64
+		)
+		if err := rows.Scan(&amt.AccountGUID, &amt.PeriodNum, &vNum, &vDenom); err != nil {
+			return nil, fmt.Errorf("scan budget amount: %w", err)
+		}
+		val, err := domain.FromNumDenom(vNum, vDenom)
+		if err != nil {
+			return nil, fmt.Errorf("budget amount value: %w", err)
+		}
+		amt.Value = val
+		amounts = append(amounts, amt)
+	}
+	return amounts, rows.Err()
+}

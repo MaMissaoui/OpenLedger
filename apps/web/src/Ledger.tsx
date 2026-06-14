@@ -10,6 +10,7 @@ import { TransactionDialog } from "./components/TransactionDialog";
 import { TradeSecurityDialog } from "./components/TradeSecurityDialog";
 import { NewAccountDialog } from "./components/NewAccountDialog";
 import { ScheduledTransactionsView } from "./components/ScheduledTransactionsView";
+import BudgetView from "./components/BudgetView";
 
 export function Ledger() {
   const books = useQuery({ queryKey: ["books"], queryFn: api.listBooks });
@@ -26,7 +27,7 @@ export function Ledger() {
   const [editTxGuid, setEditTxGuid] = useState<string | null>(null);
   const [showNewAccount, setShowNewAccount] = useState(false);
   const [showTrade, setShowTrade] = useState(false);
-  const [view, setView] = useState<"ledger" | "reports" | "portfolio" | "scheduled">("ledger");
+  const [view, setView] = useState<"ledger" | "reports" | "portfolio" | "scheduled" | "budget">("ledger");
 
   const postable = (accounts.data ?? []).filter((a) => !a.placeholder && a.type !== "ROOT");
 
@@ -84,6 +85,12 @@ export function Ledger() {
           >
             Scheduled
           </button>
+          <button
+            className={`topbar__tab${view === "budget" ? " topbar__tab--active" : ""}`}
+            onClick={() => setView("budget")}
+          >
+            Budget
+          </button>
         </nav>
         <div className="topbar__right">
           <span className="topbar__user mono">book {book.guid.slice(0, 8)}…</span>
@@ -116,6 +123,8 @@ export function Ledger() {
         <PortfolioView book={book} onTrade={() => setShowTrade(true)} />
       ) : view === "scheduled" ? (
         <ScheduledTransactionsView book={book} accounts={accounts.data ?? []} />
+      ) : view === "budget" ? (
+        <BudgetView bookGuid={book.guid} />
       ) : (
         <div className="workspace">
           <AccountTree

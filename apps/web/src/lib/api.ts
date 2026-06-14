@@ -2,9 +2,12 @@ import type {
   Account,
   BalanceSheet,
   Book,
+  Budget,
+  BudgetReport,
   Commodity,
   CapitalGainsReport,
   IncomeStatement,
+  NewBudget,
   NewScheduledTransaction,
   Numeric,
   Portfolio,
@@ -182,4 +185,22 @@ export const api = {
   // cookie is sent automatically).
   exportGnuCashUrl: (bookGuid: string, format: "sqlite" | "xml" = "sqlite") =>
     `/api/v1/books/${bookGuid}/export/gnucash${format === "xml" ? "?format=xml" : ""}`,
+
+  listBudgets: (bookGuid: string) =>
+    request<{ bookGuid: string; budgets: Budget[] }>(`/api/v1/books/${bookGuid}/budgets`),
+  createBudget: (bookGuid: string, input: NewBudget) =>
+    post<Budget>(`/api/v1/books/${bookGuid}/budgets`, input),
+  getBudget: (guid: string) => request<Budget>(`/api/v1/budgets/${guid}`),
+  updateBudget: (guid: string, input: NewBudget) =>
+    request<Budget>(`/api/v1/budgets/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteBudget: (guid: string) =>
+    request<void>(`/api/v1/budgets/${guid}`, { method: "DELETE" }),
+  budgetReport: (guid: string, asOf?: string) => {
+    const q = asOf ? `?asOf=${encodeURIComponent(asOf)}` : "";
+    return request<BudgetReport>(`/api/v1/budgets/${guid}/report${q}`);
+  },
 };

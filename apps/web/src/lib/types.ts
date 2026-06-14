@@ -203,6 +203,51 @@ export interface PostedSchedule {
   txGuid: string;
 }
 
+export interface BudgetAmount {
+  accountGuid: string;
+  periodNum: number;
+  value: Numeric;
+}
+
+export interface Budget {
+  guid: string;
+  bookGuid: string;
+  name: string;
+  description: string;
+  periodType: "monthly" | "quarterly" | "yearly";
+  numPeriods: number;
+  startDate: string;
+  amounts: BudgetAmount[];
+}
+
+export interface NewBudget {
+  name: string;
+  description: string;
+  periodType: "monthly" | "quarterly" | "yearly";
+  numPeriods: number;
+  startDate: string;
+  amounts: BudgetAmount[];
+}
+
+export interface BudgetVarianceLine {
+  account: Account;
+  budgeted: Numeric;
+  actual: Numeric;
+  variance: Numeric;
+}
+
+export interface BudgetReport {
+  budgetGuid: string;
+  periodNum: number;
+  periodLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  lines: BudgetVarianceLine[];
+  totalBudgeted: Numeric;
+  totalActual: Numeric;
+  totalVariance: Numeric;
+}
+
 export interface RegisterEntry {
   splitGuid: string;
   txGuid: string;
