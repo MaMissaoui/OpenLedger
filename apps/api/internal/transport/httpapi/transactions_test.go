@@ -48,6 +48,13 @@ type fakeRepo struct {
 	loadBookData app.GnuCashData
 	loadBookErr  error
 
+	// Reconcile side. splitUnknown forces a 404; the reconciled* fields capture
+	// what SetSplitReconcile was asked to write.
+	splitUnknown    bool
+	reconciledSplit string
+	reconciledState domain.ReconcileState
+	reconciledDate  *time.Time
+
 	// Provision side.
 	provisionedUserID string // returned by FindOrCreateLDAPUser (default "user-1")
 
@@ -84,6 +91,20 @@ func (f *fakeRepo) BookGUIDForAccount(_ context.Context, _ string) (string, erro
 		return f.accountBookGUID, nil
 	}
 	return "book-1", nil
+}
+
+func (f *fakeRepo) AccountGUIDForSplit(_ context.Context, _ string) (string, error) {
+	if f.splitUnknown {
+		return "", app.ErrSplitNotFound
+	}
+	return "checking", nil
+}
+
+func (f *fakeRepo) SetSplitReconcile(_ context.Context, splitGUID string, state domain.ReconcileState, date *time.Time) error {
+	f.reconciledSplit = splitGUID
+	f.reconciledState = state
+	f.reconciledDate = date
+	return nil
 }
 
 func (f *fakeRepo) InsertTransaction(_ context.Context, tx domain.Transaction, _ app.AuditActor) error {
@@ -225,6 +246,7 @@ func newTestServer(repo *fakeRepo) http.Handler {
 		app.NewAuthzService(repo),
 		app.NewImportService(repo, repo),
 		app.NewExportService(repo, &fakeWriter{}),
+		app.NewReconcileService(repo),
 	).Routes()
 }
 

@@ -75,6 +75,9 @@ type MembershipRepository interface {
 	// BookGUIDForAccount returns the book an account belongs to (by walking up
 	// to the root account), or ErrAccountNotFound if the account does not exist.
 	BookGUIDForAccount(ctx context.Context, accountGUID string) (string, error)
+	// AccountGUIDForSplit returns the account a split is posted to, or
+	// ErrSplitNotFound if the split does not exist.
+	AccountGUIDForSplit(ctx context.Context, splitGUID string) (string, error)
 }
 
 // AuthzService answers "may this user perform this action on this book?" for the
@@ -114,6 +117,16 @@ func (s *AuthzService) AuthorizeAccount(ctx context.Context, userID, accountGUID
 		return err
 	}
 	return s.AuthorizeBook(ctx, userID, bookGUID, need)
+}
+
+// AuthorizeSplit resolves the split's account (and thus its book) and authorizes
+// the user against it, returning ErrSplitNotFound if the split does not exist.
+func (s *AuthzService) AuthorizeSplit(ctx context.Context, userID, splitGUID string, need Access) error {
+	accountGUID, err := s.repo.AccountGUIDForSplit(ctx, splitGUID)
+	if err != nil {
+		return err
+	}
+	return s.AuthorizeAccount(ctx, userID, accountGUID, need)
 }
 
 // AuthorizeAccounts authorizes the user against the book(s) the given accounts

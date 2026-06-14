@@ -81,6 +81,13 @@ func (s *Server) authorizeAccounts(w http.ResponseWriter, r *http.Request, accou
 	return !writeAuthzError(w, s.authz.AuthorizeAccounts(r.Context(), actor.UserID, accountGUIDs, need))
 }
 
+// authorizeSplit enforces the user's role on the book the split's account
+// belongs to.
+func (s *Server) authorizeSplit(w http.ResponseWriter, r *http.Request, splitGUID string, need app.Access) bool {
+	actor := actorFromContext(r.Context())
+	return !writeAuthzError(w, s.authz.AuthorizeSplit(r.Context(), actor.UserID, splitGUID, need))
+}
+
 // writeAuthzError maps an authorization error to an HTTP response, returning
 // whether it handled one. A nil error is a no-op returning false.
 func writeAuthzError(w http.ResponseWriter, err error) bool {
@@ -95,6 +102,8 @@ func writeAuthzError(w http.ResponseWriter, err error) bool {
 		writeError(w, http.StatusNotFound, "book not found")
 	case errors.Is(err, app.ErrAccountNotFound):
 		writeError(w, http.StatusNotFound, "account not found")
+	case errors.Is(err, app.ErrSplitNotFound):
+		writeError(w, http.StatusNotFound, "split not found")
 	default:
 		writeError(w, http.StatusInternalServerError, "internal error")
 	}
