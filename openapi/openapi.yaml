@@ -94,6 +94,70 @@ paths:
           description: The authenticated user has no membership on this book
         "404":
           description: Book not found
+  /api/v1/books/{id}/reports/balance-sheet:
+    get:
+      summary: Balance sheet (assets, liabilities, equity) as of a date
+      operationId: getBalanceSheet
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: asOf
+          in: query
+          description: Point in time (inclusive) the balances are taken at. Defaults to now.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: The balance sheet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceSheet"
+        "400":
+          description: Malformed asOf timestamp
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
+  /api/v1/books/{id}/reports/income-statement:
+    get:
+      summary: Income statement (income, expense, net) over a date range
+      operationId: getIncomeStatement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: Start of the period (inclusive). Omit for an open lower bound.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End of the period (inclusive). Defaults to now.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: The income statement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncomeStatement"
+        "400":
+          description: Malformed from/to timestamp
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
   /api/v1/accounts:
     post:
       summary: Create an account in a book
@@ -383,6 +447,71 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AccountWithBalance"
+    ReportLine:
+      type: object
+      description: One account's natural-sign balance within a report section.
+      properties:
+        account:
+          $ref: "#/components/schemas/Account"
+        balance:
+          $ref: "#/components/schemas/Numeric"
+    ReportSection:
+      type: object
+      description: >-
+        A group of report lines with their total, both in natural sign
+        (positive for the account type's normal direction). Zero-balance
+        accounts are omitted.
+      properties:
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportLine"
+        total:
+          $ref: "#/components/schemas/Numeric"
+    BalanceSheet:
+      type: object
+      description: >-
+        Point-in-time statement of financial position. For a balanced book,
+        assets.total equals totalLiabilitiesAndEquity. Single-currency only;
+        balances are not converted across commodities.
+      properties:
+        bookGuid:
+          type: string
+        asOf:
+          type: string
+          format: date-time
+        assets:
+          $ref: "#/components/schemas/ReportSection"
+        liabilities:
+          $ref: "#/components/schemas/ReportSection"
+        equity:
+          $ref: "#/components/schemas/ReportSection"
+        retainedEarnings:
+          allOf:
+            - $ref: "#/components/schemas/Numeric"
+          description: Net income for the period, folded into equity.
+        totalLiabilitiesAndEquity:
+          $ref: "#/components/schemas/Numeric"
+    IncomeStatement:
+      type: object
+      description: Statement of performance over [from, to]. Single-currency only.
+      properties:
+        bookGuid:
+          type: string
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        income:
+          $ref: "#/components/schemas/ReportSection"
+        expense:
+          $ref: "#/components/schemas/ReportSection"
+        netIncome:
+          allOf:
+            - $ref: "#/components/schemas/Numeric"
+          description: Total income minus total expense.
     Numeric:
       type: object
       description: Exact rational amount (numerator/denominator).

@@ -37,10 +37,11 @@ func main() {
 	ledger := app.NewLedgerService(repo)
 	structure := app.NewStructureService(repo)
 	price := app.NewPriceService(repo)
+	report := app.NewReportService(repo)
 	provision := app.NewProvisionService(repo)
 	authz := app.NewAuthzService(repo)
 
-	server := httpapi.NewServer(posting, ledger, structure, price, provision, authz)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

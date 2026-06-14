@@ -62,3 +62,15 @@ func (t AccountType) IsDebitNormal() bool {
 		return false
 	}
 }
+
+// NaturalBalance converts a raw signed amount — debits positive, credits
+// negative, as splits are stored — into the type's natural reporting sign.
+// Debit-normal types keep the raw sign; credit-normal types (liability, income,
+// equity, payable, …) are negated so that, e.g., income and liabilities read as
+// positive on reports.
+func (t AccountType) NaturalBalance(raw GncNumeric) GncNumeric {
+	if t.IsDebitNormal() {
+		return raw
+	}
+	return raw.Neg()
+}

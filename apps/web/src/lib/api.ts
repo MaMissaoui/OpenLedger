@@ -1,4 +1,13 @@
-import type { Account, Book, Commodity, Numeric, Price, RegisterPage } from "./types";
+import type {
+  Account,
+  BalanceSheet,
+  Book,
+  Commodity,
+  IncomeStatement,
+  Numeric,
+  Price,
+  RegisterPage,
+} from "./types";
 
 // ApiError carries the HTTP status so callers can branch (e.g. 422 unbalanced)
 // and a human message from the API's { error } body.
@@ -90,4 +99,15 @@ export const api = {
     source?: string;
     type?: string;
   }) => post<Price>("/api/v1/prices", input),
+  getBalanceSheet: (bookGuid: string, asOf?: string) => {
+    const q = asOf ? `?asOf=${encodeURIComponent(asOf)}` : "";
+    return request<BalanceSheet>(`/api/v1/books/${bookGuid}/reports/balance-sheet${q}`);
+  },
+  getIncomeStatement: (bookGuid: string, from?: string, to?: string) => {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const q = params.toString() ? `?${params}` : "";
+    return request<IncomeStatement>(`/api/v1/books/${bookGuid}/reports/income-statement${q}`);
+  },
 };

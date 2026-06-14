@@ -341,7 +341,45 @@ ORDER BY t.code, t.name`
 		return nil, fmt.Errorf("list accounts: %w", err)
 	}
 	defer rows.Close()
+	return scanAccountBalances(rows)
+}
 
+// AccountBalances returns every descendant of rootGUID with the raw signed sum
+// of its splits' quantities, restricted to transactions whose post_date falls
+// within [from, to] (a nil bound is open on that side). It backs the financial
+// reports; balances are in each account's own commodity.
+func (r *Repository) AccountBalances(ctx context.Context, rootGUID string, from, to *time.Time) ([]app.AccountWithBalance, error) {
+	const sql = `
+WITH RECURSIVE tree AS (
+    SELECT guid, name, account_type, commodity_guid, parent_guid, code, description, hidden, placeholder
+    FROM accounts WHERE parent_guid = $1
+    UNION ALL
+    SELECT a.guid, a.name, a.account_type, a.commodity_guid, a.parent_guid, a.code, a.description, a.hidden, a.placeholder
+    FROM accounts a JOIN tree t ON a.parent_guid = t.guid
+)
+SELECT t.guid, t.name, t.account_type, t.commodity_guid, t.parent_guid, t.code, t.description, t.hidden, t.placeholder,
+       COALESCE(SUM(CASE WHEN tx.guid IS NOT NULL THEN s.quantity_num END), 0) AS balance_num,
+       COALESCE(c.fraction, 1)                                                  AS balance_denom
+FROM tree t
+LEFT JOIN commodities c   ON c.guid = t.commodity_guid
+LEFT JOIN splits s        ON s.account_guid = t.guid
+LEFT JOIN transactions tx ON tx.guid = s.tx_guid
+    AND ($2::timestamptz IS NULL OR tx.post_date >= $2)
+    AND ($3::timestamptz IS NULL OR tx.post_date <= $3)
+GROUP BY t.guid, t.name, t.account_type, t.commodity_guid, t.parent_guid, t.code, t.description, t.hidden, t.placeholder, c.fraction
+ORDER BY t.code, t.name`
+
+	rows, err := r.pool.Query(ctx, sql, rootGUID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("account balances: %w", err)
+	}
+	defer rows.Close()
+	return scanAccountBalances(rows)
+}
+
+// scanAccountBalances reads rows shaped as (account columns…, balance_num,
+// balance_denom) into app.AccountWithBalance values.
+func scanAccountBalances(rows pgx.Rows) ([]app.AccountWithBalance, error) {
 	var accounts []app.AccountWithBalance
 	for rows.Next() {
 		var (

@@ -52,6 +52,41 @@ export interface Price {
   value: Numeric;
 }
 
+// One account's natural-sign balance within a report section.
+export interface ReportLine {
+  account: Account;
+  balance: Numeric;
+}
+
+// A group of report lines plus their total, both in natural sign (positive for
+// the account type's normal direction). Zero-balance accounts are omitted.
+export interface ReportSection {
+  lines: ReportLine[];
+  total: Numeric;
+}
+
+// Point-in-time statement of financial position. For a balanced single-currency
+// book, assets.total === totalLiabilitiesAndEquity.
+export interface BalanceSheet {
+  bookGuid: string;
+  asOf: string;
+  assets: ReportSection;
+  liabilities: ReportSection;
+  equity: ReportSection;
+  retainedEarnings: Numeric;
+  totalLiabilitiesAndEquity: Numeric;
+}
+
+// Statement of performance over [from, to]. Single-currency only.
+export interface IncomeStatement {
+  bookGuid: string;
+  from: string;
+  to: string;
+  income: ReportSection;
+  expense: ReportSection;
+  netIncome: Numeric;
+}
+
 export interface RegisterEntry {
   splitGuid: string;
   txGuid: string;

@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/domain"
@@ -27,6 +28,7 @@ type fakeRepo struct {
 	bookRoot     string // root returned by BookRootAccount
 	bookNotFound bool   // make BookRootAccount return ErrBookNotFound
 	listAccounts []app.AccountWithBalance
+	reportRows   []app.AccountWithBalance // returned by AccountBalances
 
 	// Provision side.
 	provisionedUserID string // returned by FindOrCreateLDAPUser (default "user-1")
@@ -123,12 +125,17 @@ func (f *fakeRepo) ListAccountsUnderRoot(_ context.Context, _ string) ([]app.Acc
 	return f.listAccounts, nil
 }
 
+func (f *fakeRepo) AccountBalances(_ context.Context, _ string, _, _ *time.Time) ([]app.AccountWithBalance, error) {
+	return f.reportRows, nil
+}
+
 func newTestServer(repo *fakeRepo) http.Handler {
 	return NewServer(
 		app.NewPostingService(repo),
 		app.NewLedgerService(repo),
 		app.NewStructureService(repo),
 		app.NewPriceService(repo),
+		app.NewReportService(repo),
 		app.NewProvisionService(repo),
 		app.NewAuthzService(repo),
 	).Routes()

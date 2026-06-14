@@ -14,13 +14,14 @@ type Server struct {
 	ledger    *app.LedgerService
 	structure *app.StructureService
 	price     *app.PriceService
+	report    *app.ReportService
 	provision *app.ProvisionService
 	authz     *app.AuthzService
 }
 
 // NewServer builds a Server from its service dependencies.
-func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, provision *app.ProvisionService, authz *app.AuthzService) *Server {
-	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, provision: provision, authz: authz}
+func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, provision *app.ProvisionService, authz *app.AuthzService) *Server {
+	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, report: report, provision: provision, authz: authz}
 }
 
 // Routes returns the configured HTTP handler. /healthz is public; every
@@ -34,6 +35,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/books", s.requireAuth(s.handleListBooks))
 	mux.HandleFunc("POST /api/v1/books", s.requireAuth(s.handleCreateBook))
 	mux.HandleFunc("GET /api/v1/books/{id}/accounts", s.requireAuth(s.handleListAccounts))
+	mux.HandleFunc("GET /api/v1/books/{id}/reports/balance-sheet", s.requireAuth(s.handleBalanceSheet))
+	mux.HandleFunc("GET /api/v1/books/{id}/reports/income-statement", s.requireAuth(s.handleIncomeStatement))
 	mux.HandleFunc("POST /api/v1/accounts", s.requireAuth(s.handleCreateAccount))
 	mux.HandleFunc("POST /api/v1/transactions", s.requireAuth(s.handlePostTransaction))
 	mux.HandleFunc("GET /api/v1/accounts/{id}/register", s.requireAuth(s.handleAccountRegister))
