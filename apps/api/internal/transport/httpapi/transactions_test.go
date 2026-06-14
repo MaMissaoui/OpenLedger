@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -42,6 +43,10 @@ type fakeRepo struct {
 	readerErr    error
 	importedData *app.GnuCashData
 	importErr    error
+
+	// Export side. loadBookData/loadBookErr drive the fake ExportRepository.
+	loadBookData app.GnuCashData
+	loadBookErr  error
 
 	// Provision side.
 	provisionedUserID string // returned by FindOrCreateLDAPUser (default "user-1")
@@ -178,6 +183,24 @@ func (f *fakeRepo) ReadGnuCashSQLite(_ context.Context, _ string) (app.GnuCashDa
 	return f.readerData, f.readerErr
 }
 
+// LoadBook is the fake ExportRepository: it returns the canned book data/error
+// the test configured.
+func (f *fakeRepo) LoadBook(_ context.Context, _ string) (app.GnuCashData, error) {
+	return f.loadBookData, f.loadBookErr
+}
+
+// fakeWriter is a stub GnuCashWriter that records what it was asked to write and
+// creates a placeholder file at the path so the handler can stream it back.
+type fakeWriter struct {
+	wrote *app.GnuCashData
+}
+
+func (fw *fakeWriter) WriteGnuCashSQLite(_ context.Context, path string, data app.GnuCashData) error {
+	cp := data
+	fw.wrote = &cp
+	return os.WriteFile(path, []byte("gnucash-export"), 0o600)
+}
+
 func (f *fakeRepo) ImportBook(_ context.Context, data app.GnuCashData, _ string) error {
 	if f.importErr != nil {
 		return f.importErr
@@ -197,6 +220,7 @@ func newTestServer(repo *fakeRepo) http.Handler {
 		app.NewProvisionService(repo),
 		app.NewAuthzService(repo),
 		app.NewImportService(repo, repo),
+		app.NewExportService(repo, &fakeWriter{}),
 	).Routes()
 }
 
