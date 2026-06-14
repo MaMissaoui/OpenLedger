@@ -347,6 +347,103 @@ func (r *Repository) InsertBook(ctx context.Context, b domain.Book, root, templa
 	})
 }
 
+// ImportBook persists a parsed GnuCash book in a single DB transaction:
+// commodities first (accounts reference them), then accounts in parent-before-
+// child order (the self-referential parent_guid FK), then the book row and its
+// owner membership, then every transaction with its splits. A primary-key
+// collision (re-importing the same file) maps to app.ErrImportConflict.
+func (r *Repository) ImportBook(ctx context.Context, data app.GnuCashData, ownerUserID string) error {
+	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		for _, c := range data.Commodities {
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO commodities (guid, namespace, mnemonic, fullname, fraction)
+				 VALUES ($1, $2, $3, $4, $5)`,
+				c.GUID, c.Namespace, c.Mnemonic, nullable(c.Fullname), c.Fraction,
+			); err != nil {
+				return importErr("insert commodity", err)
+			}
+		}
+
+		if err := insertAccountsParentFirst(ctx, tx, data.Accounts); err != nil {
+			return err
+		}
+
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO books (guid, root_account_guid, root_template_guid)
+			 VALUES ($1, $2, $3)`,
+			data.Book.GUID, data.Book.RootAccountGUID, data.Book.RootTemplateGUID,
+		); err != nil {
+			return importErr("insert book", err)
+		}
+		if ownerUserID != "" {
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO memberships (user_id, book_guid, role) VALUES ($1, $2, 'owner')`,
+				ownerUserID, data.Book.GUID,
+			); err != nil {
+				return fmt.Errorf("insert owner membership: %w", err)
+			}
+		}
+
+		for _, t := range data.Transactions {
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO transactions (guid, currency_guid, num, post_date, enter_date, description)
+				 VALUES ($1, $2, $3, $4, $5, $6)`,
+				t.GUID, t.CurrencyGUID, t.Num, t.PostDate, t.EnterDate, t.Description,
+			); err != nil {
+				return importErr("insert transaction", err)
+			}
+			if err := r.insertSplits(ctx, tx, t); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// insertAccountsParentFirst writes accounts so that each parent is inserted
+// before its children, satisfying the self-referential parent_guid FK. Accounts
+// with no parent in the set (the root) go first. It errors if an account's
+// parent is missing from the set (an orphan), which would otherwise loop forever.
+func insertAccountsParentFirst(ctx context.Context, tx pgx.Tx, accounts []domain.Account) error {
+	present := make(map[string]bool, len(accounts))
+	for _, a := range accounts {
+		present[a.GUID] = true
+	}
+	done := make(map[string]bool, len(accounts))
+	remaining := accounts
+	for len(remaining) > 0 {
+		next := remaining[:0]
+		progressed := false
+		for _, a := range remaining {
+			parentReady := a.ParentGUID == "" || !present[a.ParentGUID] || done[a.ParentGUID]
+			if parentReady {
+				if err := insertAccount(ctx, tx, a); err != nil {
+					return importErr("insert account", err)
+				}
+				done[a.GUID] = true
+				progressed = true
+			} else {
+				next = append(next, a)
+			}
+		}
+		if !progressed {
+			return fmt.Errorf("import: account tree has a cycle or orphan among %d accounts", len(remaining))
+		}
+		remaining = next
+	}
+	return nil
+}
+
+// importErr maps a primary-key/unique collision during import to
+// app.ErrImportConflict and otherwise wraps the error with context.
+func importErr(context string, err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+		return app.ErrImportConflict
+	}
+	return fmt.Errorf("%s: %w", context, err)
+}
+
 // ListBooksForUser returns the books a user has a membership on, newest first.
 func (r *Repository) ListBooksForUser(ctx context.Context, userID string) ([]domain.Book, error) {
 	rows, err := r.pool.Query(ctx,

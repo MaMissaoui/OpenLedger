@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/openledger/openledger/apps/api/internal/app"
+	"github.com/openledger/openledger/apps/api/internal/infra/gnucash"
 	"github.com/openledger/openledger/apps/api/internal/infra/pg"
 	"github.com/openledger/openledger/apps/api/internal/transport/httpapi"
 )
@@ -40,8 +41,9 @@ func main() {
 	report := app.NewReportService(repo)
 	provision := app.NewProvisionService(repo)
 	authz := app.NewAuthzService(repo)
+	importer := app.NewImportService(gnucash.NewReader(), repo)
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

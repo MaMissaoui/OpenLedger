@@ -336,6 +336,40 @@ paths:
                 $ref: "#/components/schemas/Price"
         "400":
           description: Invalid input (missing commodity/currency or zero value)
+  /api/v1/imports/gnucash:
+    post:
+      summary: Import a GnuCash SQLite file as a new book
+      description: >
+        Uploads a GnuCash SQLite database and persists it as a new book owned by
+        the authenticated user, preserving GnuCash GUIDs. Every transaction is
+        re-validated to balance on the way in; if any does not, the whole import
+        is rejected with 422.
+      operationId: importGnuCash
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: A GnuCash SQLite database file.
+      responses:
+        "201":
+          description: Book imported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "400":
+          description: Missing upload or the file could not be read as a GnuCash database
+        "409":
+          description: The book has already been imported (GUID collision)
+        "422":
+          description: The file contains one or more unbalanced transactions
 components:
   schemas:
     Health:
@@ -693,3 +727,19 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RegisterEntry"
+    ImportResult:
+      type: object
+      description: Summary of a completed GnuCash import.
+      properties:
+        bookGuid:
+          type: string
+          description: GUID of the newly created book (preserved from the file).
+        commodities:
+          type: integer
+          description: Number of commodities imported.
+        accounts:
+          type: integer
+          description: Number of accounts imported (including root accounts).
+        transactions:
+          type: integer
+          description: Number of transactions imported.

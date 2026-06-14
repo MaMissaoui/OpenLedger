@@ -35,6 +35,14 @@ type fakeRepo struct {
 	listAccounts []app.AccountWithBalance
 	reportRows   []app.AccountWithBalance // returned by AccountBalances
 
+	// Import side. readerData/readerErr drive the fake GnuCashReader;
+	// importedData captures what ImportBook persisted, and importErr forces a
+	// repository failure.
+	readerData   app.GnuCashData
+	readerErr    error
+	importedData *app.GnuCashData
+	importErr    error
+
 	// Provision side.
 	provisionedUserID string // returned by FindOrCreateLDAPUser (default "user-1")
 
@@ -164,6 +172,21 @@ func (f *fakeRepo) AccountBalances(_ context.Context, _ string, _, _ *time.Time)
 	return f.reportRows, nil
 }
 
+// ReadGnuCashSQLite is the fake GnuCashReader: it ignores the path and returns
+// the canned reader data/error the test configured.
+func (f *fakeRepo) ReadGnuCashSQLite(_ context.Context, _ string) (app.GnuCashData, error) {
+	return f.readerData, f.readerErr
+}
+
+func (f *fakeRepo) ImportBook(_ context.Context, data app.GnuCashData, _ string) error {
+	if f.importErr != nil {
+		return f.importErr
+	}
+	cp := data
+	f.importedData = &cp
+	return nil
+}
+
 func newTestServer(repo *fakeRepo) http.Handler {
 	return NewServer(
 		app.NewPostingService(repo),
@@ -173,6 +196,7 @@ func newTestServer(repo *fakeRepo) http.Handler {
 		app.NewReportService(repo),
 		app.NewProvisionService(repo),
 		app.NewAuthzService(repo),
+		app.NewImportService(repo, repo),
 	).Routes()
 }
 
