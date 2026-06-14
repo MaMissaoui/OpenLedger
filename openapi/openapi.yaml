@@ -338,12 +338,14 @@ paths:
           description: Invalid input (missing commodity/currency or zero value)
   /api/v1/imports/gnucash:
     post:
-      summary: Import a GnuCash SQLite file as a new book
+      summary: Import a GnuCash file as a new book
       description: >
-        Uploads a GnuCash SQLite database and persists it as a new book owned by
-        the authenticated user, preserving GnuCash GUIDs. Every transaction is
-        re-validated to balance on the way in; if any does not, the whole import
-        is rejected with 422.
+        Uploads a GnuCash file and persists it as a new book owned by the
+        authenticated user, preserving GnuCash GUIDs. Both on-disk formats are
+        accepted and auto-detected from the file's contents: the SQLite backend
+        (highest fidelity) and the XML format (plain or gzipped, GnuCash's
+        default). Every transaction is re-validated to balance on the way in; if
+        any does not, the whole import is rejected with 422.
       operationId: importGnuCash
       requestBody:
         required: true
@@ -356,7 +358,7 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: A GnuCash SQLite database file.
+                  description: A GnuCash SQLite or XML (optionally gzipped) file.
       responses:
         "201":
           description: Book imported
@@ -365,7 +367,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ImportResult"
         "400":
-          description: Missing upload or the file could not be read as a GnuCash database
+          description: Missing upload or the file is not a recognised GnuCash SQLite or XML document
         "409":
           description: The book has already been imported (GUID collision)
         "422":

@@ -29,11 +29,12 @@ type GnuCashData struct {
 	Transactions []domain.Transaction
 }
 
-// GnuCashReader reads a GnuCash file from disk into domain types. The SQLite
-// implementation lives in internal/infra/gnucash; defining the port here keeps
-// the use-case independent of the file format.
+// GnuCashReader reads a GnuCash file from disk into domain types. Both the
+// SQLite and XML implementations live in internal/infra/gnucash; defining the
+// port here keeps the use-case independent of the file format.
 type GnuCashReader interface {
 	ReadGnuCashSQLite(ctx context.Context, path string) (GnuCashData, error)
+	ReadGnuCashXML(ctx context.Context, path string) (GnuCashData, error)
 }
 
 // ImportRepository persists a parsed GnuCash book atomically: every commodity,
@@ -70,8 +71,24 @@ func NewImportService(reader GnuCashReader, repo ImportRepository) *ImportServic
 // source file can never introduce an unbalanced transaction.
 func (s *ImportService) ImportSQLite(ctx context.Context, path, ownerUserID string) (ImportResult, error) {
 	data, err := s.reader.ReadGnuCashSQLite(ctx, path)
-	if err != nil {
-		return ImportResult{}, fmt.Errorf("%w: %w", ErrImportParse, err)
+	return s.persist(ctx, data, err, ownerUserID)
+}
+
+// ImportXML reads the GnuCash XML file at path (optionally gzipped, GnuCash's
+// default on-disk form) and persists it like ImportSQLite, applying the same
+// balance re-validation.
+func (s *ImportService) ImportXML(ctx context.Context, path, ownerUserID string) (ImportResult, error) {
+	data, err := s.reader.ReadGnuCashXML(ctx, path)
+	return s.persist(ctx, data, err, ownerUserID)
+}
+
+// persist validates and writes a freshly-read book: it maps a read error to
+// ErrImportParse, rejects a book-less file, re-checks the balance invariant
+// (wrapping domain.ErrUnbalanced) rather than trusting the source, then writes
+// the book. It is the shared tail of every Import* method.
+func (s *ImportService) persist(ctx context.Context, data GnuCashData, readErr error, ownerUserID string) (ImportResult, error) {
+	if readErr != nil {
+		return ImportResult{}, fmt.Errorf("%w: %w", ErrImportParse, readErr)
 	}
 	if data.Book.GUID == "" {
 		return ImportResult{}, fmt.Errorf("%w: file contains no book", ErrImportParse)
