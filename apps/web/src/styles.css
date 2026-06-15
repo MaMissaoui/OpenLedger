@@ -281,71 +281,151 @@ a {
 .sidenav {
   width: 220px;
   flex-shrink: 0;
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--paper-panel);
+  color: var(--ink);
+  border-right: 1px solid var(--rule-strong);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.sidenav--collapsed {
+  width: 56px;
+}
+
+/* Brand area keeps the dark ink header for contrast */
 .sidenav__brand {
-  padding: 1.4rem 1.2rem 1.1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  margin-bottom: 0.4rem;
+  background: var(--ink);
+  padding: 0.85rem 0.85rem 0.85rem 1rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+  min-height: 54px;
+}
+
+.sidenav__brand-mark {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: 0.78rem;
+  color: var(--gold);
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid var(--gold);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.sidenav__brand-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .sidenav__brand-name {
   font-family: var(--display);
   font-weight: 900;
-  font-size: 1.2rem;
+  font-size: 1rem;
   letter-spacing: -0.01em;
   display: block;
   color: var(--paper-raised);
+  line-height: 1.1;
 }
 
 .sidenav__brand-tag {
   display: block;
   margin-top: 0.1rem;
-  font-size: 0.63rem;
+  font-size: 0.58rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(241, 234, 217, 0.35);
+  color: rgba(241, 234, 217, 0.3);
+}
+
+/* Collapse toggle button — lives inside the dark brand bar */
+.sidenav__toggle {
+  border: none;
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(241, 234, 217, 0.55);
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  font-size: 0.75rem;
+  line-height: 1;
+  transition: background 0.12s ease, color 0.12s ease;
+  padding: 0;
+}
+.sidenav__toggle:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--paper-raised);
+}
+
+/* When collapsed: center just the mark + toggle */
+.sidenav--collapsed .sidenav__brand {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.7rem 0;
+}
+.sidenav--collapsed .sidenav__brand-text {
+  display: none;
 }
 
 .sidenav__nav {
   flex: 1;
-  padding: 0.2rem 0;
+  padding: 0.35rem 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidenav__item {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.65rem;
   width: 100%;
   border: none;
   background: none;
-  color: rgba(241, 234, 217, 0.6);
+  color: var(--ink-soft);
   font-family: var(--ui);
-  font-size: 0.875rem;
+  font-size: 0.855rem;
   font-weight: 500;
-  padding: 0.6rem 1.1rem 0.6rem 1rem;
+  padding: 0.58rem 1rem 0.58rem 0.9rem;
   text-align: left;
   border-left: 3px solid transparent;
   cursor: pointer;
+  white-space: nowrap;
   transition:
     color 0.12s ease,
     background 0.12s ease,
     border-color 0.12s ease;
 }
 .sidenav__item:hover {
-  color: var(--paper-raised);
-  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  background: rgba(34, 29, 22, 0.05);
 }
 .sidenav__item--active {
-  color: var(--paper-raised);
-  border-left-color: var(--gold);
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--oxblood);
+  border-left-color: var(--oxblood);
+  background: rgba(140, 43, 34, 0.07);
   font-weight: 600;
+}
+
+.sidenav--collapsed .sidenav__item {
+  justify-content: center;
+  padding: 0.72rem 0;
+  border-left-width: 2px;
 }
 
 .sidenav__icon {
@@ -355,6 +435,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: inherit;
 }
 .sidenav__icon svg {
   width: 18px;
@@ -362,31 +443,49 @@ a {
 }
 .sidenav__label {
   flex: 1;
+  overflow: hidden;
+}
+.sidenav--collapsed .sidenav__label {
+  display: none;
 }
 
 .sidenav__footer {
-  padding: 1rem 1.1rem 1.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 0.75rem 0.9rem 1.2rem;
+  border-top: 1px solid var(--rule-strong);
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.35rem;
+  overflow: hidden;
+  flex-shrink: 0;
 }
+.sidenav--collapsed .sidenav__footer {
+  align-items: center;
+  padding: 0.75rem 0 1.2rem;
+}
+
 .sidenav__book-id {
-  font-size: 0.7rem;
-  color: rgba(241, 234, 217, 0.28);
-  margin-bottom: 0.2rem;
+  font-size: 0.67rem;
+  color: var(--ink-faint);
+  margin-bottom: 0.1rem;
+  white-space: nowrap;
+  overflow: hidden;
 }
+.sidenav--collapsed .sidenav__book-id {
+  display: none;
+}
+
 .sidenav__link {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
-  color: rgba(241, 234, 217, 0.48);
+  gap: 0.45rem;
+  font-size: 0.79rem;
+  color: var(--ink-soft);
   text-decoration: none;
+  white-space: nowrap;
   transition: color 0.12s ease;
 }
 .sidenav__link:hover {
-  color: var(--paper);
+  color: var(--ink);
 }
 .sidenav__link-icon {
   width: 14px;
@@ -395,10 +494,17 @@ a {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: inherit;
 }
 .sidenav__link-icon svg {
   width: 14px;
   height: 14px;
+}
+.sidenav__link-text {
+  overflow: hidden;
+}
+.sidenav--collapsed .sidenav__link-text {
+  display: none;
 }
 
 /* ── shell content (right side) ───────────────────────────────────────────── */

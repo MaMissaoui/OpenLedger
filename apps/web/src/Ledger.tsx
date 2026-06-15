@@ -58,6 +58,16 @@ const Icon = {
       <path d="M7 17H3a1 1 0 01-1-1V2a1 1 0 011-1h4M12 13l4-4-4-4M16 9H7" />
     </svg>
   ),
+  chevronLeft: (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4l-5 5 5 5" />
+    </svg>
+  ),
+  chevronRight: (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 4l5 5-5 5" />
+    </svg>
+  ),
 };
 
 // ── nav item ──────────────────────────────────────────────────────────────────
@@ -65,17 +75,20 @@ function NavItem({
   label,
   icon,
   active,
+  collapsed,
   onClick,
 }: {
   label: string;
   icon: React.ReactNode;
   active: boolean;
+  collapsed: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       className={`sidenav__item${active ? " sidenav__item--active" : ""}`}
       onClick={onClick}
+      title={collapsed ? label : undefined}
     >
       <span className="sidenav__icon">{icon}</span>
       <span className="sidenav__label">{label}</span>
@@ -100,6 +113,7 @@ export function Ledger() {
   const [showNewAccount, setShowNewAccount] = useState(false);
   const [showTrade, setShowTrade] = useState(false);
   const [view, setView] = useState<View>("ledger");
+  const [collapsed, setCollapsed] = useState(false);
 
   const postable = (accounts.data ?? []).filter((a) => !a.placeholder && a.type !== "ROOT");
 
@@ -126,18 +140,28 @@ export function Ledger() {
   return (
     <div className="shell">
       {/* ── left sidebar ── */}
-      <nav className="sidenav">
+      <nav className={`sidenav${collapsed ? " sidenav--collapsed" : ""}`}>
         <div className="sidenav__brand">
-          <span className="sidenav__brand-name">OpenLedger</span>
-          <span className="sidenav__brand-tag">double-entry</span>
+          <span className="sidenav__brand-mark">OL</span>
+          <div className="sidenav__brand-text">
+            <span className="sidenav__brand-name">OpenLedger</span>
+            <span className="sidenav__brand-tag">double-entry</span>
+          </div>
+          <button
+            className="sidenav__toggle"
+            onClick={() => setCollapsed((c) => !c)}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? Icon.chevronRight : Icon.chevronLeft}
+          </button>
         </div>
 
         <div className="sidenav__nav">
-          <NavItem label="Ledger" icon={Icon.ledger} active={view === "ledger"} onClick={() => setView("ledger")} />
-          <NavItem label="Reports" icon={Icon.reports} active={view === "reports"} onClick={() => setView("reports")} />
-          <NavItem label="Portfolio" icon={Icon.portfolio} active={view === "portfolio"} onClick={() => setView("portfolio")} />
-          <NavItem label="Scheduled" icon={Icon.scheduled} active={view === "scheduled"} onClick={() => setView("scheduled")} />
-          <NavItem label="Budget" icon={Icon.budget} active={view === "budget"} onClick={() => setView("budget")} />
+          <NavItem label="Ledger" icon={Icon.ledger} active={view === "ledger"} collapsed={collapsed} onClick={() => setView("ledger")} />
+          <NavItem label="Reports" icon={Icon.reports} active={view === "reports"} collapsed={collapsed} onClick={() => setView("reports")} />
+          <NavItem label="Portfolio" icon={Icon.portfolio} active={view === "portfolio"} collapsed={collapsed} onClick={() => setView("portfolio")} />
+          <NavItem label="Scheduled" icon={Icon.scheduled} active={view === "scheduled"} collapsed={collapsed} onClick={() => setView("scheduled")} />
+          <NavItem label="Budget" icon={Icon.budget} active={view === "budget"} collapsed={collapsed} onClick={() => setView("budget")} />
         </div>
 
         <div className="sidenav__footer">
@@ -146,24 +170,27 @@ export function Ledger() {
             className="sidenav__link"
             href={api.exportGnuCashUrl(book.guid)}
             download={`${book.guid}.gnucash`}
+            title={collapsed ? "Export SQLite" : undefined}
           >
             <span className="sidenav__link-icon">{Icon.download}</span>
-            Export SQLite
+            <span className="sidenav__link-text">Export SQLite</span>
           </a>
           <a
             className="sidenav__link"
             href={api.exportGnuCashUrl(book.guid, "xml")}
             download={`${book.guid}.gnucash`}
+            title={collapsed ? "Export XML" : undefined}
           >
             <span className="sidenav__link-icon">{Icon.download}</span>
-            Export XML
+            <span className="sidenav__link-text">Export XML</span>
           </a>
           <a
             className="sidenav__link"
             href={`${import.meta.env.VITE_AUTHELIA_PORTAL_URL ?? "http://auth.openledger.localhost"}/logout`}
+            title={collapsed ? "Sign out" : undefined}
           >
             <span className="sidenav__link-icon">{Icon.signout}</span>
-            Sign out
+            <span className="sidenav__link-text">Sign out</span>
           </a>
         </div>
       </nav>
