@@ -340,8 +340,29 @@ export interface Invoice extends NewInvoice {
   dateDue: string | null;
   postTxnGuid: string;
   postAccGuid: string;
+  paidAt: string | null;
+  paidTxnGuid: string;
   createdAt: string;
   entries?: Entry[];
+}
+
+export interface AgingReportRow {
+  invoice: Invoice;
+  total: Numeric;
+  daysOverdue: number;
+}
+
+export interface AgingBucket {
+  label: string;
+  rows: AgingReportRow[];
+  total: Numeric;
+}
+
+export interface AgingReport {
+  bookGuid: string;
+  asOf: string;
+  buckets: AgingBucket[];
+  total: Numeric;
 }
 
 export interface RegisterEntry {

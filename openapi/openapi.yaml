@@ -224,6 +224,57 @@ paths:
           description: The authenticated user has no membership on this book
         "404":
           description: Book not found
+  /api/v1/books/{id}/reports/ar-aging:
+    get:
+      summary: Accounts-receivable aging report
+      description: >
+        Returns posted, unpaid customer invoices grouped into aging buckets
+        (Current / 1-30 / 31-60 / 61-90 / 91+ days overdue) based on their
+        due date (or post date + 30 days when no due date is set).
+      operationId: arAgingReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A/R aging report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgingReport"
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
+
+  /api/v1/books/{id}/reports/ap-aging:
+    get:
+      summary: Accounts-payable aging report
+      description: >
+        Returns posted, unpaid vendor bills grouped into aging buckets
+        (Current / 1-30 / 31-60 / 61-90 / 91+ days overdue).
+      operationId: apAgingReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A/P aging report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgingReport"
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
+
   /api/v1/securities/buy:
     post:
       summary: Buy a security
@@ -1173,6 +1224,34 @@ paths:
         "422":
           description: Invoice already posted
 
+  /api/v1/invoices/{id}/pay:
+    post:
+      summary: Record a payment against a posted invoice
+      operationId: payInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayInvoiceRequest"
+      responses:
+        "200":
+          description: Paid invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Invoice not found
+        "422":
+          description: Not posted or already paid
+
   /api/v1/invoices/{id}/post:
     post:
       summary: Post an invoice to the ledger
@@ -2084,6 +2163,12 @@ components:
               type: string
             postAccGuid:
               type: string
+            paidAt:
+              type: string
+              format: date-time
+              nullable: true
+            paidTxnGuid:
+              type: string
             createdAt:
               type: string
               format: date-time
@@ -2165,3 +2250,53 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Entry"
+
+    PayInvoiceRequest:
+      type: object
+      required: [paymentAccGuid]
+      properties:
+        paymentAccGuid:
+          type: string
+          description: Cash or bank account GUID to debit (customer invoice) or credit (vendor bill)
+        paymentDate:
+          type: string
+          format: date
+
+    AgingReportRow:
+      type: object
+      properties:
+        invoice:
+          $ref: "#/components/schemas/Invoice"
+        total:
+          $ref: "#/components/schemas/GncNumeric"
+        daysOverdue:
+          type: integer
+          description: Negative when not yet due
+
+    AgingBucket:
+      type: object
+      properties:
+        label:
+          type: string
+          description: "Current | 1-30 days | 31-60 days | 61-90 days | 91+ days"
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgingReportRow"
+        total:
+          $ref: "#/components/schemas/GncNumeric"
+
+    AgingReport:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        asOf:
+          type: string
+          format: date-time
+        buckets:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgingBucket"
+        total:
+          $ref: "#/components/schemas/GncNumeric"

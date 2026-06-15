@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { Account, Commodity, Customer, NewCustomer, NewVendor, Vendor } from "../lib/types";
-import InvoiceView from "./InvoiceView";
+import InvoiceView, { AgingReportView } from "./InvoiceView";
 
 // ── Commodity select — loads its own list when rendered ───────────────────────
 
@@ -348,29 +348,35 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
 
 // ── Top-level BusinessView ────────────────────────────────────────────────────
 
-type BizTab = "customers" | "vendors" | "invoices" | "bills";
+type BizTab = "customers" | "vendors" | "invoices" | "bills" | "ar-aging" | "ap-aging";
 
 const TAB_LABELS: Record<BizTab, string> = {
   customers: "Customers",
   vendors: "Vendors",
   invoices: "Invoices",
   bills: "Bills",
+  "ar-aging": "A/R Aging",
+  "ap-aging": "A/P Aging",
 };
 
 export default function BusinessView({ bookGuid, accounts }: { bookGuid: string; accounts: Account[] }) {
   const [tab, setTab] = useState<BizTab>("customers");
   const [newTrigger, setNewTrigger] = useState(0);
   const [commodities, setCommodities] = useState<Commodity[]>([]);
+  const [customers, setCustomers] = useState<Array<{ guid: string; name: string }>>([]);
+  const [vendors, setVendors] = useState<Array<{ guid: string; name: string }>>([]);
 
   useEffect(() => {
     api.listCommodities().then(setCommodities).catch(() => null);
-  }, []);
+    api.listCustomers(bookGuid).then(setCustomers).catch(() => null);
+    api.listVendors(bookGuid).then(setVendors).catch(() => null);
+  }, [bookGuid]);
 
   function handleNew() {
     setNewTrigger((n) => n + 1);
   }
 
-  const newLabel = TAB_LABELS[tab].replace(/s$/, ""); // strip trailing 's' → "Customer", "Invoice", etc.
+  const newLabel = TAB_LABELS[tab].replace(/s$/, "");
 
   return (
     <section className="register report">
@@ -381,7 +387,7 @@ export default function BusinessView({ bookGuid, accounts }: { bookGuid: string;
         </div>
         <div className="register__actions">
           <div className="biz-tabs">
-            {(["customers", "vendors", "invoices", "bills"] as BizTab[]).map((t) => (
+            {(["customers", "vendors", "invoices", "bills", "ar-aging", "ap-aging"] as BizTab[]).map((t) => (
               <button
                 key={t}
                 className={`biz-tab${tab === t ? " biz-tab--active" : ""}`}
@@ -389,9 +395,11 @@ export default function BusinessView({ bookGuid, accounts }: { bookGuid: string;
               >{TAB_LABELS[t]}</button>
             ))}
           </div>
-          <button className="btn btn--primary btn--sm" onClick={handleNew}>
-            + New {newLabel}
-          </button>
+          {(tab === "customers" || tab === "vendors" || tab === "invoices" || tab === "bills") && (
+            <button className="btn btn--primary btn--sm" onClick={handleNew}>
+              + New {newLabel}
+            </button>
+          )}
         </div>
       </header>
 
@@ -440,6 +448,12 @@ export default function BusinessView({ bookGuid, accounts }: { bookGuid: string;
           triggerNew={newTrigger}
           accounts={accounts}
         />
+      )}
+      {tab === "ar-aging" && (
+        <AgingReportView bookGuid={bookGuid} invType="invoice" owners={customers} />
+      )}
+      {tab === "ap-aging" && (
+        <AgingReportView bookGuid={bookGuid} invType="bill" owners={vendors} />
       )}
     </section>
   );

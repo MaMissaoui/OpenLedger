@@ -2262,12 +2262,13 @@ func scanVendor(s vendorScanner) (domain.Vendor, error) {
 
 // ── Invoices ─────────────────────────────────────────────────────────────────
 
+const invoiceCols = `guid, book_guid, id, type, owner_guid,
+	       date_opened, date_posted, date_due, notes, active, currency_guid,
+	       COALESCE(post_txn_guid,''), COALESCE(post_acc_guid,''), COALESCE(terms_guid,''),
+	       paid_at, COALESCE(paid_txn_guid,''), created_at`
+
 func (r *Repository) ListInvoices(ctx context.Context, bookGUID, invoiceType string) ([]domain.Invoice, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT guid, book_guid, id, type, owner_guid,
-		       date_opened, date_posted, date_due, notes, active, currency_guid,
-		       COALESCE(post_txn_guid,''), COALESCE(post_acc_guid,''), COALESCE(terms_guid,''),
-		       created_at
+	rows, err := r.pool.Query(ctx, `SELECT `+invoiceCols+`
 		FROM invoices
 		WHERE book_guid=$1 AND type=$2
 		ORDER BY date_opened DESC, created_at DESC`, bookGUID, invoiceType)
@@ -2302,12 +2303,7 @@ func (r *Repository) CreateInvoice(ctx context.Context, inv domain.Invoice) erro
 }
 
 func (r *Repository) GetInvoice(ctx context.Context, guid string) (domain.Invoice, error) {
-	row := r.pool.QueryRow(ctx, `
-		SELECT guid, book_guid, id, type, owner_guid,
-		       date_opened, date_posted, date_due, notes, active, currency_guid,
-		       COALESCE(post_txn_guid,''), COALESCE(post_acc_guid,''), COALESCE(terms_guid,''),
-		       created_at
-		FROM invoices WHERE guid=$1`, guid)
+	row := r.pool.QueryRow(ctx, `SELECT `+invoiceCols+` FROM invoices WHERE guid=$1`, guid)
 	inv, err := scanInvoice(row)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Invoice{}, domain.ErrInvoiceNotFound
@@ -2371,11 +2367,12 @@ type invoiceScanner interface {
 func scanInvoice(s invoiceScanner) (domain.Invoice, error) {
 	var inv domain.Invoice
 	var invType string
-	var datePosted, dateDue *time.Time
+	var datePosted, dateDue, paidAt *time.Time
 	err := s.Scan(
 		&inv.GUID, &inv.BookGUID, &inv.ID, &invType, &inv.OwnerGUID,
 		&inv.DateOpened, &datePosted, &dateDue, &inv.Notes, &inv.Active, &inv.CurrencyGUID,
-		&inv.PostTxnGUID, &inv.PostAccGUID, &inv.TermsGUID, &inv.CreatedAt,
+		&inv.PostTxnGUID, &inv.PostAccGUID, &inv.TermsGUID,
+		&paidAt, &inv.PaidTxnGUID, &inv.CreatedAt,
 	)
 	if err != nil {
 		return domain.Invoice{}, err
@@ -2383,7 +2380,103 @@ func scanInvoice(s invoiceScanner) (domain.Invoice, error) {
 	inv.Type = domain.InvoiceType(invType)
 	inv.DatePosted = datePosted
 	inv.DateDue = dateDue
+	inv.PaidAt = paidAt
 	return inv, nil
+}
+
+func (r *Repository) MarkInvoicePaid(ctx context.Context, guid, txnGUID string, paidAt time.Time) error {
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE invoices SET paid_at=$2, paid_txn_guid=$3
+		WHERE guid=$1 AND date_posted IS NOT NULL AND paid_at IS NULL`,
+		guid, paidAt, txnGUID)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrInvoiceNotFound
+	}
+	return nil
+}
+
+func (r *Repository) ARAgingRows(ctx context.Context, bookGUID string) ([]app.AgingRow, error) {
+	return r.agingRows(ctx, bookGUID, "invoice")
+}
+
+func (r *Repository) APAgingRows(ctx context.Context, bookGUID string) ([]app.AgingRow, error) {
+	return r.agingRows(ctx, bookGUID, "bill")
+}
+
+func (r *Repository) agingRows(ctx context.Context, bookGUID, invType string) ([]app.AgingRow, error) {
+	rows, err := r.pool.Query(ctx, `SELECT `+invoiceCols+`
+		FROM invoices
+		WHERE book_guid=$1 AND type=$2 AND date_posted IS NOT NULL AND paid_at IS NULL
+		ORDER BY date_posted`, bookGUID, invType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var invoices []domain.Invoice
+	for rows.Next() {
+		inv, err := scanInvoice(rows)
+		if err != nil {
+			return nil, err
+		}
+		invoices = append(invoices, inv)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(invoices) == 0 {
+		return nil, nil
+	}
+
+	// Load all entries for these invoices in one query.
+	guids := make([]string, len(invoices))
+	for i, inv := range invoices {
+		guids[i] = inv.GUID
+	}
+	entryRows, err := r.pool.Query(ctx, `
+		SELECT guid, invoice_guid, date, description, action, notes,
+		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
+		       taxable, created_at
+		FROM entries WHERE invoice_guid = ANY($1)`, guids)
+	if err != nil {
+		return nil, err
+	}
+	defer entryRows.Close()
+	byInvoice := make(map[string][]domain.InvoiceEntry)
+	for entryRows.Next() {
+		e, err := scanEntry(entryRows)
+		if err != nil {
+			return nil, err
+		}
+		byInvoice[e.InvoiceGUID] = append(byInvoice[e.InvoiceGUID], e)
+	}
+	if err := entryRows.Err(); err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	result := make([]app.AgingRow, 0, len(invoices))
+	for _, inv := range invoices {
+		total := domain.Zero()
+		for _, e := range byInvoice[inv.GUID] {
+			total = total.Add(e.LineTotal())
+		}
+		var dueDate time.Time
+		if inv.DateDue != nil {
+			dueDate = *inv.DateDue
+		} else if inv.DatePosted != nil {
+			dueDate = inv.DatePosted.Add(30 * 24 * time.Hour)
+		}
+		daysOverdue := int(now.Sub(dueDate).Hours() / 24)
+		result = append(result, app.AgingRow{
+			Invoice:     inv,
+			Total:       total,
+			DaysOverdue: daysOverdue,
+		})
+	}
+	return result, nil
 }
 
 // ── Entries ───────────────────────────────────────────────────────────────────

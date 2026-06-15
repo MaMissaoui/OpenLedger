@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import type { Account, Entry, Invoice, NewEntry, NewInvoice, Numeric } from "../lib/types";
+import type { Account, AgingReport, Entry, Invoice, NewEntry, NewInvoice, Numeric } from "../lib/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -237,6 +237,166 @@ function PostDialog({
   );
 }
 
+// ── Pay dialog ────────────────────────────────────────────────────────────────
+
+function PayDialog({
+  invoice,
+  accounts,
+  onClose,
+  onPaid,
+}: {
+  invoice: Invoice;
+  accounts: Account[];
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const [paymentDate, setPaymentDate] = useState(today());
+  const [paymentAccGuid, setPaymentAccGuid] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Cash/Bank accounts suitable for receiving/disbursing payment
+  const cashFilter = (a: Account) =>
+    (a.type === "BANK" || a.type === "CASH" || a.type === "ASSET") && !a.placeholder;
+
+  async function handlePay() {
+    setError(null);
+    if (!paymentAccGuid) { setError("Select a payment account."); return; }
+    setSaving(true);
+    try {
+      await api.payInvoice(invoice.guid, paymentAccGuid, paymentDate || undefined);
+      onPaid();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Payment failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="dialog-overlay" onClick={onClose}>
+      <div className="dialog" style={{ width: "min(400px, 96vw)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="dialog__header">
+          <h2>Record Payment</h2>
+          <button className="dialog__close" onClick={onClose}>×</button>
+        </div>
+        <div className="dialog__body">
+          {error && <p className="error" style={{ margin: 0 }}>{error}</p>}
+          <label className="field">
+            <span>Payment Date</span>
+            <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Received Into / Paid From *</span>
+            <AccountSelect
+              accounts={accounts}
+              value={paymentAccGuid}
+              onChange={setPaymentAccGuid}
+              filter={cashFilter}
+              placeholder="— cash / bank account —"
+            />
+          </label>
+        </div>
+        <div className="dialog__footer">
+          <button className="btn btn--ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn--primary" onClick={handlePay} disabled={saving}>
+            {saving ? "Recording…" : "Record Payment"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Aging report ──────────────────────────────────────────────────────────────
+
+export function AgingReportView({
+  bookGuid,
+  invType,
+  owners,
+}: {
+  bookGuid: string;
+  invType: "invoice" | "bill";
+  owners: Array<{ guid: string; name: string }>;
+}) {
+  const [report, setReport] = useState<AgingReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const fn = invType === "invoice" ? api.arAgingReport : api.apAgingReport;
+    fn(bookGuid)
+      .then(setReport)
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
+      .finally(() => setLoading(false));
+  }, [bookGuid, invType]);
+
+  const ownerMap = Object.fromEntries(owners.map((o) => [o.guid, o.name]));
+
+  if (loading) return <div className="empty"><span className="spinner" /></div>;
+  if (error) return <div style={{ padding: "1rem 1.5rem" }}><p className="error">{error}</p></div>;
+  if (!report) return null;
+
+  if (report.buckets.length === 0) {
+    return (
+      <div className="empty">
+        <span style={{ fontSize: "2rem", opacity: 0.25, lineHeight: 1 }}>✓</span>
+        <span style={{ fontWeight: 500, color: "var(--ink)" }}>All clear — no outstanding {invType === "invoice" ? "receivables" : "payables"}.</span>
+      </div>
+    );
+  }
+
+  const grandTotal = numericToFloat(report.total);
+
+  return (
+    <div style={{ padding: "0 1.5rem 1.5rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "0.25rem 0 1rem" }}>
+        <span style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>As of {report.asOf}</span>
+        <span style={{ fontWeight: 700, fontSize: "1.05rem" }}>Total outstanding: {grandTotal.toFixed(2)}</span>
+      </div>
+      {report.buckets.map((bucket) => (
+        <div key={bucket.label} style={{ marginBottom: "1.5rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.4rem" }}>
+            <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{bucket.label}</span>
+            <span style={{ fontWeight: 600, color: bucket.label === "Current" ? "var(--forest-dark)" : "var(--oxblood-soft)", fontSize: "0.9rem" }}>
+              {numericToFloat(bucket.total).toFixed(2)}
+            </span>
+          </div>
+          <table className="ledger-table">
+            <thead>
+              <tr>
+                <th>Number</th>
+                <th>{invType === "invoice" ? "Customer" : "Vendor"}</th>
+                <th>Date</th>
+                <th>Due</th>
+                <th style={{ textAlign: "right" }}>Amount</th>
+                <th style={{ textAlign: "right" }}>Days</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bucket.rows.map((row) => (
+                <tr key={row.invoice.guid}>
+                  <td className="mono" style={{ fontSize: "0.85rem" }}>{row.invoice.id || row.invoice.guid.slice(0, 8)}</td>
+                  <td>{ownerMap[row.invoice.ownerGuid] ?? "—"}</td>
+                  <td className="mono" style={{ fontSize: "0.85rem" }}>{row.invoice.datePosted ?? "—"}</td>
+                  <td className="mono" style={{ fontSize: "0.85rem", color: row.daysOverdue > 0 ? "var(--oxblood-soft)" : "var(--ink-soft)" }}>
+                    {row.invoice.dateDue ?? "—"}
+                  </td>
+                  <td style={{ textAlign: "right", fontWeight: 500 }}>{numericToFloat(row.total).toFixed(2)}</td>
+                  <td style={{ textAlign: "right", fontSize: "0.85rem", color: row.daysOverdue > 0 ? "var(--oxblood-soft)" : "var(--ink-soft)" }}>
+                    {row.daysOverdue > 0 ? `${row.daysOverdue}d` : "current"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Invoice detail ────────────────────────────────────────────────────────────
 
 function InvoiceDetail({
@@ -254,6 +414,7 @@ function InvoiceDetail({
   const [addingEntry, setAddingEntry] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [showPost, setShowPost] = useState(false);
+  const [showPay, setShowPay] = useState(false);
   const [loadingEntries, setLoadingEntries] = useState(false);
 
   async function reloadEntries() {
@@ -276,6 +437,7 @@ function InvoiceDetail({
 
   const total = entries.reduce((sum, e) => sum + numericToFloat(e.lineTotal), 0);
   const isPosted = invoice.datePosted !== null;
+  const isPaid = invoice.paidAt !== null;
 
   return (
     <div>
@@ -284,7 +446,11 @@ function InvoiceDetail({
         <h2 style={{ margin: 0, fontSize: "1.1rem" }}>
           {invoice.type === "invoice" ? "Invoice" : "Bill"} {invoice.id || invoice.guid.slice(0, 8)}
         </h2>
-        {isPosted ? (
+        {isPaid ? (
+          <span style={{ background: "rgba(26,127,55,0.18)", color: "var(--forest-dark)", borderRadius: "999px", padding: "0.15rem 0.55rem", fontSize: "0.75rem", fontWeight: 600 }}>
+            Paid
+          </span>
+        ) : isPosted ? (
           <span style={{ background: "rgba(26,127,55,0.12)", color: "var(--forest-dark)", borderRadius: "999px", padding: "0.15rem 0.55rem", fontSize: "0.75rem", fontWeight: 600 }}>
             Posted
           </span>
@@ -296,6 +462,11 @@ function InvoiceDetail({
         {!isPosted && (
           <button className="btn btn--primary btn--sm" style={{ marginLeft: "auto" }} onClick={() => setShowPost(true)}>
             Post to Ledger
+          </button>
+        )}
+        {isPosted && !isPaid && (
+          <button className="btn btn--primary btn--sm" style={{ marginLeft: isPosted ? "auto" : 0 }} onClick={() => setShowPay(true)}>
+            Record Payment
           </button>
         )}
       </div>
@@ -382,6 +553,14 @@ function InvoiceDetail({
           accounts={accounts}
           onClose={() => setShowPost(false)}
           onPosted={() => { setShowPost(false); onRefresh(); }}
+        />
+      )}
+      {showPay && (
+        <PayDialog
+          invoice={invoice}
+          accounts={accounts}
+          onClose={() => setShowPay(false)}
+          onPaid={() => { setShowPay(false); onRefresh(); }}
         />
       )}
     </div>
@@ -632,14 +811,12 @@ export default function InvoiceView({
                     : "—"}
                 </td>
                 <td>
-                  {inv.datePosted ? (
-                    <span style={{ background: "rgba(26,127,55,0.12)", color: "var(--forest-dark)", borderRadius: "999px", padding: "0.15rem 0.55rem", fontSize: "0.75rem", fontWeight: 600 }}>
-                      Posted
-                    </span>
+                  {inv.paidAt ? (
+                    <span style={{ background: "rgba(26,127,55,0.18)", color: "var(--forest-dark)", borderRadius: "999px", padding: "0.15rem 0.55rem", fontSize: "0.75rem", fontWeight: 600 }}>Paid</span>
+                  ) : inv.datePosted ? (
+                    <span style={{ background: "rgba(26,127,55,0.12)", color: "var(--forest-dark)", borderRadius: "999px", padding: "0.15rem 0.55rem", fontSize: "0.75rem", fontWeight: 600 }}>Posted</span>
                   ) : (
-                    <span style={{ background: "rgba(99,110,123,0.12)", color: "var(--ink-soft)", borderRadius: "999px", padding: "0.15rem 0.55rem", fontSize: "0.75rem", fontWeight: 600 }}>
-                      Draft
-                    </span>
+                    <span style={{ background: "rgba(99,110,123,0.12)", color: "var(--ink-soft)", borderRadius: "999px", padding: "0.15rem 0.55rem", fontSize: "0.75rem", fontWeight: 600 }}>Draft</span>
                   )}
                 </td>
                 <td style={{ textAlign: "right", whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>

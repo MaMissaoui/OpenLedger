@@ -57,6 +57,7 @@ func invoiceToResponse(inv domain.Invoice) map[string]any {
 		"postTxnGuid":  inv.PostTxnGUID,
 		"postAccGuid":  inv.PostAccGUID,
 		"termsGuid":    inv.TermsGUID,
+		"paidTxnGuid":  inv.PaidTxnGUID,
 		"createdAt":    inv.CreatedAt.Format(time.RFC3339),
 	}
 	if inv.DatePosted != nil {
@@ -68,6 +69,11 @@ func invoiceToResponse(inv domain.Invoice) map[string]any {
 		r["dateDue"] = inv.DateDue.Format("2006-01-02")
 	} else {
 		r["dateDue"] = nil
+	}
+	if inv.PaidAt != nil {
+		r["paidAt"] = inv.PaidAt.Format("2006-01-02")
+	} else {
+		r["paidAt"] = nil
 	}
 	if inv.Entries != nil {
 		entries := make([]map[string]any, len(inv.Entries))
@@ -393,4 +399,90 @@ func (s *Server) handleDeleteEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Payment handler ───────────────────────────────────────────────────────────
+
+func (s *Server) handlePayInvoice(w http.ResponseWriter, r *http.Request) {
+	userID := actorFromContext(r.Context()).UserID
+	guid := r.PathValue("id")
+	var body struct {
+		PaymentDate    string `json:"paymentDate"`
+		PaymentAccGUID string `json:"paymentAccGuid"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if body.PaymentAccGUID == "" {
+		writeError(w, http.StatusBadRequest, "paymentAccGuid is required")
+		return
+	}
+	payDate := time.Now().UTC().Truncate(24 * time.Hour)
+	if body.PaymentDate != "" {
+		if t, err := time.Parse("2006-01-02", body.PaymentDate); err == nil {
+			payDate = t
+		}
+	}
+	req := app.PayRequest{PaymentDate: payDate, PaymentAccGUID: body.PaymentAccGUID}
+	inv, err := s.invoice.PayInvoice(r.Context(), userID, guid, req)
+	if err != nil {
+		if errors.Is(err, domain.ErrInvoiceNotFound) {
+			writeError(w, http.StatusNotFound, "invoice not found")
+			return
+		}
+		if errors.Is(err, domain.ErrInvoiceNotPosted) {
+			writeError(w, http.StatusUnprocessableEntity, "invoice has not been posted")
+			return
+		}
+		if errors.Is(err, domain.ErrInvoiceAlreadyPaid) {
+			writeError(w, http.StatusUnprocessableEntity, "invoice is already paid")
+			return
+		}
+		writeAuthzError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, invoiceToResponse(inv))
+}
+
+// ── Aging report handlers ─────────────────────────────────────────────────────
+
+func (s *Server) handleARAgingReport(w http.ResponseWriter, r *http.Request) {
+	s.handleAgingReport(w, r, domain.InvoiceTypeCustomer)
+}
+
+func (s *Server) handleAPAgingReport(w http.ResponseWriter, r *http.Request) {
+	s.handleAgingReport(w, r, domain.InvoiceTypeBill)
+}
+
+func (s *Server) handleAgingReport(w http.ResponseWriter, r *http.Request, invType domain.InvoiceType) {
+	userID := actorFromContext(r.Context()).UserID
+	bookGUID := r.PathValue("id")
+	report, err := s.invoice.AgingReport(r.Context(), userID, bookGUID, invType)
+	if err != nil {
+		writeAuthzError(w, err)
+		return
+	}
+	buckets := make([]map[string]any, len(report.Buckets))
+	for i, b := range report.Buckets {
+		rows := make([]map[string]any, len(b.Rows))
+		for j, row := range b.Rows {
+			rows[j] = map[string]any{
+				"invoice":     invoiceToResponse(row.Invoice),
+				"total":       numericAtScale(row.Total, 100),
+				"daysOverdue": row.DaysOverdue,
+			}
+		}
+		buckets[i] = map[string]any{
+			"label": b.Label,
+			"rows":  rows,
+			"total": numericAtScale(b.Total, 100),
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"bookGuid": report.BookGUID,
+		"asOf":     report.AsOf,
+		"buckets":  buckets,
+		"total":    numericAtScale(report.Total, 100),
+	})
 }

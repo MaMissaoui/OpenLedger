@@ -16,12 +16,40 @@ type InvoiceRepository interface {
 	UpdateInvoice(ctx context.Context, inv domain.Invoice) error
 	DeleteInvoice(ctx context.Context, guid string) error
 	MarkInvoicePosted(ctx context.Context, guid, txnGUID, accGUID string, datePosted, dateDue *time.Time) error
+	MarkInvoicePaid(ctx context.Context, guid, txnGUID string, paidAt time.Time) error
+	// ARAgingRows returns posted unpaid invoices (type='invoice') for a book with
+	// their entry totals, for the A/R aging report.
+	ARAgingRows(ctx context.Context, bookGUID string) ([]AgingRow, error)
+	// APAgingRows returns posted unpaid bills (type='bill') for a book.
+	APAgingRows(ctx context.Context, bookGUID string) ([]AgingRow, error)
 
 	ListEntries(ctx context.Context, invoiceGUID string) ([]domain.InvoiceEntry, error)
 	CreateEntry(ctx context.Context, e domain.InvoiceEntry) error
 	GetEntry(ctx context.Context, guid string) (domain.InvoiceEntry, error)
 	UpdateEntry(ctx context.Context, e domain.InvoiceEntry) error
 	DeleteEntry(ctx context.Context, guid string) error
+}
+
+// AgingRow is one posted-unpaid invoice/bill with its computed total.
+type AgingRow struct {
+	Invoice     domain.Invoice
+	Total       domain.GncNumeric
+	DaysOverdue int // positive = overdue; negative = not yet due
+}
+
+// AgingBucket groups rows by overdue bracket.
+type AgingBucket struct {
+	Label string
+	Rows  []AgingRow
+	Total domain.GncNumeric
+}
+
+// AgingReport is the A/R or A/P aging result.
+type AgingReport struct {
+	BookGUID string
+	AsOf     string
+	Buckets  []AgingBucket
+	Total    domain.GncNumeric
 }
 
 // InvoiceService manages the lifecycle of invoices (customer) and bills (vendor).
@@ -166,6 +194,151 @@ func (s *InvoiceService) DeleteEntry(ctx context.Context, userID, guid string) e
 		return domain.ErrInvoiceAlreadyPosted
 	}
 	return s.repo.DeleteEntry(ctx, guid)
+}
+
+// PayRequest carries the parameters for recording payment against a posted invoice.
+type PayRequest struct {
+	PaymentDate    time.Time
+	PaymentAccGUID string // Cash/Bank account receiving (invoice) or disbursing (bill)
+}
+
+// PayInvoice records a full payment against a posted invoice. For a customer
+// invoice it debits the payment account and credits A/R; for a vendor bill it
+// debits A/P and credits the payment account. The invoice total is computed from
+// its entries at payment time.
+func (s *InvoiceService) PayInvoice(ctx context.Context, userID, guid string, req PayRequest) (domain.Invoice, error) {
+	inv, err := s.repo.GetInvoice(ctx, guid)
+	if err != nil {
+		return domain.Invoice{}, err
+	}
+	if err := s.authz.AuthorizeBook(ctx, userID, inv.BookGUID, AccessWrite); err != nil {
+		return domain.Invoice{}, err
+	}
+	if !inv.IsPosted() {
+		return domain.Invoice{}, domain.ErrInvoiceNotPosted
+	}
+	if inv.IsPaid() {
+		return domain.Invoice{}, domain.ErrInvoiceAlreadyPaid
+	}
+
+	entries, err := s.repo.ListEntries(ctx, guid)
+	if err != nil {
+		return domain.Invoice{}, err
+	}
+	total := domain.Zero()
+	for _, e := range entries {
+		total = total.Add(e.LineTotal())
+	}
+
+	// Payment splits: cash moves to/from the A/R or A/P account.
+	var splits []domain.Split
+	if inv.Type == domain.InvoiceTypeCustomer {
+		// Cash received: debit cash (+), credit A/R (-)
+		splits = []domain.Split{
+			{AccountGUID: req.PaymentAccGUID, Value: total, Quantity: total},
+			{AccountGUID: inv.PostAccGUID, Value: total.Neg(), Quantity: total.Neg()},
+		}
+	} else {
+		// Cash paid: debit A/P (-), credit cash (-)
+		splits = []domain.Split{
+			{AccountGUID: inv.PostAccGUID, Value: total, Quantity: total},
+			{AccountGUID: req.PaymentAccGUID, Value: total.Neg(), Quantity: total.Neg()},
+		}
+	}
+
+	payDate := req.PaymentDate
+	if payDate.IsZero() {
+		payDate = s.now().UTC().Truncate(24 * time.Hour)
+	}
+	label := "Payment"
+	if inv.ID != "" {
+		label = fmt.Sprintf("Payment: %s %s", func() string {
+			if inv.Type == domain.InvoiceTypeCustomer {
+				return "Invoice"
+			}
+			return "Bill"
+		}(), inv.ID)
+	}
+
+	tx := domain.Transaction{
+		CurrencyGUID: inv.CurrencyGUID,
+		PostDate:     payDate,
+		Description:  label,
+		Splits:       splits,
+	}
+	actor := AuditActor{UserID: userID, BookGUID: inv.BookGUID}
+	posted, err := s.posting.Post(ctx, tx, actor)
+	if err != nil {
+		return domain.Invoice{}, err
+	}
+
+	if err := s.repo.MarkInvoicePaid(ctx, guid, posted.GUID, payDate); err != nil {
+		return domain.Invoice{}, err
+	}
+
+	inv.PaidAt = &payDate
+	inv.PaidTxnGUID = posted.GUID
+	inv.Entries = entries
+	return inv, nil
+}
+
+// AgingReport returns the A/R or A/P aging for a book, bucketed by days overdue.
+func (s *InvoiceService) AgingReport(ctx context.Context, userID, bookGUID string, invType domain.InvoiceType) (AgingReport, error) {
+	if err := s.authz.AuthorizeBook(ctx, userID, bookGUID, AccessRead); err != nil {
+		return AgingReport{}, err
+	}
+
+	var rows []AgingRow
+	var err error
+	if invType == domain.InvoiceTypeCustomer {
+		rows, err = s.repo.ARAgingRows(ctx, bookGUID)
+	} else {
+		rows, err = s.repo.APAgingRows(ctx, bookGUID)
+	}
+	if err != nil {
+		return AgingReport{}, err
+	}
+
+	buckets := []AgingBucket{
+		{Label: "Current"},
+		{Label: "1–30 days"},
+		{Label: "31–60 days"},
+		{Label: "61–90 days"},
+		{Label: "91+ days"},
+	}
+	grand := domain.Zero()
+	for _, row := range rows {
+		var idx int
+		switch {
+		case row.DaysOverdue <= 0:
+			idx = 0
+		case row.DaysOverdue <= 30:
+			idx = 1
+		case row.DaysOverdue <= 60:
+			idx = 2
+		case row.DaysOverdue <= 90:
+			idx = 3
+		default:
+			idx = 4
+		}
+		buckets[idx].Rows = append(buckets[idx].Rows, row)
+		buckets[idx].Total = buckets[idx].Total.Add(row.Total)
+		grand = grand.Add(row.Total)
+	}
+
+	// Drop empty buckets.
+	filled := buckets[:0]
+	for _, b := range buckets {
+		if len(b.Rows) > 0 {
+			filled = append(filled, b)
+		}
+	}
+	return AgingReport{
+		BookGUID: bookGUID,
+		AsOf:     s.now().UTC().Format("2006-01-02"),
+		Buckets:  filled,
+		Total:    grand,
+	}, nil
 }
 
 // PostRequest carries the parameters for finalizing an invoice.

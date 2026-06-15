@@ -1,5 +1,6 @@
 import type {
   Account,
+  AgingReport,
   BalanceSheet,
   Book,
   Budget,
@@ -265,6 +266,12 @@ export const api = {
     request<void>(`/api/v1/invoices/${guid}`, { method: "DELETE" }),
   postInvoice: (guid: string, postAccGuid: string, postDate?: string, dueDate?: string) =>
     post<Invoice>(`/api/v1/invoices/${guid}/post`, { postAccGuid, postDate, dueDate }),
+  payInvoice: (guid: string, paymentAccGuid: string, paymentDate?: string) =>
+    post<Invoice>(`/api/v1/invoices/${guid}/pay`, { paymentAccGuid, paymentDate }),
+  arAgingReport: (bookGuid: string) =>
+    request<AgingReport>(`/api/v1/books/${bookGuid}/reports/ar-aging`),
+  apAgingReport: (bookGuid: string) =>
+    request<AgingReport>(`/api/v1/books/${bookGuid}/reports/ap-aging`),
 
   listEntries: (invoiceGuid: string) =>
     request<{ invoiceGuid: string; entries: Entry[] }>(

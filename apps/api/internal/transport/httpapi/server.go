@@ -90,10 +90,13 @@ func (s *Server) Routes() http.Handler {
 	// Business: invoices and bills
 	mux.HandleFunc("GET /api/v1/books/{id}/invoices", s.requireAuth(s.handleListInvoices))
 	mux.HandleFunc("POST /api/v1/books/{id}/invoices", s.requireAuth(s.handleCreateInvoice))
+	mux.HandleFunc("GET /api/v1/books/{id}/reports/ar-aging", s.requireAuth(s.handleARAgingReport))
+	mux.HandleFunc("GET /api/v1/books/{id}/reports/ap-aging", s.requireAuth(s.handleAPAgingReport))
 	mux.HandleFunc("GET /api/v1/invoices/{id}", s.requireAuth(s.handleGetInvoice))
 	mux.HandleFunc("PATCH /api/v1/invoices/{id}", s.requireAuth(s.handleUpdateInvoice))
 	mux.HandleFunc("DELETE /api/v1/invoices/{id}", s.requireAuth(s.handleDeleteInvoice))
 	mux.HandleFunc("POST /api/v1/invoices/{id}/post", s.requireAuth(s.handlePostInvoice))
+	mux.HandleFunc("POST /api/v1/invoices/{id}/pay", s.requireAuth(s.handlePayInvoice))
 	mux.HandleFunc("GET /api/v1/invoices/{id}/entries", s.requireAuth(s.handleListEntries))
 	mux.HandleFunc("POST /api/v1/invoices/{id}/entries", s.requireAuth(s.handleAddEntry))
 	mux.HandleFunc("PATCH /api/v1/entries/{id}", s.requireAuth(s.handleUpdateEntry))
