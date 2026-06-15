@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import type { Commodity, Customer, NewCustomer, NewVendor, Vendor } from "../lib/types";
+import type { Account, Commodity, Customer, NewCustomer, NewVendor, Vendor } from "../lib/types";
+import InvoiceView from "./InvoiceView";
 
 // ── Commodity select — loads its own list when rendered ───────────────────────
 
@@ -347,9 +348,16 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
 
 // ── Top-level BusinessView ────────────────────────────────────────────────────
 
-type BizTab = "customers" | "vendors";
+type BizTab = "customers" | "vendors" | "invoices" | "bills";
 
-export default function BusinessView({ bookGuid }: { bookGuid: string }) {
+const TAB_LABELS: Record<BizTab, string> = {
+  customers: "Customers",
+  vendors: "Vendors",
+  invoices: "Invoices",
+  bills: "Bills",
+};
+
+export default function BusinessView({ bookGuid, accounts }: { bookGuid: string; accounts: Account[] }) {
   const [tab, setTab] = useState<BizTab>("customers");
   const [newTrigger, setNewTrigger] = useState(0);
   const [commodities, setCommodities] = useState<Commodity[]>([]);
@@ -362,27 +370,27 @@ export default function BusinessView({ bookGuid }: { bookGuid: string }) {
     setNewTrigger((n) => n + 1);
   }
 
+  const newLabel = TAB_LABELS[tab].replace(/s$/, ""); // strip trailing 's' → "Customer", "Invoice", etc.
+
   return (
     <section className="register report">
       <header className="register__header">
         <div className="register__title">
           <div className="eyebrow">Business</div>
-          <h1>{tab === "customers" ? "Customers" : "Vendors"}</h1>
+          <h1>{TAB_LABELS[tab]}</h1>
         </div>
         <div className="register__actions">
-          {/* Tab switcher */}
           <div className="biz-tabs">
-            <button
-              className={`biz-tab${tab === "customers" ? " biz-tab--active" : ""}`}
-              onClick={() => setTab("customers")}
-            >Customers</button>
-            <button
-              className={`biz-tab${tab === "vendors" ? " biz-tab--active" : ""}`}
-              onClick={() => setTab("vendors")}
-            >Vendors</button>
+            {(["customers", "vendors", "invoices", "bills"] as BizTab[]).map((t) => (
+              <button
+                key={t}
+                className={`biz-tab${tab === t ? " biz-tab--active" : ""}`}
+                onClick={() => setTab(t)}
+              >{TAB_LABELS[t]}</button>
+            ))}
           </div>
           <button className="btn btn--primary btn--sm" onClick={handleNew}>
-            + New {tab === "customers" ? "Customer" : "Vendor"}
+            + New {newLabel}
           </button>
         </div>
       </header>
@@ -423,6 +431,14 @@ export default function BusinessView({ bookGuid }: { bookGuid: string }) {
             active: f.active,
             currencyGuid: f.currencyGuid,
           })}
+        />
+      )}
+      {(tab === "invoices" || tab === "bills") && (
+        <InvoiceView
+          bookGuid={bookGuid}
+          invType={tab === "invoices" ? "invoice" : "bill"}
+          triggerNew={newTrigger}
+          accounts={accounts}
         />
       )}
     </section>

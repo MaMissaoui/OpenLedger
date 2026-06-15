@@ -51,8 +51,9 @@ func main() {
 	budget := app.NewBudgetService(repo)
 	customer := app.NewCustomerService(repo, authz)
 	vendor := app.NewVendorService(repo, authz)
+	invoice := app.NewInvoiceService(repo, posting, authz)
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor, invoice)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

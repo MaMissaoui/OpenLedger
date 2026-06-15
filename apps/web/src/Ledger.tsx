@@ -217,7 +217,7 @@ export function Ledger() {
         ) : view === "budget" ? (
           <BudgetView bookGuid={book.guid} />
         ) : view === "business" ? (
-          <BusinessView bookGuid={book.guid} />
+          <BusinessView bookGuid={book.guid} accounts={accounts.data ?? []} />
         ) : (
           <div className="workspace">
             <AccountTree

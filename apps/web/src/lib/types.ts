@@ -304,6 +304,46 @@ export interface NewVendor {
   termsGuid?: string;
 }
 
+export interface NewEntry {
+  date?: string;
+  description?: string;
+  action?: string;
+  notes?: string;
+  quantity?: Numeric;
+  accountGuid: string;
+  price: Numeric;
+  taxable?: boolean;
+}
+
+export interface Entry extends NewEntry {
+  guid: string;
+  invoiceGuid: string;
+  lineTotal: Numeric;
+  createdAt: string;
+}
+
+export interface NewInvoice {
+  id?: string;
+  type: "invoice" | "bill";
+  ownerGuid: string;
+  dateOpened?: string;
+  notes?: string;
+  active?: boolean;
+  currencyGuid: string;
+  termsGuid?: string;
+}
+
+export interface Invoice extends NewInvoice {
+  guid: string;
+  bookGuid: string;
+  datePosted: string | null;
+  dateDue: string | null;
+  postTxnGuid: string;
+  postAccGuid: string;
+  createdAt: string;
+  entries?: Entry[];
+}
+
 export interface RegisterEntry {
   splitGuid: string;
   txGuid: string;

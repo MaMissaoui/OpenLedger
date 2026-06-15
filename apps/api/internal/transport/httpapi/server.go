@@ -27,11 +27,12 @@ type Server struct {
 	budget       *app.BudgetService
 	customer     *app.CustomerService
 	vendor       *app.VendorService
+	invoice      *app.InvoiceService
 }
 
 // NewServer builds a Server from its service dependencies.
-func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService, reconciler *app.ReconcileService, portfolio *app.PortfolioService, trade *app.TradeService, capitalGains *app.CapitalGainsService, schedule *app.ScheduleService, budget *app.BudgetService, customer *app.CustomerService, vendor *app.VendorService) *Server {
-	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, report: report, provision: provision, authz: authz, importer: importer, exporter: exporter, reconciler: reconciler, portfolio: portfolio, trade: trade, capitalGains: capitalGains, schedule: schedule, budget: budget, customer: customer, vendor: vendor}
+func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService, reconciler *app.ReconcileService, portfolio *app.PortfolioService, trade *app.TradeService, capitalGains *app.CapitalGainsService, schedule *app.ScheduleService, budget *app.BudgetService, customer *app.CustomerService, vendor *app.VendorService, invoice *app.InvoiceService) *Server {
+	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, report: report, provision: provision, authz: authz, importer: importer, exporter: exporter, reconciler: reconciler, portfolio: portfolio, trade: trade, capitalGains: capitalGains, schedule: schedule, budget: budget, customer: customer, vendor: vendor, invoice: invoice}
 }
 
 // Routes returns the configured HTTP handler. /healthz is public; every
@@ -86,6 +87,17 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/vendors/{id}", s.requireAuth(s.handleGetVendor))
 	mux.HandleFunc("PATCH /api/v1/vendors/{id}", s.requireAuth(s.handleUpdateVendor))
 	mux.HandleFunc("DELETE /api/v1/vendors/{id}", s.requireAuth(s.handleDeleteVendor))
+	// Business: invoices and bills
+	mux.HandleFunc("GET /api/v1/books/{id}/invoices", s.requireAuth(s.handleListInvoices))
+	mux.HandleFunc("POST /api/v1/books/{id}/invoices", s.requireAuth(s.handleCreateInvoice))
+	mux.HandleFunc("GET /api/v1/invoices/{id}", s.requireAuth(s.handleGetInvoice))
+	mux.HandleFunc("PATCH /api/v1/invoices/{id}", s.requireAuth(s.handleUpdateInvoice))
+	mux.HandleFunc("DELETE /api/v1/invoices/{id}", s.requireAuth(s.handleDeleteInvoice))
+	mux.HandleFunc("POST /api/v1/invoices/{id}/post", s.requireAuth(s.handlePostInvoice))
+	mux.HandleFunc("GET /api/v1/invoices/{id}/entries", s.requireAuth(s.handleListEntries))
+	mux.HandleFunc("POST /api/v1/invoices/{id}/entries", s.requireAuth(s.handleAddEntry))
+	mux.HandleFunc("PATCH /api/v1/entries/{id}", s.requireAuth(s.handleUpdateEntry))
+	mux.HandleFunc("DELETE /api/v1/entries/{id}", s.requireAuth(s.handleDeleteEntry))
 	return mux
 }
 

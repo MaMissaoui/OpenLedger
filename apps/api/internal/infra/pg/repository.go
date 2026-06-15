@@ -2259,3 +2259,250 @@ func scanVendor(s vendorScanner) (domain.Vendor, error) {
 	)
 	return v, err
 }
+
+// ── Invoices ─────────────────────────────────────────────────────────────────
+
+func (r *Repository) ListInvoices(ctx context.Context, bookGUID, invoiceType string) ([]domain.Invoice, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT guid, book_guid, id, type, owner_guid,
+		       date_opened, date_posted, date_due, notes, active, currency_guid,
+		       COALESCE(post_txn_guid,''), COALESCE(post_acc_guid,''), COALESCE(terms_guid,''),
+		       created_at
+		FROM invoices
+		WHERE book_guid=$1 AND type=$2
+		ORDER BY date_opened DESC, created_at DESC`, bookGUID, invoiceType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Invoice
+	for rows.Next() {
+		inv, err := scanInvoice(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, inv)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) CreateInvoice(ctx context.Context, inv domain.Invoice) error {
+	var termsGUID *string
+	if inv.TermsGUID != "" {
+		termsGUID = &inv.TermsGUID
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO invoices
+		  (guid, book_guid, id, type, owner_guid,
+		   date_opened, notes, active, currency_guid, terms_guid)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		inv.GUID, inv.BookGUID, inv.ID, string(inv.Type), inv.OwnerGUID,
+		inv.DateOpened.Format("2006-01-02"), inv.Notes, inv.Active, inv.CurrencyGUID, termsGUID)
+	return err
+}
+
+func (r *Repository) GetInvoice(ctx context.Context, guid string) (domain.Invoice, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT guid, book_guid, id, type, owner_guid,
+		       date_opened, date_posted, date_due, notes, active, currency_guid,
+		       COALESCE(post_txn_guid,''), COALESCE(post_acc_guid,''), COALESCE(terms_guid,''),
+		       created_at
+		FROM invoices WHERE guid=$1`, guid)
+	inv, err := scanInvoice(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Invoice{}, domain.ErrInvoiceNotFound
+	}
+	return inv, err
+}
+
+func (r *Repository) UpdateInvoice(ctx context.Context, inv domain.Invoice) error {
+	var termsGUID *string
+	if inv.TermsGUID != "" {
+		termsGUID = &inv.TermsGUID
+	}
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE invoices SET
+		  id=$2, owner_guid=$3,
+		  date_opened=$4, date_due=$5, notes=$6, active=$7,
+		  currency_guid=$8, terms_guid=$9
+		WHERE guid=$1 AND date_posted IS NULL`,
+		inv.GUID, inv.ID, inv.OwnerGUID,
+		inv.DateOpened.Format("2006-01-02"), inv.DateDue, inv.Notes, inv.Active,
+		inv.CurrencyGUID, termsGUID)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrInvoiceNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteInvoice(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM invoices WHERE guid=$1 AND date_posted IS NULL`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrInvoiceNotFound
+	}
+	return nil
+}
+
+func (r *Repository) MarkInvoicePosted(ctx context.Context, guid, txnGUID, accGUID string, datePosted, dateDue *time.Time) error {
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE invoices SET
+		  date_posted=$2, date_due=$3, post_txn_guid=$4, post_acc_guid=$5
+		WHERE guid=$1 AND date_posted IS NULL`,
+		guid, datePosted, dateDue, txnGUID, accGUID)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrInvoiceNotFound
+	}
+	return nil
+}
+
+type invoiceScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanInvoice(s invoiceScanner) (domain.Invoice, error) {
+	var inv domain.Invoice
+	var invType string
+	var datePosted, dateDue *time.Time
+	err := s.Scan(
+		&inv.GUID, &inv.BookGUID, &inv.ID, &invType, &inv.OwnerGUID,
+		&inv.DateOpened, &datePosted, &dateDue, &inv.Notes, &inv.Active, &inv.CurrencyGUID,
+		&inv.PostTxnGUID, &inv.PostAccGUID, &inv.TermsGUID, &inv.CreatedAt,
+	)
+	if err != nil {
+		return domain.Invoice{}, err
+	}
+	inv.Type = domain.InvoiceType(invType)
+	inv.DatePosted = datePosted
+	inv.DateDue = dateDue
+	return inv, nil
+}
+
+// ── Entries ───────────────────────────────────────────────────────────────────
+
+func (r *Repository) ListEntries(ctx context.Context, invoiceGUID string) ([]domain.InvoiceEntry, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT guid, invoice_guid, date, description, action, notes,
+		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
+		       taxable, created_at
+		FROM entries WHERE invoice_guid=$1
+		ORDER BY created_at`, invoiceGUID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.InvoiceEntry
+	for rows.Next() {
+		e, err := scanEntry(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) CreateEntry(ctx context.Context, e domain.InvoiceEntry) error {
+	qNum, qDenom, err := e.Quantity.NumDenom()
+	if err != nil {
+		return err
+	}
+	pNum, pDenom, err := e.Price.NumDenom()
+	if err != nil {
+		return err
+	}
+	_, err = r.pool.Exec(ctx, `
+		INSERT INTO entries
+		  (guid, invoice_guid, date, description, action, notes,
+		   quantity_num, quantity_denom, account_guid, price_num, price_denom, taxable)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		e.GUID, e.InvoiceGUID, e.Date.Format("2006-01-02"),
+		e.Description, e.Action, e.Notes,
+		qNum, qDenom, e.AccountGUID, pNum, pDenom, e.Taxable)
+	return err
+}
+
+func (r *Repository) GetEntry(ctx context.Context, guid string) (domain.InvoiceEntry, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT guid, invoice_guid, date, description, action, notes,
+		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
+		       taxable, created_at
+		FROM entries WHERE guid=$1`, guid)
+	e, err := scanEntry(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.InvoiceEntry{}, domain.ErrEntryNotFound
+	}
+	return e, err
+}
+
+func (r *Repository) UpdateEntry(ctx context.Context, e domain.InvoiceEntry) error {
+	qNum, qDenom, err := e.Quantity.NumDenom()
+	if err != nil {
+		return err
+	}
+	pNum, pDenom, err := e.Price.NumDenom()
+	if err != nil {
+		return err
+	}
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE entries SET
+		  date=$2, description=$3, action=$4, notes=$5,
+		  quantity_num=$6, quantity_denom=$7, account_guid=$8,
+		  price_num=$9, price_denom=$10, taxable=$11
+		WHERE guid=$1`,
+		e.GUID, e.Date.Format("2006-01-02"),
+		e.Description, e.Action, e.Notes,
+		qNum, qDenom, e.AccountGUID, pNum, pDenom, e.Taxable)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrEntryNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteEntry(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM entries WHERE guid=$1`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrEntryNotFound
+	}
+	return nil
+}
+
+type entryScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanEntry(s entryScanner) (domain.InvoiceEntry, error) {
+	var e domain.InvoiceEntry
+	var qNum, qDenom, pNum, pDenom int64
+	err := s.Scan(
+		&e.GUID, &e.InvoiceGUID, &e.Date, &e.Description, &e.Action, &e.Notes,
+		&qNum, &qDenom, &e.AccountGUID, &pNum, &pDenom,
+		&e.Taxable, &e.CreatedAt,
+	)
+	if err != nil {
+		return domain.InvoiceEntry{}, err
+	}
+	e.Quantity, err = domain.FromNumDenom(qNum, qDenom)
+	if err != nil {
+		return domain.InvoiceEntry{}, err
+	}
+	e.Price, err = domain.FromNumDenom(pNum, pDenom)
+	if err != nil {
+		return domain.InvoiceEntry{}, err
+	}
+	return e, nil
+}

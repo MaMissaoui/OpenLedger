@@ -102,6 +102,7 @@ func newBudgetTestServer(fr *fakeBudgetRepoH) http.Handler {
 		budgetSvc,
 		nil,
 		nil,
+		nil,
 	).Routes()
 }
 

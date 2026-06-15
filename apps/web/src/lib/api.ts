@@ -7,9 +7,13 @@ import type {
   CapitalGainsReport,
   Commodity,
   Customer,
+  Entry,
   IncomeStatement,
+  Invoice,
   NewBudget,
   NewCustomer,
+  NewEntry,
+  NewInvoice,
   NewScheduledTransaction,
   NewVendor,
   Numeric,
@@ -243,4 +247,37 @@ export const api = {
     }),
   deleteVendor: (guid: string) =>
     request<void>(`/api/v1/vendors/${guid}`, { method: "DELETE" }),
+
+  listInvoices: (bookGuid: string, type: "invoice" | "bill" = "invoice") =>
+    request<{ bookGuid: string; type: string; invoices: Invoice[] }>(
+      `/api/v1/books/${bookGuid}/invoices?type=${type}`,
+    ).then((r) => r.invoices),
+  createInvoice: (bookGuid: string, input: NewInvoice) =>
+    post<Invoice>(`/api/v1/books/${bookGuid}/invoices`, input),
+  getInvoice: (guid: string) => request<Invoice>(`/api/v1/invoices/${guid}`),
+  updateInvoice: (guid: string, input: NewInvoice) =>
+    request<Invoice>(`/api/v1/invoices/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteInvoice: (guid: string) =>
+    request<void>(`/api/v1/invoices/${guid}`, { method: "DELETE" }),
+  postInvoice: (guid: string, postAccGuid: string, postDate?: string, dueDate?: string) =>
+    post<Invoice>(`/api/v1/invoices/${guid}/post`, { postAccGuid, postDate, dueDate }),
+
+  listEntries: (invoiceGuid: string) =>
+    request<{ invoiceGuid: string; entries: Entry[] }>(
+      `/api/v1/invoices/${invoiceGuid}/entries`,
+    ).then((r) => r.entries),
+  addEntry: (invoiceGuid: string, input: NewEntry) =>
+    post<Entry>(`/api/v1/invoices/${invoiceGuid}/entries`, input),
+  updateEntry: (guid: string, input: NewEntry) =>
+    request<Entry>(`/api/v1/entries/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteEntry: (guid: string) =>
+    request<void>(`/api/v1/entries/${guid}`, { method: "DELETE" }),
 };

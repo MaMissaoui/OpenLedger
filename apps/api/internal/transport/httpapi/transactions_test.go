@@ -330,6 +330,7 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 		nil,
 		nil,
 		nil,
+		nil,
 	).Routes()
 }
 
