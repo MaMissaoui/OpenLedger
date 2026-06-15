@@ -24,11 +24,12 @@ type Server struct {
 	trade        *app.TradeService
 	capitalGains *app.CapitalGainsService
 	schedule     *app.ScheduleService
+	budget       *app.BudgetService
 }
 
 // NewServer builds a Server from its service dependencies.
-func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService, reconciler *app.ReconcileService, portfolio *app.PortfolioService, trade *app.TradeService, capitalGains *app.CapitalGainsService, schedule *app.ScheduleService) *Server {
-	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, report: report, provision: provision, authz: authz, importer: importer, exporter: exporter, reconciler: reconciler, portfolio: portfolio, trade: trade, capitalGains: capitalGains, schedule: schedule}
+func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService, reconciler *app.ReconcileService, portfolio *app.PortfolioService, trade *app.TradeService, capitalGains *app.CapitalGainsService, schedule *app.ScheduleService, budget *app.BudgetService) *Server {
+	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, report: report, provision: provision, authz: authz, importer: importer, exporter: exporter, reconciler: reconciler, portfolio: portfolio, trade: trade, capitalGains: capitalGains, schedule: schedule, budget: budget}
 }
 
 // Routes returns the configured HTTP handler. /healthz is public; every
@@ -49,6 +50,12 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/books/{id}/scheduled-transactions", s.requireAuth(s.handleListScheduledTransactions))
 	mux.HandleFunc("POST /api/v1/books/{id}/scheduled-transactions", s.requireAuth(s.handleCreateScheduledTransaction))
 	mux.HandleFunc("POST /api/v1/books/{id}/scheduled-transactions/post-due", s.requireAuth(s.handlePostDueSchedules))
+	mux.HandleFunc("GET /api/v1/books/{id}/budgets", s.requireAuth(s.handleListBudgets))
+	mux.HandleFunc("POST /api/v1/books/{id}/budgets", s.requireAuth(s.handleCreateBudget))
+	mux.HandleFunc("GET /api/v1/budgets/{id}", s.requireAuth(s.handleGetBudget))
+	mux.HandleFunc("PATCH /api/v1/budgets/{id}", s.requireAuth(s.handleUpdateBudget))
+	mux.HandleFunc("DELETE /api/v1/budgets/{id}", s.requireAuth(s.handleDeleteBudget))
+	mux.HandleFunc("GET /api/v1/budgets/{id}/report", s.requireAuth(s.handleBudgetReport))
 	mux.HandleFunc("GET /api/v1/scheduled-transactions/{id}", s.requireAuth(s.handleGetScheduledTransaction))
 	mux.HandleFunc("PATCH /api/v1/scheduled-transactions/{id}", s.requireAuth(s.handleUpdateScheduledTransaction))
 	mux.HandleFunc("DELETE /api/v1/scheduled-transactions/{id}", s.requireAuth(s.handleDeleteScheduledTransaction))

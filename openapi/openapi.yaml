@@ -721,6 +721,132 @@ paths:
           description: Deleted
         "404":
           description: Scheduled transaction not found
+
+  /api/v1/books/{id}/budgets:
+    get:
+      summary: List budgets for a book
+      operationId: listBudgets
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Budget list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetList"
+    post:
+      summary: Create a budget
+      operationId: createBudget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewBudget"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Budget"
+        "400":
+          description: Invalid budget
+
+  /api/v1/budgets/{id}:
+    get:
+      summary: Get a budget
+      operationId: getBudget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Budget
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Budget"
+        "404":
+          description: Budget not found
+    patch:
+      summary: Update a budget
+      operationId: updateBudget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewBudget"
+      responses:
+        "200":
+          description: Updated budget
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Budget"
+        "404":
+          description: Budget not found
+    delete:
+      summary: Delete a budget
+      operationId: deleteBudget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Budget not found
+
+  /api/v1/budgets/{id}/report:
+    get:
+      summary: Budget variance report for the period containing asOf
+      operationId: budgetReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: asOf
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Variance report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetReport"
+        "404":
+          description: Budget not found
+
 components:
   schemas:
     Health:
@@ -1278,3 +1404,93 @@ components:
                 format: date
               txGuid:
                 type: string
+
+    BudgetAmount:
+      type: object
+      required: [accountGuid, periodNum, value]
+      properties:
+        accountGuid:
+          type: string
+        periodNum:
+          type: integer
+        value:
+          $ref: "#/components/schemas/GncNumeric"
+
+    NewBudget:
+      type: object
+      required: [name, periodType, numPeriods, startDate]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        periodType:
+          type: string
+          enum: [monthly, quarterly, yearly]
+        numPeriods:
+          type: integer
+        startDate:
+          type: string
+          format: date
+        amounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/BudgetAmount"
+
+    Budget:
+      allOf:
+        - $ref: "#/components/schemas/NewBudget"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+
+    BudgetList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        budgets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Budget"
+
+    BudgetVarianceLine:
+      type: object
+      properties:
+        account:
+          $ref: "#/components/schemas/Account"
+        budgeted:
+          $ref: "#/components/schemas/GncNumeric"
+        actual:
+          $ref: "#/components/schemas/GncNumeric"
+        variance:
+          $ref: "#/components/schemas/GncNumeric"
+
+    BudgetReport:
+      type: object
+      properties:
+        budgetGuid:
+          type: string
+        periodNum:
+          type: integer
+        periodLabel:
+          type: string
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/BudgetVarianceLine"
+        totalBudgeted:
+          $ref: "#/components/schemas/GncNumeric"
+        totalActual:
+          $ref: "#/components/schemas/GncNumeric"
+        totalVariance:
+          $ref: "#/components/schemas/GncNumeric"
