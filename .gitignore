@@ -36,3 +36,7 @@ coverage/
 /apps/api/server
 *.out
 *.test
+
+# Local dev runtime artifacts (make start / make stop)
+/.dev-api
+/.dev.pid
