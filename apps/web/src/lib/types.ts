@@ -248,6 +248,62 @@ export interface BudgetReport {
   totalVariance: Numeric;
 }
 
+export interface Address {
+  name: string;
+  addr1: string;
+  addr2: string;
+  phone: string;
+  email: string;
+}
+
+export interface Customer {
+  guid: string;
+  bookGuid: string;
+  name: string;
+  id: string;
+  notes: string;
+  active: boolean;
+  currencyGuid: string;
+  addr: Address;
+  creditLimit: Numeric;
+  termsGuid: string;
+  createdAt: string;
+}
+
+export interface NewCustomer {
+  name: string;
+  id?: string;
+  notes?: string;
+  active?: boolean;
+  currencyGuid: string;
+  addr?: Partial<Address>;
+  creditLimit?: Numeric;
+  termsGuid?: string;
+}
+
+export interface Vendor {
+  guid: string;
+  bookGuid: string;
+  name: string;
+  id: string;
+  notes: string;
+  active: boolean;
+  currencyGuid: string;
+  addr: Address;
+  termsGuid: string;
+  createdAt: string;
+}
+
+export interface NewVendor {
+  name: string;
+  id?: string;
+  notes?: string;
+  active?: boolean;
+  currencyGuid: string;
+  addr?: Partial<Address>;
+  termsGuid?: string;
+}
+
 export interface RegisterEntry {
   splitGuid: string;
   txGuid: string;

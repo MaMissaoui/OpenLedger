@@ -4,11 +4,14 @@ import type {
   Book,
   Budget,
   BudgetReport,
-  Commodity,
   CapitalGainsReport,
+  Commodity,
+  Customer,
   IncomeStatement,
   NewBudget,
+  NewCustomer,
   NewScheduledTransaction,
+  NewVendor,
   Numeric,
   Portfolio,
   PostedSchedule,
@@ -18,6 +21,7 @@ import type {
   Transaction,
   TradeInput,
   TradeResult,
+  Vendor,
 } from "./types";
 
 // ApiError carries the HTTP status so callers can branch (e.g. 422 unbalanced)
@@ -203,4 +207,40 @@ export const api = {
     const q = asOf ? `?asOf=${encodeURIComponent(asOf)}` : "";
     return request<BudgetReport>(`/api/v1/budgets/${guid}/report${q}`);
   },
+
+  listCustomers: (bookGuid: string, activeOnly = false) => {
+    const q = activeOnly ? "?active=true" : "";
+    return request<{ bookGuid: string; customers: Customer[] }>(
+      `/api/v1/books/${bookGuid}/customers${q}`,
+    ).then((r) => r.customers);
+  },
+  createCustomer: (bookGuid: string, input: NewCustomer) =>
+    post<Customer>(`/api/v1/books/${bookGuid}/customers`, input),
+  getCustomer: (guid: string) => request<Customer>(`/api/v1/customers/${guid}`),
+  updateCustomer: (guid: string, input: NewCustomer) =>
+    request<Customer>(`/api/v1/customers/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteCustomer: (guid: string) =>
+    request<void>(`/api/v1/customers/${guid}`, { method: "DELETE" }),
+
+  listVendors: (bookGuid: string, activeOnly = false) => {
+    const q = activeOnly ? "?active=true" : "";
+    return request<{ bookGuid: string; vendors: Vendor[] }>(
+      `/api/v1/books/${bookGuid}/vendors${q}`,
+    ).then((r) => r.vendors);
+  },
+  createVendor: (bookGuid: string, input: NewVendor) =>
+    post<Vendor>(`/api/v1/books/${bookGuid}/vendors`, input),
+  getVendor: (guid: string) => request<Vendor>(`/api/v1/vendors/${guid}`),
+  updateVendor: (guid: string, input: NewVendor) =>
+    request<Vendor>(`/api/v1/vendors/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteVendor: (guid: string) =>
+    request<void>(`/api/v1/vendors/${guid}`, { method: "DELETE" }),
 };

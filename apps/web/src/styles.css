@@ -124,6 +124,14 @@ a {
   padding: 0.38rem 0.75rem;
   font-size: 0.8rem;
 }
+.btn--active {
+  background: rgba(26, 127, 55, 0.1);
+  border-color: var(--forest);
+  color: var(--forest-dark);
+}
+.btn--active:hover {
+  background: rgba(26, 127, 55, 0.15);
+}
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;

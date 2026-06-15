@@ -100,6 +100,8 @@ func newBudgetTestServer(fr *fakeBudgetRepoH) http.Handler {
 		app.NewCapitalGainsService(fr.fakeRepo),
 		nil,
 		budgetSvc,
+		nil,
+		nil,
 	).Routes()
 }
 

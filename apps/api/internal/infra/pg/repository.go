@@ -2028,3 +2028,234 @@ func (r *Repository) loadBudgetAmounts(ctx context.Context, budgetGUID string) (
 	}
 	return amounts, rows.Err()
 }
+
+// ── Customers ────────────────────────────────────────────────────────────────
+
+func (r *Repository) ListCustomers(ctx context.Context, bookGUID string, activeOnly bool) ([]domain.Customer, error) {
+	q := `SELECT guid, book_guid, name, id, notes, active, currency_guid,
+		         addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		         credit_num, credit_denom, COALESCE(terms_guid,''), created_at
+		    FROM customers WHERE book_guid = $1`
+	args := []any{bookGUID}
+	if activeOnly {
+		q += " AND active = TRUE"
+	}
+	q += " ORDER BY name"
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list customers: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Customer
+	for rows.Next() {
+		c, err := scanCustomer(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) GetCustomer(ctx context.Context, guid string) (domain.Customer, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT guid, book_guid, name, id, notes, active, currency_guid,
+		        addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		        credit_num, credit_denom, COALESCE(terms_guid,''), created_at
+		   FROM customers WHERE guid = $1`, guid)
+	c, err := scanCustomer(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Customer{}, domain.ErrCustomerNotFound
+	}
+	return c, err
+}
+
+func (r *Repository) CreateCustomer(ctx context.Context, c domain.Customer) error {
+	cNum, cDenom, err := c.CreditLimit.NumDenom()
+	if err != nil {
+		return fmt.Errorf("credit limit: %w", err)
+	}
+	var termsGUID *string
+	if c.TermsGUID != "" {
+		termsGUID = &c.TermsGUID
+	}
+	_, err = r.pool.Exec(ctx,
+		`INSERT INTO customers
+		   (guid, book_guid, name, id, notes, active, currency_guid,
+		    addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		    credit_num, credit_denom, terms_guid, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+		c.GUID, c.BookGUID, c.Name, c.ID, c.Notes, c.Active, c.CurrencyGUID,
+		c.Addr.Name, c.Addr.Addr1, c.Addr.Addr2, c.Addr.Phone, c.Addr.Email,
+		cNum, cDenom, termsGUID, c.CreatedAt,
+	)
+	return err
+}
+
+func (r *Repository) UpdateCustomer(ctx context.Context, c domain.Customer) error {
+	cNum, cDenom, err := c.CreditLimit.NumDenom()
+	if err != nil {
+		return fmt.Errorf("credit limit: %w", err)
+	}
+	var termsGUID *string
+	if c.TermsGUID != "" {
+		termsGUID = &c.TermsGUID
+	}
+	ct, err := r.pool.Exec(ctx,
+		`UPDATE customers SET
+		   name=$2, id=$3, notes=$4, active=$5, currency_guid=$6,
+		   addr_name=$7, addr_addr1=$8, addr_addr2=$9, addr_phone=$10, addr_email=$11,
+		   credit_num=$12, credit_denom=$13, terms_guid=$14
+		 WHERE guid=$1`,
+		c.GUID, c.Name, c.ID, c.Notes, c.Active, c.CurrencyGUID,
+		c.Addr.Name, c.Addr.Addr1, c.Addr.Addr2, c.Addr.Phone, c.Addr.Email,
+		cNum, cDenom, termsGUID,
+	)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrCustomerNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteCustomer(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM customers WHERE guid = $1`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrCustomerNotFound
+	}
+	return nil
+}
+
+type customerScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanCustomer(s customerScanner) (domain.Customer, error) {
+	var (
+		c            domain.Customer
+		cNum, cDenom int64
+	)
+	err := s.Scan(
+		&c.GUID, &c.BookGUID, &c.Name, &c.ID, &c.Notes, &c.Active, &c.CurrencyGUID,
+		&c.Addr.Name, &c.Addr.Addr1, &c.Addr.Addr2, &c.Addr.Phone, &c.Addr.Email,
+		&cNum, &cDenom, &c.TermsGUID, &c.CreatedAt,
+	)
+	if err != nil {
+		return domain.Customer{}, err
+	}
+	c.CreditLimit, err = domain.FromNumDenom(cNum, cDenom)
+	return c, err
+}
+
+// ── Vendors ──────────────────────────────────────────────────────────────────
+
+func (r *Repository) ListVendors(ctx context.Context, bookGUID string, activeOnly bool) ([]domain.Vendor, error) {
+	q := `SELECT guid, book_guid, name, id, notes, active, currency_guid,
+		         addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		         COALESCE(terms_guid,''), created_at
+		    FROM vendors WHERE book_guid = $1`
+	args := []any{bookGUID}
+	if activeOnly {
+		q += " AND active = TRUE"
+	}
+	q += " ORDER BY name"
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list vendors: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Vendor
+	for rows.Next() {
+		v, err := scanVendor(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) GetVendor(ctx context.Context, guid string) (domain.Vendor, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT guid, book_guid, name, id, notes, active, currency_guid,
+		        addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		        COALESCE(terms_guid,''), created_at
+		   FROM vendors WHERE guid = $1`, guid)
+	v, err := scanVendor(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Vendor{}, domain.ErrVendorNotFound
+	}
+	return v, err
+}
+
+func (r *Repository) CreateVendor(ctx context.Context, v domain.Vendor) error {
+	var termsGUID *string
+	if v.TermsGUID != "" {
+		termsGUID = &v.TermsGUID
+	}
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO vendors
+		   (guid, book_guid, name, id, notes, active, currency_guid,
+		    addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		    terms_guid, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+		v.GUID, v.BookGUID, v.Name, v.ID, v.Notes, v.Active, v.CurrencyGUID,
+		v.Addr.Name, v.Addr.Addr1, v.Addr.Addr2, v.Addr.Phone, v.Addr.Email,
+		termsGUID, v.CreatedAt,
+	)
+	return err
+}
+
+func (r *Repository) UpdateVendor(ctx context.Context, v domain.Vendor) error {
+	var termsGUID *string
+	if v.TermsGUID != "" {
+		termsGUID = &v.TermsGUID
+	}
+	ct, err := r.pool.Exec(ctx,
+		`UPDATE vendors SET
+		   name=$2, id=$3, notes=$4, active=$5, currency_guid=$6,
+		   addr_name=$7, addr_addr1=$8, addr_addr2=$9, addr_phone=$10, addr_email=$11,
+		   terms_guid=$12
+		 WHERE guid=$1`,
+		v.GUID, v.Name, v.ID, v.Notes, v.Active, v.CurrencyGUID,
+		v.Addr.Name, v.Addr.Addr1, v.Addr.Addr2, v.Addr.Phone, v.Addr.Email,
+		termsGUID,
+	)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrVendorNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteVendor(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM vendors WHERE guid = $1`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrVendorNotFound
+	}
+	return nil
+}
+
+type vendorScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanVendor(s vendorScanner) (domain.Vendor, error) {
+	var v domain.Vendor
+	err := s.Scan(
+		&v.GUID, &v.BookGUID, &v.Name, &v.ID, &v.Notes, &v.Active, &v.CurrencyGUID,
+		&v.Addr.Name, &v.Addr.Addr1, &v.Addr.Addr2, &v.Addr.Phone, &v.Addr.Email,
+		&v.TermsGUID, &v.CreatedAt,
+	)
+	return v, err
+}

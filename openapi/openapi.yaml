@@ -847,6 +847,224 @@ paths:
         "404":
           description: Budget not found
 
+  /api/v1/books/{id}/customers:
+    get:
+      summary: List customers for a book
+      operationId: listCustomers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        "200":
+          description: Customer list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerList"
+        "403":
+          description: Forbidden
+    post:
+      summary: Create a customer in a book
+      operationId: createCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewCustomer"
+      responses:
+        "201":
+          description: Created customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "400":
+          description: Validation error
+        "403":
+          description: Forbidden
+
+  /api/v1/customers/{id}:
+    get:
+      summary: Get a customer by GUID
+      operationId: getCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "404":
+          description: Customer not found
+    patch:
+      summary: Update a customer
+      operationId: updateCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewCustomer"
+      responses:
+        "200":
+          description: Updated customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "404":
+          description: Customer not found
+    delete:
+      summary: Delete a customer
+      operationId: deleteCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Customer not found
+
+  /api/v1/books/{id}/vendors:
+    get:
+      summary: List vendors for a book
+      operationId: listVendors
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        "200":
+          description: Vendor list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorList"
+        "403":
+          description: Forbidden
+    post:
+      summary: Create a vendor in a book
+      operationId: createVendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewVendor"
+      responses:
+        "201":
+          description: Created vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+        "400":
+          description: Validation error
+        "403":
+          description: Forbidden
+
+  /api/v1/vendors/{id}:
+    get:
+      summary: Get a vendor by GUID
+      operationId: getVendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+        "404":
+          description: Vendor not found
+    patch:
+      summary: Update a vendor
+      operationId: updateVendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewVendor"
+      responses:
+        "200":
+          description: Updated vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+        "404":
+          description: Vendor not found
+    delete:
+      summary: Delete a vendor
+      operationId: deleteVendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Vendor not found
+
 components:
   schemas:
     Health:
@@ -1494,3 +1712,105 @@ components:
           $ref: "#/components/schemas/GncNumeric"
         totalVariance:
           $ref: "#/components/schemas/GncNumeric"
+
+    Address:
+      type: object
+      properties:
+        name:
+          type: string
+        addr1:
+          type: string
+        addr2:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+
+    NewCustomer:
+      type: object
+      required: [name, currencyGuid]
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+          description: Display number (e.g. CUST-0001)
+        notes:
+          type: string
+        active:
+          type: boolean
+        currencyGuid:
+          type: string
+        addr:
+          $ref: "#/components/schemas/Address"
+        creditLimit:
+          $ref: "#/components/schemas/GncNumeric"
+        termsGuid:
+          type: string
+
+    Customer:
+      allOf:
+        - $ref: "#/components/schemas/NewCustomer"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+
+    CustomerList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        customers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Customer"
+
+    NewVendor:
+      type: object
+      required: [name, currencyGuid]
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+          description: Display number (e.g. VEND-0001)
+        notes:
+          type: string
+        active:
+          type: boolean
+        currencyGuid:
+          type: string
+        addr:
+          $ref: "#/components/schemas/Address"
+        termsGuid:
+          type: string
+
+    Vendor:
+      allOf:
+        - $ref: "#/components/schemas/NewVendor"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+
+    VendorList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        vendors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Vendor"

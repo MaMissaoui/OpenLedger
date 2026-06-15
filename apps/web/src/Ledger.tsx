@@ -11,8 +11,9 @@ import { TradeSecurityDialog } from "./components/TradeSecurityDialog";
 import { NewAccountDialog } from "./components/NewAccountDialog";
 import { ScheduledTransactionsView } from "./components/ScheduledTransactionsView";
 import BudgetView from "./components/BudgetView";
+import BusinessView from "./components/BusinessView";
 
-type View = "ledger" | "reports" | "portfolio" | "scheduled" | "budget";
+type View = "ledger" | "reports" | "portfolio" | "scheduled" | "budget" | "business";
 
 // ── icon set (simple 18×18 SVG outlines) ──────────────────────────────────────
 const Icon = {
@@ -45,6 +46,13 @@ const Icon = {
       <path d="M9 2v14M5 16h8" />
       <path d="M4 6H2l2 4 2-4zM14 6h2l-2 4-2-4z" />
       <path d="M4 6h10" />
+    </svg>
+  ),
+  business: (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="14" height="10" rx="1" />
+      <path d="M6 7V5a3 3 0 016 0v2" />
+      <path d="M9 11v2" />
     </svg>
   ),
   download: (
@@ -164,6 +172,7 @@ export function Ledger() {
           <NavItem label="Portfolio" icon={Icon.portfolio} active={view === "portfolio"} collapsed={collapsed} onClick={() => setView("portfolio")} />
           <NavItem label="Scheduled" icon={Icon.scheduled} active={view === "scheduled"} collapsed={collapsed} onClick={() => setView("scheduled")} />
           <NavItem label="Budget" icon={Icon.budget} active={view === "budget"} collapsed={collapsed} onClick={() => setView("budget")} />
+          <NavItem label="Business" icon={Icon.business} active={view === "business"} collapsed={collapsed} onClick={() => setView("business")} />
         </div>
 
         <div className="sidenav__footer">
@@ -207,6 +216,8 @@ export function Ledger() {
           <ScheduledTransactionsView book={book} accounts={accounts.data ?? []} />
         ) : view === "budget" ? (
           <BudgetView bookGuid={book.guid} />
+        ) : view === "business" ? (
+          <BusinessView bookGuid={book.guid} />
         ) : (
           <div className="workspace">
             <AccountTree

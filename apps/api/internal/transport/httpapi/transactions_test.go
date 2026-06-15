@@ -328,6 +328,8 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 		app.NewCapitalGainsService(repo),
 		svc,
 		nil,
+		nil,
+		nil,
 	).Routes()
 }
 
