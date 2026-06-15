@@ -224,6 +224,57 @@ paths:
           description: The authenticated user has no membership on this book
         "404":
           description: Book not found
+  /api/v1/books/{id}/reports/ar-aging:
+    get:
+      summary: Accounts-receivable aging report
+      description: >
+        Returns posted, unpaid customer invoices grouped into aging buckets
+        (Current / 1-30 / 31-60 / 61-90 / 91+ days overdue) based on their
+        due date (or post date + 30 days when no due date is set).
+      operationId: arAgingReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A/R aging report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgingReport"
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
+
+  /api/v1/books/{id}/reports/ap-aging:
+    get:
+      summary: Accounts-payable aging report
+      description: >
+        Returns posted, unpaid vendor bills grouped into aging buckets
+        (Current / 1-30 / 31-60 / 61-90 / 91+ days overdue).
+      operationId: apAgingReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: A/P aging report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgingReport"
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
+
   /api/v1/securities/buy:
     post:
       summary: Buy a security
@@ -721,6 +772,600 @@ paths:
           description: Deleted
         "404":
           description: Scheduled transaction not found
+
+  /api/v1/books/{id}/budgets:
+    get:
+      summary: List budgets for a book
+      operationId: listBudgets
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Budget list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetList"
+    post:
+      summary: Create a budget
+      operationId: createBudget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewBudget"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Budget"
+        "400":
+          description: Invalid budget
+
+  /api/v1/budgets/{id}:
+    get:
+      summary: Get a budget
+      operationId: getBudget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Budget
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Budget"
+        "404":
+          description: Budget not found
+    patch:
+      summary: Update a budget
+      operationId: updateBudget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewBudget"
+      responses:
+        "200":
+          description: Updated budget
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Budget"
+        "404":
+          description: Budget not found
+    delete:
+      summary: Delete a budget
+      operationId: deleteBudget
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Budget not found
+
+  /api/v1/budgets/{id}/report:
+    get:
+      summary: Budget variance report for the period containing asOf
+      operationId: budgetReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: asOf
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Variance report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BudgetReport"
+        "404":
+          description: Budget not found
+
+  /api/v1/books/{id}/customers:
+    get:
+      summary: List customers for a book
+      operationId: listCustomers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        "200":
+          description: Customer list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerList"
+        "403":
+          description: Forbidden
+    post:
+      summary: Create a customer in a book
+      operationId: createCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewCustomer"
+      responses:
+        "201":
+          description: Created customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "400":
+          description: Validation error
+        "403":
+          description: Forbidden
+
+  /api/v1/customers/{id}:
+    get:
+      summary: Get a customer by GUID
+      operationId: getCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "404":
+          description: Customer not found
+    patch:
+      summary: Update a customer
+      operationId: updateCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewCustomer"
+      responses:
+        "200":
+          description: Updated customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Customer"
+        "404":
+          description: Customer not found
+    delete:
+      summary: Delete a customer
+      operationId: deleteCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Customer not found
+
+  /api/v1/books/{id}/vendors:
+    get:
+      summary: List vendors for a book
+      operationId: listVendors
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        "200":
+          description: Vendor list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorList"
+        "403":
+          description: Forbidden
+    post:
+      summary: Create a vendor in a book
+      operationId: createVendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewVendor"
+      responses:
+        "201":
+          description: Created vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+        "400":
+          description: Validation error
+        "403":
+          description: Forbidden
+
+  /api/v1/vendors/{id}:
+    get:
+      summary: Get a vendor by GUID
+      operationId: getVendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+        "404":
+          description: Vendor not found
+    patch:
+      summary: Update a vendor
+      operationId: updateVendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewVendor"
+      responses:
+        "200":
+          description: Updated vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vendor"
+        "404":
+          description: Vendor not found
+    delete:
+      summary: Delete a vendor
+      operationId: deleteVendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Vendor not found
+
+  /api/v1/books/{id}/invoices:
+    get:
+      summary: List invoices or bills for a book
+      operationId: listInvoices
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [invoice, bill]
+            default: invoice
+      responses:
+        "200":
+          description: Invoice list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceList"
+    post:
+      summary: Create a draft invoice or bill
+      operationId: createInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewInvoice"
+      responses:
+        "201":
+          description: Created invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+
+  /api/v1/invoices/{id}:
+    get:
+      summary: Get an invoice with its entries
+      operationId: getInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Invoice not found
+    patch:
+      summary: Update a draft invoice
+      operationId: updateInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewInvoice"
+      responses:
+        "200":
+          description: Updated invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Invoice not found
+        "422":
+          description: Invoice already posted
+    delete:
+      summary: Delete a draft invoice
+      operationId: deleteInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Invoice not found
+        "422":
+          description: Invoice already posted
+
+  /api/v1/invoices/{id}/pay:
+    post:
+      summary: Record a payment against a posted invoice
+      operationId: payInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayInvoiceRequest"
+      responses:
+        "200":
+          description: Paid invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Invoice not found
+        "422":
+          description: Not posted or already paid
+
+  /api/v1/invoices/{id}/post:
+    post:
+      summary: Post an invoice to the ledger
+      operationId: postInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostInvoiceRequest"
+      responses:
+        "200":
+          description: Posted invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invoice"
+        "404":
+          description: Invoice not found
+        "422":
+          description: Already posted or no entries
+
+  /api/v1/invoices/{id}/entries:
+    get:
+      summary: List entries for an invoice
+      operationId: listEntries
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Entry list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntryList"
+    post:
+      summary: Add a line item to a draft invoice
+      operationId: addEntry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewEntry"
+      responses:
+        "201":
+          description: Created entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entry"
+        "422":
+          description: Invoice already posted
+
+  /api/v1/entries/{id}:
+    patch:
+      summary: Update a line item
+      operationId: updateEntry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewEntry"
+      responses:
+        "200":
+          description: Updated entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entry"
+        "404":
+          description: Entry not found
+        "422":
+          description: Invoice already posted
+    delete:
+      summary: Delete a line item
+      operationId: deleteEntry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Entry not found
+        "422":
+          description: Invoice already posted
+
 components:
   schemas:
     Health:
@@ -1278,3 +1923,380 @@ components:
                 format: date
               txGuid:
                 type: string
+
+    BudgetAmount:
+      type: object
+      required: [accountGuid, periodNum, value]
+      properties:
+        accountGuid:
+          type: string
+        periodNum:
+          type: integer
+        value:
+          $ref: "#/components/schemas/GncNumeric"
+
+    NewBudget:
+      type: object
+      required: [name, periodType, numPeriods, startDate]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        periodType:
+          type: string
+          enum: [monthly, quarterly, yearly]
+        numPeriods:
+          type: integer
+        startDate:
+          type: string
+          format: date
+        amounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/BudgetAmount"
+
+    Budget:
+      allOf:
+        - $ref: "#/components/schemas/NewBudget"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+
+    BudgetList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        budgets:
+          type: array
+          items:
+            $ref: "#/components/schemas/Budget"
+
+    BudgetVarianceLine:
+      type: object
+      properties:
+        account:
+          $ref: "#/components/schemas/Account"
+        budgeted:
+          $ref: "#/components/schemas/GncNumeric"
+        actual:
+          $ref: "#/components/schemas/GncNumeric"
+        variance:
+          $ref: "#/components/schemas/GncNumeric"
+
+    BudgetReport:
+      type: object
+      properties:
+        budgetGuid:
+          type: string
+        periodNum:
+          type: integer
+        periodLabel:
+          type: string
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/BudgetVarianceLine"
+        totalBudgeted:
+          $ref: "#/components/schemas/GncNumeric"
+        totalActual:
+          $ref: "#/components/schemas/GncNumeric"
+        totalVariance:
+          $ref: "#/components/schemas/GncNumeric"
+
+    Address:
+      type: object
+      properties:
+        name:
+          type: string
+        addr1:
+          type: string
+        addr2:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+
+    NewCustomer:
+      type: object
+      required: [name, currencyGuid]
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+          description: Display number (e.g. CUST-0001)
+        notes:
+          type: string
+        active:
+          type: boolean
+        currencyGuid:
+          type: string
+        addr:
+          $ref: "#/components/schemas/Address"
+        creditLimit:
+          $ref: "#/components/schemas/GncNumeric"
+        termsGuid:
+          type: string
+
+    Customer:
+      allOf:
+        - $ref: "#/components/schemas/NewCustomer"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+
+    CustomerList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        customers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Customer"
+
+    NewVendor:
+      type: object
+      required: [name, currencyGuid]
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+          description: Display number (e.g. VEND-0001)
+        notes:
+          type: string
+        active:
+          type: boolean
+        currencyGuid:
+          type: string
+        addr:
+          $ref: "#/components/schemas/Address"
+        termsGuid:
+          type: string
+
+    Vendor:
+      allOf:
+        - $ref: "#/components/schemas/NewVendor"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+
+    VendorList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        vendors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Vendor"
+
+    NewInvoice:
+      type: object
+      required: [type, ownerGuid, currencyGuid]
+      properties:
+        id:
+          type: string
+          description: Display number (e.g. INV-0001)
+        type:
+          type: string
+          enum: [invoice, bill]
+        ownerGuid:
+          type: string
+          description: Customer GUID (invoice) or Vendor GUID (bill)
+        dateOpened:
+          type: string
+          format: date
+        notes:
+          type: string
+        active:
+          type: boolean
+          default: true
+        currencyGuid:
+          type: string
+        termsGuid:
+          type: string
+
+    Invoice:
+      allOf:
+        - $ref: "#/components/schemas/NewInvoice"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+            datePosted:
+              type: string
+              format: date
+              nullable: true
+            dateDue:
+              type: string
+              format: date
+              nullable: true
+            postTxnGuid:
+              type: string
+            postAccGuid:
+              type: string
+            paidAt:
+              type: string
+              format: date-time
+              nullable: true
+            paidTxnGuid:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+            entries:
+              type: array
+              items:
+                $ref: "#/components/schemas/Entry"
+
+    InvoiceList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        type:
+          type: string
+        invoices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invoice"
+
+    PostInvoiceRequest:
+      type: object
+      required: [postAccGuid]
+      properties:
+        postDate:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+        postAccGuid:
+          type: string
+          description: A/R account GUID (invoice) or A/P account GUID (bill)
+
+    NewEntry:
+      type: object
+      required: [accountGuid, price]
+      properties:
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+        action:
+          type: string
+        notes:
+          type: string
+        quantity:
+          $ref: "#/components/schemas/GncNumeric"
+        accountGuid:
+          type: string
+        price:
+          $ref: "#/components/schemas/GncNumeric"
+        taxable:
+          type: boolean
+          default: false
+
+    Entry:
+      allOf:
+        - $ref: "#/components/schemas/NewEntry"
+        - type: object
+          properties:
+            guid:
+              type: string
+            invoiceGuid:
+              type: string
+            lineTotal:
+              $ref: "#/components/schemas/GncNumeric"
+            createdAt:
+              type: string
+              format: date-time
+
+    EntryList:
+      type: object
+      properties:
+        invoiceGuid:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry"
+
+    PayInvoiceRequest:
+      type: object
+      required: [paymentAccGuid]
+      properties:
+        paymentAccGuid:
+          type: string
+          description: Cash or bank account GUID to debit (customer invoice) or credit (vendor bill)
+        paymentDate:
+          type: string
+          format: date
+
+    AgingReportRow:
+      type: object
+      properties:
+        invoice:
+          $ref: "#/components/schemas/Invoice"
+        total:
+          $ref: "#/components/schemas/GncNumeric"
+        daysOverdue:
+          type: integer
+          description: Negative when not yet due
+
+    AgingBucket:
+      type: object
+      properties:
+        label:
+          type: string
+          description: "Current | 1-30 days | 31-60 days | 61-90 days | 91+ days"
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgingReportRow"
+        total:
+          $ref: "#/components/schemas/GncNumeric"
+
+    AgingReport:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        asOf:
+          type: string
+          format: date-time
+        buckets:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgingBucket"
+        total:
+          $ref: "#/components/schemas/GncNumeric"

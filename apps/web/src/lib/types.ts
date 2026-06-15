@@ -203,6 +203,168 @@ export interface PostedSchedule {
   txGuid: string;
 }
 
+export interface BudgetAmount {
+  accountGuid: string;
+  periodNum: number;
+  value: Numeric;
+}
+
+export interface Budget {
+  guid: string;
+  bookGuid: string;
+  name: string;
+  description: string;
+  periodType: "monthly" | "quarterly" | "yearly";
+  numPeriods: number;
+  startDate: string;
+  amounts: BudgetAmount[];
+}
+
+export interface NewBudget {
+  name: string;
+  description: string;
+  periodType: "monthly" | "quarterly" | "yearly";
+  numPeriods: number;
+  startDate: string;
+  amounts: BudgetAmount[];
+}
+
+export interface BudgetVarianceLine {
+  account: Account;
+  budgeted: Numeric;
+  actual: Numeric;
+  variance: Numeric;
+}
+
+export interface BudgetReport {
+  budgetGuid: string;
+  periodNum: number;
+  periodLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  lines: BudgetVarianceLine[];
+  totalBudgeted: Numeric;
+  totalActual: Numeric;
+  totalVariance: Numeric;
+}
+
+export interface Address {
+  name: string;
+  addr1: string;
+  addr2: string;
+  phone: string;
+  email: string;
+}
+
+export interface Customer {
+  guid: string;
+  bookGuid: string;
+  name: string;
+  id: string;
+  notes: string;
+  active: boolean;
+  currencyGuid: string;
+  addr: Address;
+  creditLimit: Numeric;
+  termsGuid: string;
+  createdAt: string;
+}
+
+export interface NewCustomer {
+  name: string;
+  id?: string;
+  notes?: string;
+  active?: boolean;
+  currencyGuid: string;
+  addr?: Partial<Address>;
+  creditLimit?: Numeric;
+  termsGuid?: string;
+}
+
+export interface Vendor {
+  guid: string;
+  bookGuid: string;
+  name: string;
+  id: string;
+  notes: string;
+  active: boolean;
+  currencyGuid: string;
+  addr: Address;
+  termsGuid: string;
+  createdAt: string;
+}
+
+export interface NewVendor {
+  name: string;
+  id?: string;
+  notes?: string;
+  active?: boolean;
+  currencyGuid: string;
+  addr?: Partial<Address>;
+  termsGuid?: string;
+}
+
+export interface NewEntry {
+  date?: string;
+  description?: string;
+  action?: string;
+  notes?: string;
+  quantity?: Numeric;
+  accountGuid: string;
+  price: Numeric;
+  taxable?: boolean;
+}
+
+export interface Entry extends NewEntry {
+  guid: string;
+  invoiceGuid: string;
+  lineTotal: Numeric;
+  createdAt: string;
+}
+
+export interface NewInvoice {
+  id?: string;
+  type: "invoice" | "bill";
+  ownerGuid: string;
+  dateOpened?: string;
+  notes?: string;
+  active?: boolean;
+  currencyGuid: string;
+  termsGuid?: string;
+}
+
+export interface Invoice extends NewInvoice {
+  guid: string;
+  bookGuid: string;
+  datePosted: string | null;
+  dateDue: string | null;
+  postTxnGuid: string;
+  postAccGuid: string;
+  paidAt: string | null;
+  paidTxnGuid: string;
+  createdAt: string;
+  entries?: Entry[];
+}
+
+export interface AgingReportRow {
+  invoice: Invoice;
+  total: Numeric;
+  daysOverdue: number;
+}
+
+export interface AgingBucket {
+  label: string;
+  rows: AgingReportRow[];
+  total: Numeric;
+}
+
+export interface AgingReport {
+  bookGuid: string;
+  asOf: string;
+  buckets: AgingBucket[];
+  total: Numeric;
+}
+
 export interface RegisterEntry {
   splitGuid: string;
   txGuid: string;

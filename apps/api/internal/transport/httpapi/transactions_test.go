@@ -327,6 +327,10 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 		app.NewTradeService(repo, posting),
 		app.NewCapitalGainsService(repo),
 		svc,
+		nil,
+		nil,
+		nil,
+		nil,
 	).Routes()
 }
 

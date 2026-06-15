@@ -1,11 +1,22 @@
 import type {
   Account,
+  AgingReport,
   BalanceSheet,
   Book,
-  Commodity,
+  Budget,
+  BudgetReport,
   CapitalGainsReport,
+  Commodity,
+  Customer,
+  Entry,
   IncomeStatement,
+  Invoice,
+  NewBudget,
+  NewCustomer,
+  NewEntry,
+  NewInvoice,
   NewScheduledTransaction,
+  NewVendor,
   Numeric,
   Portfolio,
   PostedSchedule,
@@ -15,6 +26,7 @@ import type {
   Transaction,
   TradeInput,
   TradeResult,
+  Vendor,
 } from "./types";
 
 // ApiError carries the HTTP status so callers can branch (e.g. 422 unbalanced)
@@ -182,4 +194,97 @@ export const api = {
   // cookie is sent automatically).
   exportGnuCashUrl: (bookGuid: string, format: "sqlite" | "xml" = "sqlite") =>
     `/api/v1/books/${bookGuid}/export/gnucash${format === "xml" ? "?format=xml" : ""}`,
+
+  listBudgets: (bookGuid: string) =>
+    request<{ bookGuid: string; budgets: Budget[] }>(`/api/v1/books/${bookGuid}/budgets`),
+  createBudget: (bookGuid: string, input: NewBudget) =>
+    post<Budget>(`/api/v1/books/${bookGuid}/budgets`, input),
+  getBudget: (guid: string) => request<Budget>(`/api/v1/budgets/${guid}`),
+  updateBudget: (guid: string, input: NewBudget) =>
+    request<Budget>(`/api/v1/budgets/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteBudget: (guid: string) =>
+    request<void>(`/api/v1/budgets/${guid}`, { method: "DELETE" }),
+  budgetReport: (guid: string, asOf?: string) => {
+    const q = asOf ? `?asOf=${encodeURIComponent(asOf)}` : "";
+    return request<BudgetReport>(`/api/v1/budgets/${guid}/report${q}`);
+  },
+
+  listCustomers: (bookGuid: string, activeOnly = false) => {
+    const q = activeOnly ? "?active=true" : "";
+    return request<{ bookGuid: string; customers: Customer[] }>(
+      `/api/v1/books/${bookGuid}/customers${q}`,
+    ).then((r) => r.customers);
+  },
+  createCustomer: (bookGuid: string, input: NewCustomer) =>
+    post<Customer>(`/api/v1/books/${bookGuid}/customers`, input),
+  getCustomer: (guid: string) => request<Customer>(`/api/v1/customers/${guid}`),
+  updateCustomer: (guid: string, input: NewCustomer) =>
+    request<Customer>(`/api/v1/customers/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteCustomer: (guid: string) =>
+    request<void>(`/api/v1/customers/${guid}`, { method: "DELETE" }),
+
+  listVendors: (bookGuid: string, activeOnly = false) => {
+    const q = activeOnly ? "?active=true" : "";
+    return request<{ bookGuid: string; vendors: Vendor[] }>(
+      `/api/v1/books/${bookGuid}/vendors${q}`,
+    ).then((r) => r.vendors);
+  },
+  createVendor: (bookGuid: string, input: NewVendor) =>
+    post<Vendor>(`/api/v1/books/${bookGuid}/vendors`, input),
+  getVendor: (guid: string) => request<Vendor>(`/api/v1/vendors/${guid}`),
+  updateVendor: (guid: string, input: NewVendor) =>
+    request<Vendor>(`/api/v1/vendors/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteVendor: (guid: string) =>
+    request<void>(`/api/v1/vendors/${guid}`, { method: "DELETE" }),
+
+  listInvoices: (bookGuid: string, type: "invoice" | "bill" = "invoice") =>
+    request<{ bookGuid: string; type: string; invoices: Invoice[] }>(
+      `/api/v1/books/${bookGuid}/invoices?type=${type}`,
+    ).then((r) => r.invoices),
+  createInvoice: (bookGuid: string, input: NewInvoice) =>
+    post<Invoice>(`/api/v1/books/${bookGuid}/invoices`, input),
+  getInvoice: (guid: string) => request<Invoice>(`/api/v1/invoices/${guid}`),
+  updateInvoice: (guid: string, input: NewInvoice) =>
+    request<Invoice>(`/api/v1/invoices/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteInvoice: (guid: string) =>
+    request<void>(`/api/v1/invoices/${guid}`, { method: "DELETE" }),
+  postInvoice: (guid: string, postAccGuid: string, postDate?: string, dueDate?: string) =>
+    post<Invoice>(`/api/v1/invoices/${guid}/post`, { postAccGuid, postDate, dueDate }),
+  payInvoice: (guid: string, paymentAccGuid: string, paymentDate?: string) =>
+    post<Invoice>(`/api/v1/invoices/${guid}/pay`, { paymentAccGuid, paymentDate }),
+  arAgingReport: (bookGuid: string) =>
+    request<AgingReport>(`/api/v1/books/${bookGuid}/reports/ar-aging`),
+  apAgingReport: (bookGuid: string) =>
+    request<AgingReport>(`/api/v1/books/${bookGuid}/reports/ap-aging`),
+
+  listEntries: (invoiceGuid: string) =>
+    request<{ invoiceGuid: string; entries: Entry[] }>(
+      `/api/v1/invoices/${invoiceGuid}/entries`,
+    ).then((r) => r.entries),
+  addEntry: (invoiceGuid: string, input: NewEntry) =>
+    post<Entry>(`/api/v1/invoices/${invoiceGuid}/entries`, input),
+  updateEntry: (guid: string, input: NewEntry) =>
+    request<Entry>(`/api/v1/entries/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteEntry: (guid: string) =>
+    request<void>(`/api/v1/entries/${guid}`, { method: "DELETE" }),
 };

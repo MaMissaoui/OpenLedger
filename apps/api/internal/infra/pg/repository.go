@@ -1864,3 +1864,738 @@ func boolToInt(b bool) int {
 	}
 	return 0
 }
+
+// CreateBudget inserts a budget and all its amounts in one transaction.
+func (r *Repository) CreateBudget(ctx context.Context, b domain.Budget) (domain.Budget, error) {
+	return b, pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO budgets (guid, book_guid, name, description, period_type, num_periods, start_date)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+			b.GUID, b.BookGUID, b.Name, b.Description, string(b.PeriodType), b.NumPeriods,
+			schedDate(b.StartDate),
+		); err != nil {
+			return fmt.Errorf("insert budget: %w", err)
+		}
+		return insertBudgetAmounts(ctx, tx, b.GUID, b.Amounts)
+	})
+}
+
+func insertBudgetAmounts(ctx context.Context, tx pgx.Tx, budgetGUID string, amounts []domain.BudgetAmount) error {
+	for _, amt := range amounts {
+		vNum, vDenom, err := amt.Value.NumDenom()
+		if err != nil {
+			return fmt.Errorf("budget amount for %s: %w", amt.AccountGUID, err)
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO budget_amounts (budget_guid, account_guid, period_num, value_num, value_denom)
+			 VALUES ($1,$2,$3,$4,$5)
+			 ON CONFLICT (budget_guid, account_guid, period_num)
+			 DO UPDATE SET value_num = EXCLUDED.value_num, value_denom = EXCLUDED.value_denom`,
+			budgetGUID, amt.AccountGUID, amt.PeriodNum, vNum, vDenom,
+		); err != nil {
+			return fmt.Errorf("upsert budget amount: %w", err)
+		}
+	}
+	return nil
+}
+
+// ListBudgets returns all budgets for a book without amounts.
+func (r *Repository) ListBudgets(ctx context.Context, bookGUID string) ([]domain.Budget, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT guid, book_guid, name, description, period_type, num_periods, start_date
+		   FROM budgets WHERE book_guid = $1 ORDER BY name`, bookGUID)
+	if err != nil {
+		return nil, fmt.Errorf("list budgets: %w", err)
+	}
+	defer rows.Close()
+	var budgets []domain.Budget
+	for rows.Next() {
+		b, err := scanBudget(rows)
+		if err != nil {
+			return nil, err
+		}
+		budgets = append(budgets, b)
+	}
+	return budgets, rows.Err()
+}
+
+// GetBudget returns a budget with its amounts, or app.ErrBudgetNotFound.
+func (r *Repository) GetBudget(ctx context.Context, guid string) (domain.Budget, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT guid, book_guid, name, description, period_type, num_periods, start_date
+		   FROM budgets WHERE guid = $1`, guid)
+	b, err := scanBudget(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Budget{}, domain.ErrBudgetNotFound
+	}
+	if err != nil {
+		return domain.Budget{}, err
+	}
+	b.Amounts, err = r.loadBudgetAmounts(ctx, guid)
+	return b, err
+}
+
+// UpdateBudget replaces a budget's fields and amounts.
+func (r *Repository) UpdateBudget(ctx context.Context, b domain.Budget) (domain.Budget, error) {
+	return b, pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx,
+			`UPDATE budgets SET name=$2, description=$3, period_type=$4, num_periods=$5, start_date=$6
+			  WHERE guid=$1`,
+			b.GUID, b.Name, b.Description, string(b.PeriodType), b.NumPeriods, schedDate(b.StartDate),
+		)
+		if err != nil {
+			return fmt.Errorf("update budget: %w", err)
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrBudgetNotFound
+		}
+		// Delete existing amounts and re-insert so stale entries are removed.
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM budget_amounts WHERE budget_guid = $1`, b.GUID,
+		); err != nil {
+			return fmt.Errorf("clear budget amounts: %w", err)
+		}
+		return insertBudgetAmounts(ctx, tx, b.GUID, b.Amounts)
+	})
+}
+
+// DeleteBudget removes a budget and its amounts.
+func (r *Repository) DeleteBudget(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM budgets WHERE guid = $1`, guid)
+	if err != nil {
+		return fmt.Errorf("delete budget: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrBudgetNotFound
+	}
+	return nil
+}
+
+// BookGUIDForBudget returns the book a budget belongs to.
+func (r *Repository) BookGUIDForBudget(ctx context.Context, guid string) (string, error) {
+	var bookGUID string
+	err := r.pool.QueryRow(ctx,
+		`SELECT book_guid FROM budgets WHERE guid = $1`, guid,
+	).Scan(&bookGUID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrBudgetNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("book for budget: %w", err)
+	}
+	return bookGUID, nil
+}
+
+func scanBudget(row scannable) (domain.Budget, error) {
+	var (
+		b         domain.Budget
+		period    string
+		startDate *string
+	)
+	if err := row.Scan(
+		&b.GUID, &b.BookGUID, &b.Name, &b.Description, &period, &b.NumPeriods, &startDate,
+	); err != nil {
+		return domain.Budget{}, err
+	}
+	b.PeriodType = domain.BudgetPeriodType(period)
+	b.StartDate = parseSchedDate(startDate)
+	return b, nil
+}
+
+func (r *Repository) loadBudgetAmounts(ctx context.Context, budgetGUID string) ([]domain.BudgetAmount, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT account_guid, period_num, value_num, value_denom
+		   FROM budget_amounts WHERE budget_guid = $1 ORDER BY period_num, account_guid`, budgetGUID)
+	if err != nil {
+		return nil, fmt.Errorf("load budget amounts: %w", err)
+	}
+	defer rows.Close()
+	var amounts []domain.BudgetAmount
+	for rows.Next() {
+		var (
+			amt          domain.BudgetAmount
+			vNum, vDenom int64
+		)
+		if err := rows.Scan(&amt.AccountGUID, &amt.PeriodNum, &vNum, &vDenom); err != nil {
+			return nil, fmt.Errorf("scan budget amount: %w", err)
+		}
+		val, err := domain.FromNumDenom(vNum, vDenom)
+		if err != nil {
+			return nil, fmt.Errorf("budget amount value: %w", err)
+		}
+		amt.Value = val
+		amounts = append(amounts, amt)
+	}
+	return amounts, rows.Err()
+}
+
+// ── Customers ────────────────────────────────────────────────────────────────
+
+func (r *Repository) ListCustomers(ctx context.Context, bookGUID string, activeOnly bool) ([]domain.Customer, error) {
+	q := `SELECT guid, book_guid, name, id, notes, active, currency_guid,
+		         addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		         credit_num, credit_denom, COALESCE(terms_guid,''), created_at
+		    FROM customers WHERE book_guid = $1`
+	args := []any{bookGUID}
+	if activeOnly {
+		q += " AND active = TRUE"
+	}
+	q += " ORDER BY name"
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list customers: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Customer
+	for rows.Next() {
+		c, err := scanCustomer(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) GetCustomer(ctx context.Context, guid string) (domain.Customer, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT guid, book_guid, name, id, notes, active, currency_guid,
+		        addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		        credit_num, credit_denom, COALESCE(terms_guid,''), created_at
+		   FROM customers WHERE guid = $1`, guid)
+	c, err := scanCustomer(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Customer{}, domain.ErrCustomerNotFound
+	}
+	return c, err
+}
+
+func (r *Repository) CreateCustomer(ctx context.Context, c domain.Customer) error {
+	cNum, cDenom, err := c.CreditLimit.NumDenom()
+	if err != nil {
+		return fmt.Errorf("credit limit: %w", err)
+	}
+	var termsGUID *string
+	if c.TermsGUID != "" {
+		termsGUID = &c.TermsGUID
+	}
+	_, err = r.pool.Exec(ctx,
+		`INSERT INTO customers
+		   (guid, book_guid, name, id, notes, active, currency_guid,
+		    addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		    credit_num, credit_denom, terms_guid, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+		c.GUID, c.BookGUID, c.Name, c.ID, c.Notes, c.Active, c.CurrencyGUID,
+		c.Addr.Name, c.Addr.Addr1, c.Addr.Addr2, c.Addr.Phone, c.Addr.Email,
+		cNum, cDenom, termsGUID, c.CreatedAt,
+	)
+	return err
+}
+
+func (r *Repository) UpdateCustomer(ctx context.Context, c domain.Customer) error {
+	cNum, cDenom, err := c.CreditLimit.NumDenom()
+	if err != nil {
+		return fmt.Errorf("credit limit: %w", err)
+	}
+	var termsGUID *string
+	if c.TermsGUID != "" {
+		termsGUID = &c.TermsGUID
+	}
+	ct, err := r.pool.Exec(ctx,
+		`UPDATE customers SET
+		   name=$2, id=$3, notes=$4, active=$5, currency_guid=$6,
+		   addr_name=$7, addr_addr1=$8, addr_addr2=$9, addr_phone=$10, addr_email=$11,
+		   credit_num=$12, credit_denom=$13, terms_guid=$14
+		 WHERE guid=$1`,
+		c.GUID, c.Name, c.ID, c.Notes, c.Active, c.CurrencyGUID,
+		c.Addr.Name, c.Addr.Addr1, c.Addr.Addr2, c.Addr.Phone, c.Addr.Email,
+		cNum, cDenom, termsGUID,
+	)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrCustomerNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteCustomer(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM customers WHERE guid = $1`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrCustomerNotFound
+	}
+	return nil
+}
+
+type customerScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanCustomer(s customerScanner) (domain.Customer, error) {
+	var (
+		c            domain.Customer
+		cNum, cDenom int64
+	)
+	err := s.Scan(
+		&c.GUID, &c.BookGUID, &c.Name, &c.ID, &c.Notes, &c.Active, &c.CurrencyGUID,
+		&c.Addr.Name, &c.Addr.Addr1, &c.Addr.Addr2, &c.Addr.Phone, &c.Addr.Email,
+		&cNum, &cDenom, &c.TermsGUID, &c.CreatedAt,
+	)
+	if err != nil {
+		return domain.Customer{}, err
+	}
+	c.CreditLimit, err = domain.FromNumDenom(cNum, cDenom)
+	return c, err
+}
+
+// ── Vendors ──────────────────────────────────────────────────────────────────
+
+func (r *Repository) ListVendors(ctx context.Context, bookGUID string, activeOnly bool) ([]domain.Vendor, error) {
+	q := `SELECT guid, book_guid, name, id, notes, active, currency_guid,
+		         addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		         COALESCE(terms_guid,''), created_at
+		    FROM vendors WHERE book_guid = $1`
+	args := []any{bookGUID}
+	if activeOnly {
+		q += " AND active = TRUE"
+	}
+	q += " ORDER BY name"
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list vendors: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Vendor
+	for rows.Next() {
+		v, err := scanVendor(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) GetVendor(ctx context.Context, guid string) (domain.Vendor, error) {
+	row := r.pool.QueryRow(ctx,
+		`SELECT guid, book_guid, name, id, notes, active, currency_guid,
+		        addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		        COALESCE(terms_guid,''), created_at
+		   FROM vendors WHERE guid = $1`, guid)
+	v, err := scanVendor(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Vendor{}, domain.ErrVendorNotFound
+	}
+	return v, err
+}
+
+func (r *Repository) CreateVendor(ctx context.Context, v domain.Vendor) error {
+	var termsGUID *string
+	if v.TermsGUID != "" {
+		termsGUID = &v.TermsGUID
+	}
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO vendors
+		   (guid, book_guid, name, id, notes, active, currency_guid,
+		    addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		    terms_guid, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+		v.GUID, v.BookGUID, v.Name, v.ID, v.Notes, v.Active, v.CurrencyGUID,
+		v.Addr.Name, v.Addr.Addr1, v.Addr.Addr2, v.Addr.Phone, v.Addr.Email,
+		termsGUID, v.CreatedAt,
+	)
+	return err
+}
+
+func (r *Repository) UpdateVendor(ctx context.Context, v domain.Vendor) error {
+	var termsGUID *string
+	if v.TermsGUID != "" {
+		termsGUID = &v.TermsGUID
+	}
+	ct, err := r.pool.Exec(ctx,
+		`UPDATE vendors SET
+		   name=$2, id=$3, notes=$4, active=$5, currency_guid=$6,
+		   addr_name=$7, addr_addr1=$8, addr_addr2=$9, addr_phone=$10, addr_email=$11,
+		   terms_guid=$12
+		 WHERE guid=$1`,
+		v.GUID, v.Name, v.ID, v.Notes, v.Active, v.CurrencyGUID,
+		v.Addr.Name, v.Addr.Addr1, v.Addr.Addr2, v.Addr.Phone, v.Addr.Email,
+		termsGUID,
+	)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrVendorNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteVendor(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM vendors WHERE guid = $1`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrVendorNotFound
+	}
+	return nil
+}
+
+type vendorScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanVendor(s vendorScanner) (domain.Vendor, error) {
+	var v domain.Vendor
+	err := s.Scan(
+		&v.GUID, &v.BookGUID, &v.Name, &v.ID, &v.Notes, &v.Active, &v.CurrencyGUID,
+		&v.Addr.Name, &v.Addr.Addr1, &v.Addr.Addr2, &v.Addr.Phone, &v.Addr.Email,
+		&v.TermsGUID, &v.CreatedAt,
+	)
+	return v, err
+}
+
+// ── Invoices ─────────────────────────────────────────────────────────────────
+
+const invoiceCols = `guid, book_guid, id, type, owner_guid,
+	       date_opened, date_posted, date_due, notes, active, currency_guid,
+	       COALESCE(post_txn_guid,''), COALESCE(post_acc_guid,''), COALESCE(terms_guid,''),
+	       paid_at, COALESCE(paid_txn_guid,''), created_at`
+
+func (r *Repository) ListInvoices(ctx context.Context, bookGUID, invoiceType string) ([]domain.Invoice, error) {
+	rows, err := r.pool.Query(ctx, `SELECT `+invoiceCols+`
+		FROM invoices
+		WHERE book_guid=$1 AND type=$2
+		ORDER BY date_opened DESC, created_at DESC`, bookGUID, invoiceType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Invoice
+	for rows.Next() {
+		inv, err := scanInvoice(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, inv)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) CreateInvoice(ctx context.Context, inv domain.Invoice) error {
+	var termsGUID *string
+	if inv.TermsGUID != "" {
+		termsGUID = &inv.TermsGUID
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO invoices
+		  (guid, book_guid, id, type, owner_guid,
+		   date_opened, notes, active, currency_guid, terms_guid)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		inv.GUID, inv.BookGUID, inv.ID, string(inv.Type), inv.OwnerGUID,
+		inv.DateOpened.Format("2006-01-02"), inv.Notes, inv.Active, inv.CurrencyGUID, termsGUID)
+	return err
+}
+
+func (r *Repository) GetInvoice(ctx context.Context, guid string) (domain.Invoice, error) {
+	row := r.pool.QueryRow(ctx, `SELECT `+invoiceCols+` FROM invoices WHERE guid=$1`, guid)
+	inv, err := scanInvoice(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Invoice{}, domain.ErrInvoiceNotFound
+	}
+	return inv, err
+}
+
+func (r *Repository) UpdateInvoice(ctx context.Context, inv domain.Invoice) error {
+	var termsGUID *string
+	if inv.TermsGUID != "" {
+		termsGUID = &inv.TermsGUID
+	}
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE invoices SET
+		  id=$2, owner_guid=$3,
+		  date_opened=$4, date_due=$5, notes=$6, active=$7,
+		  currency_guid=$8, terms_guid=$9
+		WHERE guid=$1 AND date_posted IS NULL`,
+		inv.GUID, inv.ID, inv.OwnerGUID,
+		inv.DateOpened.Format("2006-01-02"), inv.DateDue, inv.Notes, inv.Active,
+		inv.CurrencyGUID, termsGUID)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrInvoiceNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteInvoice(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM invoices WHERE guid=$1 AND date_posted IS NULL`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrInvoiceNotFound
+	}
+	return nil
+}
+
+func (r *Repository) MarkInvoicePosted(ctx context.Context, guid, txnGUID, accGUID string, datePosted, dateDue *time.Time) error {
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE invoices SET
+		  date_posted=$2, date_due=$3, post_txn_guid=$4, post_acc_guid=$5
+		WHERE guid=$1 AND date_posted IS NULL`,
+		guid, datePosted, dateDue, txnGUID, accGUID)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrInvoiceNotFound
+	}
+	return nil
+}
+
+type invoiceScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanInvoice(s invoiceScanner) (domain.Invoice, error) {
+	var inv domain.Invoice
+	var invType string
+	var datePosted, dateDue, paidAt *time.Time
+	err := s.Scan(
+		&inv.GUID, &inv.BookGUID, &inv.ID, &invType, &inv.OwnerGUID,
+		&inv.DateOpened, &datePosted, &dateDue, &inv.Notes, &inv.Active, &inv.CurrencyGUID,
+		&inv.PostTxnGUID, &inv.PostAccGUID, &inv.TermsGUID,
+		&paidAt, &inv.PaidTxnGUID, &inv.CreatedAt,
+	)
+	if err != nil {
+		return domain.Invoice{}, err
+	}
+	inv.Type = domain.InvoiceType(invType)
+	inv.DatePosted = datePosted
+	inv.DateDue = dateDue
+	inv.PaidAt = paidAt
+	return inv, nil
+}
+
+func (r *Repository) MarkInvoicePaid(ctx context.Context, guid, txnGUID string, paidAt time.Time) error {
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE invoices SET paid_at=$2, paid_txn_guid=$3
+		WHERE guid=$1 AND date_posted IS NOT NULL AND paid_at IS NULL`,
+		guid, paidAt, txnGUID)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrInvoiceNotFound
+	}
+	return nil
+}
+
+func (r *Repository) ARAgingRows(ctx context.Context, bookGUID string) ([]app.AgingRow, error) {
+	return r.agingRows(ctx, bookGUID, "invoice")
+}
+
+func (r *Repository) APAgingRows(ctx context.Context, bookGUID string) ([]app.AgingRow, error) {
+	return r.agingRows(ctx, bookGUID, "bill")
+}
+
+func (r *Repository) agingRows(ctx context.Context, bookGUID, invType string) ([]app.AgingRow, error) {
+	rows, err := r.pool.Query(ctx, `SELECT `+invoiceCols+`
+		FROM invoices
+		WHERE book_guid=$1 AND type=$2 AND date_posted IS NOT NULL AND paid_at IS NULL
+		ORDER BY date_posted`, bookGUID, invType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var invoices []domain.Invoice
+	for rows.Next() {
+		inv, err := scanInvoice(rows)
+		if err != nil {
+			return nil, err
+		}
+		invoices = append(invoices, inv)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(invoices) == 0 {
+		return nil, nil
+	}
+
+	// Load all entries for these invoices in one query.
+	guids := make([]string, len(invoices))
+	for i, inv := range invoices {
+		guids[i] = inv.GUID
+	}
+	entryRows, err := r.pool.Query(ctx, `
+		SELECT guid, invoice_guid, date, description, action, notes,
+		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
+		       taxable, created_at
+		FROM entries WHERE invoice_guid = ANY($1)`, guids)
+	if err != nil {
+		return nil, err
+	}
+	defer entryRows.Close()
+	byInvoice := make(map[string][]domain.InvoiceEntry)
+	for entryRows.Next() {
+		e, err := scanEntry(entryRows)
+		if err != nil {
+			return nil, err
+		}
+		byInvoice[e.InvoiceGUID] = append(byInvoice[e.InvoiceGUID], e)
+	}
+	if err := entryRows.Err(); err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	result := make([]app.AgingRow, 0, len(invoices))
+	for _, inv := range invoices {
+		total := domain.Zero()
+		for _, e := range byInvoice[inv.GUID] {
+			total = total.Add(e.LineTotal())
+		}
+		var dueDate time.Time
+		if inv.DateDue != nil {
+			dueDate = *inv.DateDue
+		} else if inv.DatePosted != nil {
+			dueDate = inv.DatePosted.Add(30 * 24 * time.Hour)
+		}
+		daysOverdue := int(now.Sub(dueDate).Hours() / 24)
+		result = append(result, app.AgingRow{
+			Invoice:     inv,
+			Total:       total,
+			DaysOverdue: daysOverdue,
+		})
+	}
+	return result, nil
+}
+
+// ── Entries ───────────────────────────────────────────────────────────────────
+
+func (r *Repository) ListEntries(ctx context.Context, invoiceGUID string) ([]domain.InvoiceEntry, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT guid, invoice_guid, date, description, action, notes,
+		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
+		       taxable, created_at
+		FROM entries WHERE invoice_guid=$1
+		ORDER BY created_at`, invoiceGUID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.InvoiceEntry
+	for rows.Next() {
+		e, err := scanEntry(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) CreateEntry(ctx context.Context, e domain.InvoiceEntry) error {
+	qNum, qDenom, err := e.Quantity.NumDenom()
+	if err != nil {
+		return err
+	}
+	pNum, pDenom, err := e.Price.NumDenom()
+	if err != nil {
+		return err
+	}
+	_, err = r.pool.Exec(ctx, `
+		INSERT INTO entries
+		  (guid, invoice_guid, date, description, action, notes,
+		   quantity_num, quantity_denom, account_guid, price_num, price_denom, taxable)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		e.GUID, e.InvoiceGUID, e.Date.Format("2006-01-02"),
+		e.Description, e.Action, e.Notes,
+		qNum, qDenom, e.AccountGUID, pNum, pDenom, e.Taxable)
+	return err
+}
+
+func (r *Repository) GetEntry(ctx context.Context, guid string) (domain.InvoiceEntry, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT guid, invoice_guid, date, description, action, notes,
+		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
+		       taxable, created_at
+		FROM entries WHERE guid=$1`, guid)
+	e, err := scanEntry(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.InvoiceEntry{}, domain.ErrEntryNotFound
+	}
+	return e, err
+}
+
+func (r *Repository) UpdateEntry(ctx context.Context, e domain.InvoiceEntry) error {
+	qNum, qDenom, err := e.Quantity.NumDenom()
+	if err != nil {
+		return err
+	}
+	pNum, pDenom, err := e.Price.NumDenom()
+	if err != nil {
+		return err
+	}
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE entries SET
+		  date=$2, description=$3, action=$4, notes=$5,
+		  quantity_num=$6, quantity_denom=$7, account_guid=$8,
+		  price_num=$9, price_denom=$10, taxable=$11
+		WHERE guid=$1`,
+		e.GUID, e.Date.Format("2006-01-02"),
+		e.Description, e.Action, e.Notes,
+		qNum, qDenom, e.AccountGUID, pNum, pDenom, e.Taxable)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrEntryNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteEntry(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM entries WHERE guid=$1`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrEntryNotFound
+	}
+	return nil
+}
+
+type entryScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanEntry(s entryScanner) (domain.InvoiceEntry, error) {
+	var e domain.InvoiceEntry
+	var qNum, qDenom, pNum, pDenom int64
+	err := s.Scan(
+		&e.GUID, &e.InvoiceGUID, &e.Date, &e.Description, &e.Action, &e.Notes,
+		&qNum, &qDenom, &e.AccountGUID, &pNum, &pDenom,
+		&e.Taxable, &e.CreatedAt,
+	)
+	if err != nil {
+		return domain.InvoiceEntry{}, err
+	}
+	e.Quantity, err = domain.FromNumDenom(qNum, qDenom)
+	if err != nil {
+		return domain.InvoiceEntry{}, err
+	}
+	e.Price, err = domain.FromNumDenom(pNum, pDenom)
+	if err != nil {
+		return domain.InvoiceEntry{}, err
+	}
+	return e, nil
+}
