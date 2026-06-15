@@ -132,6 +132,40 @@ a {
 .btn--active:hover {
   background: rgba(26, 127, 55, 0.15);
 }
+
+/* ── Business view tab switcher ─────────────────────────────────────────────── */
+.biz-tabs {
+  display: flex;
+  border: 1px solid var(--rule-strong);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.biz-tab {
+  padding: 0.35rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--rule-strong);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.biz-tab:last-child {
+  border-right: none;
+}
+.biz-tab:hover {
+  background: rgba(31, 35, 40, 0.05);
+  color: var(--ink);
+}
+.biz-tab--active {
+  background: var(--forest);
+  color: #fff;
+  font-weight: 600;
+}
+.biz-tab--active:hover {
+  background: var(--forest-dark);
+}
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -151,19 +185,29 @@ a {
   color: var(--ink-soft);
 }
 .field input,
-.field select {
+.field select,
+.field textarea {
   background: var(--paper-raised);
   border: 1px solid var(--rule-strong);
   border-radius: 6px;
   padding: 0.55rem 0.65rem;
   font-size: 0.95rem;
   color: var(--ink);
+  font-family: inherit;
 }
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
   outline: none;
-  border-color: var(--oxblood);
-  box-shadow: 0 0 0 3px rgba(140, 43, 34, 0.14);
+  border-color: var(--forest);
+  box-shadow: 0 0 0 3px rgba(26, 127, 55, 0.14);
+}
+.field span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
 .mono {
@@ -836,9 +880,14 @@ a {
 }
 
 .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   padding: 3rem 1rem;
   color: var(--ink-soft);
+  gap: 0.4rem;
 }
 
 /* ---------- reports ---------- */
@@ -1275,8 +1324,8 @@ a {
 .split-row input:focus,
 .split-row select:focus {
   outline: none;
-  border-color: var(--oxblood);
-  box-shadow: 0 0 0 2px rgba(140, 43, 34, 0.12);
+  border-color: var(--forest);
+  box-shadow: 0 0 0 2px rgba(26, 127, 55, 0.12);
 }
 
 /* ---------- muted row (e.g. disabled scheduled transaction) ---------- */
