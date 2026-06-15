@@ -223,11 +223,14 @@ func (r *Repository) accountFractions(ctx context.Context, tx pgx.Tx, splits []d
 	return fractions, rows.Err()
 }
 
-// InsertCommodity writes a commodity row.
+// InsertCommodity writes a commodity row. ON CONFLICT DO NOTHING means re-importing
+// a GnuCash file that references a commodity already in the DB is a no-op rather
+// than a duplicate-key error or a silent second row.
 func (r *Repository) InsertCommodity(ctx context.Context, c domain.Commodity) error {
 	if _, err := r.pool.Exec(ctx,
 		`INSERT INTO commodities (guid, namespace, mnemonic, fullname, fraction)
-		 VALUES ($1, $2, $3, $4, $5)`,
+		 VALUES ($1, $2, $3, $4, $5)
+		 ON CONFLICT (namespace, mnemonic) DO NOTHING`,
 		c.GUID, c.Namespace, c.Mnemonic, nullable(c.Fullname), c.Fraction,
 	); err != nil {
 		return fmt.Errorf("insert commodity: %w", err)
@@ -354,13 +357,43 @@ func (r *Repository) InsertBook(ctx context.Context, b domain.Book, root, templa
 // collision (re-importing the same file) maps to app.ErrImportConflict.
 func (r *Repository) ImportBook(ctx context.Context, data app.GnuCashData, ownerUserID string) error {
 	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		// Insert commodities; if one with the same (namespace, mnemonic) already
+		// exists under a different GUID, skip the insert and remap all references
+		// in accounts and transactions to the canonical existing GUID.
+		guidRemap := make(map[string]string) // file-GUID → canonical DB GUID
 		for _, c := range data.Commodities {
 			if _, err := tx.Exec(ctx,
 				`INSERT INTO commodities (guid, namespace, mnemonic, fullname, fraction)
-				 VALUES ($1, $2, $3, $4, $5)`,
+				 VALUES ($1, $2, $3, $4, $5)
+				 ON CONFLICT (namespace, mnemonic) DO NOTHING`,
 				c.GUID, c.Namespace, c.Mnemonic, nullable(c.Fullname), c.Fraction,
 			); err != nil {
 				return importErr("insert commodity", err)
+			}
+			// Resolve the canonical GUID (may differ from c.GUID if DO NOTHING fired).
+			var canonical string
+			if err := tx.QueryRow(ctx,
+				`SELECT guid FROM commodities WHERE namespace=$1 AND mnemonic=$2`,
+				c.Namespace, c.Mnemonic,
+			).Scan(&canonical); err != nil {
+				return fmt.Errorf("resolve commodity %s/%s: %w", c.Namespace, c.Mnemonic, err)
+			}
+			if canonical != c.GUID {
+				guidRemap[c.GUID] = canonical
+			}
+		}
+
+		// Apply remap to accounts and transactions before inserting them.
+		if len(guidRemap) > 0 {
+			for i := range data.Accounts {
+				if canon, ok := guidRemap[data.Accounts[i].CommodityGUID]; ok {
+					data.Accounts[i].CommodityGUID = canon
+				}
+			}
+			for i := range data.Transactions {
+				if canon, ok := guidRemap[data.Transactions[i].CurrencyGUID]; ok {
+					data.Transactions[i].CurrencyGUID = canon
+				}
 			}
 		}
 
@@ -2284,7 +2317,42 @@ func (r *Repository) ListInvoices(ctx context.Context, bookGUID, invoiceType str
 		}
 		out = append(out, inv)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+
+	// Batch-load entries so callers can compute totals without N+1 queries.
+	guids := make([]string, len(out))
+	for i, inv := range out {
+		guids[i] = inv.GUID
+	}
+	entryRows, err := r.pool.Query(ctx, `
+		SELECT guid, invoice_guid, date, description, action, notes,
+		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
+		       taxable, created_at
+		FROM entries WHERE invoice_guid = ANY($1)`, guids)
+	if err != nil {
+		return nil, err
+	}
+	defer entryRows.Close()
+	byInvoice := make(map[string][]domain.InvoiceEntry)
+	for entryRows.Next() {
+		e, err := scanEntry(entryRows)
+		if err != nil {
+			return nil, err
+		}
+		byInvoice[e.InvoiceGUID] = append(byInvoice[e.InvoiceGUID], e)
+	}
+	if err := entryRows.Err(); err != nil {
+		return nil, err
+	}
+	for i, inv := range out {
+		out[i].Entries = byInvoice[inv.GUID]
+	}
+	return out, nil
 }
 
 func (r *Repository) CreateInvoice(ctx context.Context, inv domain.Invoice) error {
