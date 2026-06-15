@@ -368,18 +368,21 @@ a {
   border: none;
   background: rgba(31, 35, 40, 0.06);
   color: var(--ink-soft);
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   cursor: pointer;
-  font-size: 0.75rem;
   line-height: 1;
   transition: background 0.12s ease, color 0.12s ease;
   padding: 0;
+}
+.sidenav__toggle svg {
+  width: 16px;
+  height: 16px;
 }
 .sidenav__toggle:hover {
   background: rgba(31, 35, 40, 0.12);

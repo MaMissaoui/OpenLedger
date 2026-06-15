@@ -58,14 +58,16 @@ const Icon = {
       <path d="M7 17H3a1 1 0 01-1-1V2a1 1 0 011-1h4M12 13l4-4-4-4M16 9H7" />
     </svg>
   ),
-  chevronLeft: (
-    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4l-5 5 5 5" />
+  collapseMenu: (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 5l-3 4 3 4" />
+      <path d="M10 5h4M10 9h4M10 13h4" />
     </svg>
   ),
-  chevronRight: (
-    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 4l5 5-5 5" />
+  expandMenu: (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 5h4M4 9h4M4 13h4" />
+      <path d="M11 5l3 4-3 4" />
     </svg>
   ),
 };
@@ -152,7 +154,7 @@ export function Ledger() {
             onClick={() => setCollapsed((c) => !c)}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {collapsed ? Icon.chevronRight : Icon.chevronLeft}
+            {collapsed ? Icon.expandMenu : Icon.collapseMenu}
           </button>
         </div>
 
