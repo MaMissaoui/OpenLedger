@@ -3,24 +3,36 @@
    for the money columns (tabular figures aligned like a real account book). */
 
 :root {
-  --paper: #f1ead9;
-  --paper-panel: #f8f2e6;
-  --paper-raised: #fdfaf2;
-  --ink: #221d16;
-  --ink-soft: #6f6151;
-  --ink-faint: #a2937d;
-  --rule: #d9ccb2;
-  --rule-strong: #c3b291;
-  --oxblood: #8c2b22;
-  --oxblood-soft: #b4554a;
-  --forest: #2f5d4f;
-  --gold: #b8862f;
+  /* surfaces */
+  --paper: #ffffff;
+  --paper-panel: #eef2f9;
+  --paper-raised: #ffffff;
+
+  /* text */
+  --ink: #1c2128;
+  --ink-soft: #636e7b;
+  --ink-faint: #8c959f;
+
+  /* borders */
+  --rule: #d0d7de;
+  --rule-strong: #afb8c1;
+
+  /* semantic red — negative amounts, errors, debits */
+  --oxblood: #cf222e;
+  --oxblood-soft: #e5534b;
+
+  /* semantic green — positive amounts, primary actions */
+  --forest: #1a7f37;
+  --forest-dark: #116329;
+
+  /* amber — cleared/unreconciled status badge */
+  --gold: #9a6700;
 
   --display: "Fraunces", Georgia, serif;
   --ui: "Hanken Grotesk", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.6), 0 18px 40px -28px rgba(34, 29, 22, 0.55);
+  --shadow: 0 1px 3px rgba(31, 35, 40, 0.12), 0 8px 24px -8px rgba(31, 35, 40, 0.08);
 }
 
 * {
@@ -38,20 +50,13 @@ body {
   font-family: var(--ui);
   color: var(--ink);
   background-color: var(--paper);
-  /* faint paper grain + a top-light gradient for depth */
-  background-image:
-    radial-gradient(rgba(34, 29, 22, 0.025) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(255, 252, 244, 0.6), transparent 380px);
-  background-size:
-    4px 4px,
-    100% 100%;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: var(--oxblood);
-  color: var(--paper-raised);
+  background: rgba(26, 127, 55, 0.18);
+  color: var(--ink);
 }
 
 button {
@@ -87,21 +92,25 @@ a {
 }
 .btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px -10px rgba(34, 29, 22, 0.7);
+  box-shadow: 0 6px 18px -10px rgba(31, 35, 40, 0.5);
 }
 .btn:active {
   transform: translateY(0);
 }
 .btn--accent {
-  border-color: var(--oxblood);
-  background: var(--oxblood);
+  border-color: var(--forest);
+  background: var(--forest);
+}
+.btn--accent:hover {
+  background: var(--forest-dark);
+  border-color: var(--forest-dark);
 }
 .btn--ghost {
   background: transparent;
   color: var(--ink);
 }
 .btn--ghost:hover {
-  background: rgba(34, 29, 22, 0.06);
+  background: rgba(31, 35, 40, 0.06);
   box-shadow: none;
 }
 .btn--sm {
@@ -183,7 +192,7 @@ a {
 
 .auth__aside {
   background:
-    radial-gradient(120% 80% at 20% 0%, rgba(184, 134, 47, 0.18), transparent 60%),
+    radial-gradient(120% 80% at 20% 0%, rgba(26, 127, 55, 0.18), transparent 60%),
     var(--ink);
   color: var(--paper);
   padding: 3.5rem;
@@ -294,11 +303,11 @@ a {
   width: 56px;
 }
 
-/* Brand area keeps the dark ink header for contrast */
+/* Brand area — same surface as the sidebar */
 .sidenav__brand {
-  background: var(--ink);
+  background: var(--paper-panel);
   padding: 0.85rem 0.85rem 0.85rem 1rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--rule);
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -310,10 +319,10 @@ a {
   font-family: var(--display);
   font-weight: 900;
   font-size: 0.78rem;
-  color: var(--gold);
+  color: var(--forest);
   width: 28px;
   height: 28px;
-  border: 1.5px solid var(--gold);
+  border: 1.5px solid var(--forest);
   border-radius: 5px;
   display: flex;
   align-items: center;
@@ -335,7 +344,7 @@ a {
   font-size: 1rem;
   letter-spacing: -0.01em;
   display: block;
-  color: var(--paper-raised);
+  color: var(--ink);
   line-height: 1.1;
 }
 
@@ -345,14 +354,14 @@ a {
   font-size: 0.58rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(241, 234, 217, 0.3);
+  color: var(--ink-faint);
 }
 
-/* Collapse toggle button — lives inside the dark brand bar */
+/* Collapse toggle button */
 .sidenav__toggle {
   border: none;
-  background: rgba(255, 255, 255, 0.09);
-  color: rgba(241, 234, 217, 0.55);
+  background: rgba(31, 35, 40, 0.06);
+  color: var(--ink-soft);
   width: 22px;
   height: 22px;
   border-radius: 4px;
@@ -367,8 +376,8 @@ a {
   padding: 0;
 }
 .sidenav__toggle:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: var(--paper-raised);
+  background: rgba(31, 35, 40, 0.12);
+  color: var(--ink);
 }
 
 /* When collapsed: center just the mark + toggle */
@@ -416,9 +425,9 @@ a {
   background: rgba(34, 29, 22, 0.05);
 }
 .sidenav__item--active {
-  color: var(--oxblood);
-  border-left-color: var(--oxblood);
-  background: rgba(140, 43, 34, 0.07);
+  color: var(--ink);
+  border-left-color: var(--forest);
+  background: rgba(26, 127, 55, 0.09);
   font-weight: 600;
 }
 
@@ -625,7 +634,7 @@ a {
   border-left: 2px solid transparent;
 }
 .acct:hover {
-  background: rgba(184, 134, 47, 0.1);
+  background: rgba(26, 127, 55, 0.07);
 }
 .acct--active {
   background: var(--paper-raised);
@@ -719,7 +728,7 @@ a {
   vertical-align: baseline;
 }
 .ledger-table tbody tr:hover {
-  background: rgba(184, 134, 47, 0.08);
+  background: rgba(31, 35, 40, 0.04);
 }
 .ledger-table .date {
   font-family: var(--mono);
@@ -760,7 +769,7 @@ a {
   opacity: 1;
 }
 .row-actions__btn:hover {
-  background: rgba(34, 29, 22, 0.06);
+  background: rgba(31, 35, 40, 0.06);
   color: var(--ink);
 }
 .row-actions__btn--danger:hover {
@@ -791,7 +800,7 @@ a {
   transition: color 0.12s ease, background 0.12s ease;
 }
 .recon:hover {
-  background: rgba(34, 29, 22, 0.06);
+  background: rgba(31, 35, 40, 0.06);
   color: var(--ink);
 }
 .recon:disabled {
@@ -800,13 +809,13 @@ a {
 }
 /* Unreconciled is muted; cleared is amber; reconciled is green. */
 .recon--n {
-  color: var(--ink-faint, #b3a999);
+  color: var(--ink-faint);
 }
 .recon--c {
-  color: #b8860b;
+  color: var(--gold);
 }
 .recon--y {
-  color: #2e7d32;
+  color: var(--forest);
 }
 
 .empty {
@@ -932,7 +941,7 @@ a {
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(34, 29, 22, 0.45);
+  background: rgba(28, 33, 40, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -945,7 +954,7 @@ a {
   background: var(--paper-raised);
   border-radius: 4px;
   border: 1px solid var(--rule-strong);
-  box-shadow: 0 30px 70px -30px rgba(34, 29, 22, 0.8);
+  box-shadow: 0 30px 70px -30px rgba(31, 35, 40, 0.6);
   padding: 1.8rem;
   animation: rise 0.2s cubic-bezier(0.2, 0.7, 0.3, 1);
 }
@@ -1045,8 +1054,8 @@ a {
   color: var(--paper-raised);
 }
 .btn--primary:hover {
-  background: #275040;
-  border-color: #275040;
+  background: var(--forest-dark);
+  border-color: var(--forest-dark);
 }
 
 /* ---------- extra-small button ---------- */
@@ -1111,7 +1120,7 @@ a {
   vertical-align: middle;
 }
 .report-table tbody tr:hover {
-  background: rgba(184, 134, 47, 0.06);
+  background: rgba(31, 35, 40, 0.03);
 }
 .report-table tfoot td {
   padding: 0.65rem 0.8rem;
@@ -1151,7 +1160,7 @@ a {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(34, 29, 22, 0.45);
+  background: rgba(28, 33, 40, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1185,7 +1194,7 @@ a {
   border-radius: 2px;
 }
 .dialog__close:hover {
-  background: rgba(34, 29, 22, 0.06);
+  background: rgba(31, 35, 40, 0.06);
   color: var(--ink);
 }
 .dialog__body {
