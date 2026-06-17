@@ -95,6 +95,50 @@ func (s *Server) handleCapitalGains(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleCashFlow(w http.ResponseWriter, r *http.Request) {
+	bookGUID := r.PathValue("id")
+	if !s.authorizeBook(w, r, bookGUID, app.AccessRead) {
+		return
+	}
+	from, ok := queryTime(w, r, "from", time.Time{})
+	if !ok {
+		return
+	}
+	to, ok := queryTime(w, r, "to", time.Now())
+	if !ok {
+		return
+	}
+	cf, err := s.report.CashFlowStatement(r.Context(), bookGUID, from, to)
+	if writeStructureError(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"bookGuid":      bookGUID,
+		"from":          cf.From,
+		"to":            cf.To,
+		"operating":     cashSectionDTO(cf.Operating),
+		"investing":     cashSectionDTO(cf.Investing),
+		"financing":     cashSectionDTO(cf.Financing),
+		"netChange":     numericAtScale(cf.NetChange, 100),
+		"beginningCash": numericAtScale(cf.BeginningCash, 100),
+		"endingCash":    numericAtScale(cf.EndingCash, 100),
+	})
+}
+
+func cashSectionDTO(sec app.CashFlowSection) map[string]any {
+	lines := make([]map[string]any, 0, len(sec.Lines))
+	for _, l := range sec.Lines {
+		lines = append(lines, map[string]any{
+			"account": accountDTO(l.Account),
+			"amount":  numericAtScale(l.Balance, l.Scale),
+		})
+	}
+	return map[string]any{
+		"lines": lines,
+		"total": numericAtScale(sec.Total, 100),
+	}
+}
+
 // queryTime parses an RFC 3339 timestamp from query parameter key, returning def
 // when it is absent. On a malformed value it writes a 400 and returns ok=false.
 func queryTime(w http.ResponseWriter, r *http.Request, key string, def time.Time) (time.Time, bool) {

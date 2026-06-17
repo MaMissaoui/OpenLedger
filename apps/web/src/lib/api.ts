@@ -6,6 +6,7 @@ import type {
   Budget,
   BudgetReport,
   CapitalGainsReport,
+  CashFlowStatement,
   Commodity,
   Customer,
   Entry,
@@ -153,6 +154,13 @@ export const api = {
     if (to) params.set("to", to);
     const q = params.toString() ? `?${params}` : "";
     return request<IncomeStatement>(`/api/v1/books/${bookGuid}/reports/income-statement${q}`);
+  },
+  getCashFlow: (bookGuid: string, from?: string, to?: string) => {
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    const q = params.toString() ? `?${params}` : "";
+    return request<CashFlowStatement>(`/api/v1/books/${bookGuid}/reports/cash-flow${q}`);
   },
   getPortfolio: (bookGuid: string) =>
     request<Portfolio>(`/api/v1/books/${bookGuid}/reports/portfolio`),

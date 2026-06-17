@@ -12,6 +12,7 @@ type BizTab = "ar-aging" | "ap-aging";
 interface Props {
   book: Book;
   onOpenStatement: (tab: StatementTab) => void;
+  onOpenCashFlow: () => void;
   onOpenView: (view: ReportView, bizTab?: BizTab) => void;
 }
 
@@ -78,7 +79,7 @@ const ICONS: Record<string, React.ReactNode> = {
   ),
 };
 
-export function ReportsCenterView({ book, onOpenStatement, onOpenView }: Props) {
+export function ReportsCenterView({ book, onOpenStatement, onOpenCashFlow, onOpenView }: Props) {
   const balanceSheet = useQuery({
     queryKey: ["balance-sheet", book.guid, "center"],
     queryFn: () => api.getBalanceSheet(book.guid, todayISO()),
@@ -135,7 +136,7 @@ export function ReportsCenterView({ book, onOpenStatement, onOpenView }: Props) 
       {/* Report library */}
       <h2 className="report-lib__heading">Report Library</h2>
       <div className="bento">
-        <LibraryCard icon={ICONS.statements} title="Financial Statements" count={2}>
+        <LibraryCard icon={ICONS.statements} title="Financial Statements" count={3}>
           <ReportRow
             title="Balance Sheet"
             desc="Assets, liabilities, and equity as of a date."
@@ -145,6 +146,11 @@ export function ReportsCenterView({ book, onOpenStatement, onOpenView }: Props) 
             title="Income Statement (P&L)"
             desc="Revenue and expenses over a period."
             onClick={() => onOpenStatement("income-statement")}
+          />
+          <ReportRow
+            title="Cash Flow Statement"
+            desc="Operating, investing, and financing cash movement."
+            onClick={onOpenCashFlow}
           />
         </LibraryCard>
 

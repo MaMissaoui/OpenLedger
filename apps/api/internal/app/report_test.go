@@ -107,6 +107,53 @@ func TestIncomeStatement(t *testing.T) {
 	}
 }
 
+func TestCashFlowStatement(t *testing.T) {
+	// The same balanced book, viewed since inception so ending cash equals the
+	// period's net change and beginning cash is zero:
+	//   bank    +1500 (cash)              owner invested 1000, earned 700, spent 200
+	//   equity  -1000 → financing inflow +1000
+	//   income   -700 → operating inflow  +700
+	//   expense  +200 → operating outflow  -200
+	repo := &fakeReportRepo{root: "root", rows: []AccountWithBalance{
+		bal(domain.AccountBank, 150000),
+		bal(domain.AccountEquity, -100000),
+		bal(domain.AccountIncome, -70000),
+		bal(domain.AccountExpense, 20000),
+	}}
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC)
+	cf, err := NewReportService(repo).CashFlowStatement(context.Background(), "book-1", from, to)
+	if err != nil {
+		t.Fatalf("CashFlowStatement: %v", err)
+	}
+
+	// Operating = +700 income − 200 expense = +500, from two lines.
+	if want := domain.MustFromNumDenom(50000, 100); !cf.Operating.Total.Equal(want) {
+		t.Errorf("operating total = %s, want %s", cf.Operating.Total, want)
+	}
+	if len(cf.Operating.Lines) != 2 {
+		t.Errorf("operating lines = %d, want 2", len(cf.Operating.Lines))
+	}
+	// Financing = owner's +1000 contribution.
+	if want := domain.MustFromNumDenom(100000, 100); !cf.Financing.Total.Equal(want) {
+		t.Errorf("financing total = %s, want %s", cf.Financing.Total, want)
+	}
+	if !cf.Investing.Total.IsZero() || len(cf.Investing.Lines) != 0 {
+		t.Errorf("investing = %s (%d lines), want zero", cf.Investing.Total, len(cf.Investing.Lines))
+	}
+	// Net change ties out to the cash accounts' own movement (+1500), and with no
+	// prior history beginning cash is zero.
+	if want := domain.MustFromNumDenom(150000, 100); !cf.NetChange.Equal(want) {
+		t.Errorf("net change = %s, want %s", cf.NetChange, want)
+	}
+	if want := domain.MustFromNumDenom(150000, 100); !cf.EndingCash.Equal(want) {
+		t.Errorf("ending cash = %s, want %s", cf.EndingCash, want)
+	}
+	if !cf.BeginningCash.IsZero() {
+		t.Errorf("beginning cash = %s, want 0", cf.BeginningCash)
+	}
+}
+
 func TestIncomeStatementOpenLowerBound(t *testing.T) {
 	repo := &fakeReportRepo{root: "root"}
 	to := time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC)

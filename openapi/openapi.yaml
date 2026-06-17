@@ -158,6 +158,41 @@ paths:
           description: The authenticated user has no membership on this book
         "404":
           description: Book not found
+  /api/v1/books/{id}/reports/cash-flow:
+    get:
+      summary: Cash flow statement (operating, investing, financing) over a date range
+      operationId: getCashFlow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: Start of the period (inclusive). Omit for an open lower bound.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End of the period (inclusive). Defaults to now.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: The cash flow statement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashFlowStatement"
+        "400":
+          description: Malformed from/to timestamp
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
   /api/v1/books/{id}/reports/portfolio:
     get:
       summary: Portfolio (security holdings) report
@@ -1608,6 +1643,59 @@ components:
           allOf:
             - $ref: "#/components/schemas/Numeric"
           description: Total income minus total expense.
+    CashFlowLine:
+      type: object
+      description: >-
+        One account's cash effect for the period: inflow positive, outflow
+        negative (the negative of the account's own balance change).
+      properties:
+        account:
+          $ref: "#/components/schemas/Account"
+        amount:
+          $ref: "#/components/schemas/Numeric"
+    CashFlowSection:
+      type: object
+      description: >-
+        A group of cash flow lines with their total. Zero-effect accounts are
+        omitted.
+      properties:
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/CashFlowLine"
+        total:
+          $ref: "#/components/schemas/Numeric"
+    CashFlowStatement:
+      type: object
+      description: >-
+        Movement of cash over [from, to], grouped into operating, investing,
+        and financing activities. Rests on the double-entry identity that the
+        change in cash equals the negative of the change in every non-cash
+        account. Single-currency only; balances are not converted across
+        commodities.
+      properties:
+        bookGuid:
+          type: string
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        operating:
+          $ref: "#/components/schemas/CashFlowSection"
+        investing:
+          $ref: "#/components/schemas/CashFlowSection"
+        financing:
+          $ref: "#/components/schemas/CashFlowSection"
+        netChange:
+          allOf:
+            - $ref: "#/components/schemas/Numeric"
+          description: Operating + investing + financing — the period's change in cash.
+        beginningCash:
+          $ref: "#/components/schemas/Numeric"
+        endingCash:
+          $ref: "#/components/schemas/Numeric"
     Portfolio:
       type: object
       description: Security-holdings report for a book.

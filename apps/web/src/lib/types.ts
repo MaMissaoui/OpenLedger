@@ -87,6 +87,34 @@ export interface IncomeStatement {
   netIncome: Numeric;
 }
 
+// One account's cash effect for the period: inflow positive, outflow negative
+// (the negative of the account's own balance change).
+export interface CashFlowLine {
+  account: Account;
+  amount: Numeric;
+}
+
+// A group of cash-flow lines with their total. Zero-effect accounts are omitted.
+export interface CashFlowSection {
+  lines: CashFlowLine[];
+  total: Numeric;
+}
+
+// Movement of cash over [from, to], grouped into operating, investing, and
+// financing activities. netChange = operating + investing + financing, and
+// equals endingCash − beginningCash. Single-currency only.
+export interface CashFlowStatement {
+  bookGuid: string;
+  from: string;
+  to: string;
+  operating: CashFlowSection;
+  investing: CashFlowSection;
+  financing: CashFlowSection;
+  netChange: Numeric;
+  beginningCash: Numeric;
+  endingCash: Numeric;
+}
+
 // One security position in the portfolio report. shares is in the account's
 // commodity; the money fields are in the quote currency. When hasPrice is false
 // the holding has no quote and the market-value fields are absent.

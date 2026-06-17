@@ -1592,6 +1592,76 @@ a { color: var(--primary); }
 }
 .back-link:hover { color: var(--primary); }
 
+/* ---------- cash flow statement ---------- */
+
+.cf-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin: 1rem 0 1.6rem;
+  max-width: 640px;
+}
+@media (max-width: 640px) {
+  .cf-summary { grid-template-columns: 1fr; }
+}
+.cf-card {
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  padding: 1.2rem 1.4rem;
+  background: var(--surface-container-lowest);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.cf-card--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.cf-card__label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--secondary);
+}
+.cf-card--primary .cf-card__label { color: rgba(255, 255, 255, 0.6); }
+.cf-card__value { font-size: 1.7rem; font-weight: 600; color: var(--primary); }
+.cf-card--primary .cf-card__value { color: var(--on-primary); }
+.cf-card__value.pos { color: var(--positive); }
+.cf-card__value.neg { color: var(--negative); }
+
+/* statement table */
+.cf-table { max-width: 760px; }
+.cf-table .amount.neg { color: var(--negative); }
+
+.cf-cat td {
+  font-weight: 700;
+  color: var(--primary);
+  padding-top: 1.1rem;
+  border-bottom: 1px solid var(--outline-variant);
+}
+.cf-table tbody tr:first-child.cf-cat td { padding-top: 0.65rem; }
+
+.cf-line td { color: var(--secondary); }
+.cf-line__name { padding-left: 1.8rem !important; }
+.cf-empty { padding-left: 1.8rem !important; font-style: italic; color: var(--outline); }
+
+.cf-net td {
+  border-top: 2px solid var(--on-surface);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--on-surface);
+}
+.cf-begin td { color: var(--secondary); border-top: none; }
+.cf-end td {
+  background: var(--primary);
+  color: var(--on-primary);
+  font-weight: 700;
+  border-top: none;
+}
+.cf-end td:first-child { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.cf-end td:last-child { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+
 /* ---------- motion ---------- */
 
 @keyframes fade { from { opacity: 0; } }
