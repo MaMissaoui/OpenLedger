@@ -40,3 +40,8 @@ coverage/
 # Local dev runtime artifacts (make start / make stop)
 /.dev-api
 /.dev.pid
+
+# Verification / scratch artifacts (ad-hoc screenshots, browser-driver output).
+# Root-level only — design assets live under docs/ and stay tracked.
+/*.png
+.playwright-mcp/
