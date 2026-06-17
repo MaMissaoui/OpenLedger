@@ -3,21 +3,19 @@ import { TOP_LEVEL_ORDER } from "../lib/types";
 import { formatMoney, sumBalances } from "../lib/money";
 
 const BUCKET_LABEL: Record<string, string> = {
-  ASSET: "Assets",
+  ASSET:     "Assets",
   LIABILITY: "Liabilities",
-  EQUITY: "Equity",
-  INCOME: "Income",
-  EXPENSE: "Expenses",
+  EQUITY:    "Equity",
+  INCOME:    "Income",
+  EXPENSE:   "Expenses",
 };
 
-// bucket maps a GnuCash account type onto one of the five top-level sections a
-// chart of accounts rolls up into.
 function bucket(type: string): string {
   if (["LIABILITY", "CREDIT", "PAYABLE"].includes(type)) return "LIABILITY";
   if (type === "EQUITY") return "EQUITY";
   if (type === "INCOME") return "INCOME";
   if (type === "EXPENSE") return "EXPENSE";
-  return "ASSET"; // ASSET, BANK, CASH, STOCK, MUTUAL, RECEIVABLE, …
+  return "ASSET";
 }
 
 interface Props {
@@ -29,13 +27,8 @@ interface Props {
 }
 
 export function AccountTree({ accounts, rootGuid, selectedGuid, onSelect, onAddAccount }: Props) {
-  // Only postable (non-placeholder) accounts are selectable rows; placeholder
-  // "group" accounts are represented by the section headers.
   const postable = accounts.filter((a) => !a.placeholder && a.type !== "ROOT");
 
-  // sectionTotal rolls a bucket up from its top-level accounts' subtree
-  // balances, so each placeholder parent is counted once. Returns null when the
-  // section mixes commodities (we can't add those without a rate yet).
   const sectionTotal = (b: string): Numeric | null => {
     const tops = accounts.filter(
       (a) => a.parentGuid === rootGuid && bucket(a.type) === b && a.subtreeBalance,
@@ -73,7 +66,9 @@ export function AccountTree({ accounts, rootGuid, selectedGuid, onSelect, onAddA
                 {a.code && <span className="acct__code">{a.code}</span>}
                 <span className="acct__name">{a.name}</span>
                 {a.balance && (
-                  <span className="acct__balance">{formatMoney(a.balance)}</span>
+                  <span className={`acct__balance${a.balance.num < 0 ? " neg" : ""}`}>
+                    {formatMoney(a.balance)}
+                  </span>
                 )}
               </button>
             ))}

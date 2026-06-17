@@ -5,9 +5,9 @@ import type { Account, Transaction } from "../lib/types";
 import { formatMoney, negate, parseAmount } from "../lib/money";
 
 interface Props {
-  accounts: Account[]; // postable accounts
+  accounts: Account[];
   defaultToGuid: string | null;
-  editGuid?: string; // when set, the dialog edits an existing transaction
+  editGuid?: string;
   onClose: () => void;
 }
 
@@ -18,10 +18,7 @@ interface Initial {
   toGuid: string;
 }
 
-// TransactionDialog creates or edits a balanced two-split transfer: money leaves
-// the "from" account and arrives in the "to" account. In edit mode it loads the
-// full transaction first (a single account's register only carries one split),
-// then PATCHes a wholesale replacement.
+// TransactionDialog creates or edits a balanced two-split transfer.
 export function TransactionDialog({ accounts, defaultToGuid, editGuid, onClose }: Props) {
   if (!editGuid) {
     return (
@@ -40,16 +37,7 @@ export function TransactionDialog({ accounts, defaultToGuid, editGuid, onClose }
   return <EditLoader accounts={accounts} editGuid={editGuid} onClose={onClose} />;
 }
 
-// EditLoader fetches the transaction, then mounts the form initialised from it.
-function EditLoader({
-  accounts,
-  editGuid,
-  onClose,
-}: {
-  accounts: Account[];
-  editGuid: string;
-  onClose: () => void;
-}) {
+function EditLoader({ accounts, editGuid, onClose }: { accounts: Account[]; editGuid: string; onClose: () => void }) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["transaction", editGuid],
     queryFn: () => api.getTransaction(editGuid),
@@ -58,9 +46,7 @@ function EditLoader({
   if (isLoading) {
     return (
       <Shell onClose={onClose} title="Edit transaction">
-        <div className="empty">
-          <span className="spinner" />
-        </div>
+        <div className="empty"><span className="spinner" /></div>
       </Shell>
     );
   }
@@ -76,77 +62,51 @@ function EditLoader({
     return (
       <Shell onClose={onClose} title="Edit transaction">
         <p className="sub">
-          This transaction has {data.splits.length} splits and can't be edited from this simple
-          transfer form. You can still delete it from the register.
+          This transaction has {data.splits.length} splits and can't be edited here. Delete it from the register.
         </p>
         <DialogClose onClose={onClose} />
       </Shell>
     );
   }
-
-  return (
-    <TransactionForm
-      accounts={accounts}
-      editGuid={editGuid}
-      onClose={onClose}
-      initial={initialFromTransaction(data)}
-    />
-  );
+  return <TransactionForm accounts={accounts} editGuid={editGuid} onClose={onClose} initial={initialFromTransaction(data)} />;
 }
 
-// initialFromTransaction maps a balanced two-split transfer onto the from/to/amount
-// form: the positive-value split is the destination ("money in"), the negative
-// one is the source ("money out").
 function initialFromTransaction(tx: Transaction): Initial {
-  const inflow = tx.splits.find((s) => s.value.num > 0) ?? tx.splits[0];
+  const inflow  = tx.splits.find((s) => s.value.num > 0) ?? tx.splits[0];
   const outflow = tx.splits.find((s) => s.value.num < 0) ?? tx.splits[1];
   const amt = Math.abs(inflow.value.num) / inflow.value.denom;
-  return {
-    description: tx.description,
-    amount: String(amt),
-    toGuid: inflow.accountGuid,
-    fromGuid: outflow.accountGuid,
-  };
+  return { description: tx.description, amount: String(amt), toGuid: inflow.accountGuid, fromGuid: outflow.accountGuid };
 }
 
 function TransactionForm({
-  accounts,
-  initial,
-  editGuid,
-  onClose,
-}: {
-  accounts: Account[];
-  initial: Initial;
-  editGuid?: string;
-  onClose: () => void;
-}) {
+  accounts, initial, editGuid, onClose,
+}: { accounts: Account[]; initial: Initial; editGuid?: string; onClose: () => void }) {
   const qc = useQueryClient();
   const [description, setDescription] = useState(initial.description);
-  const [amount, setAmount] = useState(initial.amount);
-  const [toGuid, setToGuid] = useState(initial.toGuid);
-  const [fromGuid, setFromGuid] = useState(initial.fromGuid);
-  const [error, setError] = useState("");
+  const [amount, setAmount]           = useState(initial.amount);
+  const [toGuid, setToGuid]           = useState(initial.toGuid);
+  const [fromGuid, setFromGuid]       = useState(initial.fromGuid);
+  const [error, setError]             = useState("");
 
   const parsed = parseAmount(amount);
-  const valid =
+  const valid  =
     parsed !== null && parsed.num > 0 && toGuid !== "" && fromGuid !== "" && toGuid !== fromGuid;
 
   const save = useMutation({
     mutationFn: async () => {
-      const to = accounts.find((a) => a.guid === toGuid)!;
+      const to    = accounts.find((a) => a.guid === toGuid)!;
       const value = parsed!;
       const input = {
         currencyGuid: to.commodityGuid,
-        description: description.trim() || "Transfer",
+        description:  description.trim() || "Transfer",
         splits: [
-          { accountGuid: toGuid, value, quantity: value },
+          { accountGuid: toGuid,   value,          quantity: value },
           { accountGuid: fromGuid, value: negate(value), quantity: negate(value) },
         ],
       };
       return editGuid ? api.updateTransaction(editGuid, input) : api.postTransaction(input);
     },
     onSuccess: () => {
-      // Amounts, balances, and reports all depend on the posted splits.
       qc.invalidateQueries({ queryKey: ["register"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
       qc.invalidateQueries({ queryKey: ["balance-sheet"] });
@@ -183,9 +143,7 @@ function TransactionForm({
             <label htmlFor="tx-from">From (money out)</label>
             <select id="tx-from" value={fromGuid} onChange={(e) => setFromGuid(e.target.value)}>
               {accounts.map((a) => (
-                <option key={a.guid} value={a.guid}>
-                  {a.name}
-                </option>
+                <option key={a.guid} value={a.guid}>{a.name}</option>
               ))}
             </select>
           </div>
@@ -193,9 +151,7 @@ function TransactionForm({
             <label htmlFor="tx-to">To (money in)</label>
             <select id="tx-to" value={toGuid} onChange={(e) => setToGuid(e.target.value)}>
               {accounts.map((a) => (
-                <option key={a.guid} value={a.guid}>
-                  {a.name}
-                </option>
+                <option key={a.guid} value={a.guid}>{a.name}</option>
               ))}
             </select>
           </div>
@@ -231,7 +187,7 @@ function TransactionForm({
           <button type="button" className="btn btn--ghost" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="btn btn--accent" disabled={!valid || save.isPending}>
+          <button type="submit" className="btn btn--primary" disabled={!valid || save.isPending}>
             {save.isPending ? <span className="spinner" /> : editGuid ? "Save changes" : "Post transaction"}
           </button>
         </div>
@@ -240,15 +196,7 @@ function TransactionForm({
   );
 }
 
-function Shell({
-  title,
-  children,
-  onClose,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-}) {
+function Shell({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="dialog-backdrop" onMouseDown={onClose}>
       <div className="dialog" onMouseDown={(e) => e.stopPropagation()}>
@@ -262,9 +210,7 @@ function Shell({
 function DialogClose({ onClose }: { onClose: () => void }) {
   return (
     <div className="dialog__actions">
-      <button type="button" className="btn btn--ghost" onClick={onClose}>
-        Close
-      </button>
+      <button type="button" className="btn btn--ghost" onClick={onClose}>Close</button>
     </div>
   );
 }

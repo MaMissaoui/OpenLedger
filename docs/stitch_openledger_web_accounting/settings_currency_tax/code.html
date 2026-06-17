@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Settings - Currency &amp; Tax | OpenLedger</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Hanken+Grotesk:wght@600;700;800&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "outline-variant": "#c4c6cf",
+                    "surface-container": "#ebeef0",
+                    "on-secondary": "#ffffff",
+                    "primary-fixed": "#d6e3ff",
+                    "on-secondary-fixed": "#121c2c",
+                    "secondary": "#555f71",
+                    "background": "#f7fafc",
+                    "surface-container-high": "#e5e9eb",
+                    "surface-bright": "#f7fafc",
+                    "on-tertiary-fixed": "#002110",
+                    "secondary-container": "#d6e0f6",
+                    "on-secondary-fixed-variant": "#3d4759",
+                    "secondary-fixed-dim": "#bdc7dc",
+                    "tertiary": "#002713",
+                    "surface-container-low": "#f1f4f6",
+                    "surface-container-lowest": "#ffffff",
+                    "secondary-fixed": "#d9e3f9",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed-variant": "#00522f",
+                    "error": "#ba1a1a",
+                    "surface": "#f7fafc",
+                    "primary-fixed-dim": "#adc7f7",
+                    "surface-variant": "#e0e3e5",
+                    "surface-container-highest": "#e0e3e5",
+                    "on-primary-fixed": "#001b3c",
+                    "tertiary-container": "#003f23",
+                    "inverse-primary": "#adc7f7",
+                    "on-surface-variant": "#43474e",
+                    "on-tertiary-container": "#4bb278",
+                    "on-primary-fixed-variant": "#2d476f",
+                    "on-background": "#181c1e",
+                    "inverse-surface": "#2d3133",
+                    "surface-dim": "#d7dadc",
+                    "on-secondary-container": "#596376",
+                    "primary-container": "#1a365d",
+                    "on-error": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "on-primary-container": "#86a0cd",
+                    "outline": "#74777f",
+                    "on-tertiary": "#ffffff",
+                    "on-surface": "#181c1e",
+                    "inverse-on-surface": "#eef1f3",
+                    "tertiary-fixed": "#91f8b8",
+                    "on-primary": "#ffffff",
+                    "tertiary-fixed-dim": "#74db9d",
+                    "primary": "#002045",
+                    "surface-tint": "#455f88"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "stack-tight": "0.5rem",
+                    "gutter": "1.5rem",
+                    "stack-default": "1rem",
+                    "container-max-width": "1280px",
+                    "stack-loose": "2rem",
+                    "sidebar-width": "260px",
+                    "margin-page": "2rem"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "headline-md": ["Hanken Grotesk"],
+                    "data-numeric": ["JetBrains Mono"],
+                    "body-md": ["Inter"],
+                    "label-caps": ["Inter"],
+                    "headline-sm": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "body-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "data-numeric": ["14px", {"lineHeight": "20px", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "display-lg": ["40px", {"lineHeight": "48px", "fontWeight": "700"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #f7fafc;
+            color: #181c1e;
+        }
+        .sidebar-active-indicator {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: #91f8b8;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md overflow-hidden">
+<!-- App Shell Wrapper -->
+<div class="flex h-screen w-full">
+<!-- Predicted Component: SideNavBar -->
+<aside class="fixed left-0 top-0 h-full w-sidebar-width bg-primary flex flex-col z-40">
+<div class="p-6 flex items-center gap-3">
+<div class="w-10 h-10 bg-on-primary-fixed-variant/20 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary" data-icon="account_balance">account_balance</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-sm text-headline-sm text-on-primary leading-tight">OpenLedger</span>
+<span class="text-[10px] text-on-primary/60 uppercase tracking-widest font-bold">Enterprise Finance</span>
+</div>
+</div>
+<nav class="flex-1 px-4 mt-4 space-y-1 overflow-y-auto custom-scrollbar">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+<span>Accounts</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span>Transactions</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+<span>Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span>Budgeting</span>
+</a>
+<a class="relative flex items-center gap-3 px-4 py-3 bg-on-primary-fixed-variant/10 text-on-primary border-l-4 border-tertiary-fixed transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<div class="mt-auto p-6 space-y-4">
+<button class="w-full py-3 px-4 bg-tertiary-fixed text-tertiary font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-tertiary-fixed-dim transition-all active:scale-[0.98]">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+<span>New Transaction</span>
+</button>
+<div class="pt-4 border-t border-on-primary-fixed-variant/10 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-on-primary/60 hover:text-on-primary transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+<span class="text-body-sm">Help</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-primary/60 hover:text-on-primary transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="text-body-sm">Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Canvas -->
+<main class="ml-sidebar-width flex-1 h-screen flex flex-col overflow-hidden">
+<!-- Predicted Component: TopNavBar -->
+<header class="sticky top-0 z-30 w-full h-16 bg-surface border-b border-outline-variant flex justify-between items-center px-gutter shrink-0">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-md focus-within:ring-2 focus-within:ring-primary rounded-lg">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="w-full bg-surface-container-low border-none rounded-lg pl-10 py-2 text-body-md focus:ring-0" placeholder="Search settings or configurations..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-secondary hover:text-primary transition-all relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="text-secondary hover:text-primary transition-all">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+</button>
+<div class="h-8 w-[1px] bg-outline-variant"></div>
+<div class="flex items-center gap-3 cursor-pointer group">
+<div class="text-right">
+<p class="text-body-md font-bold text-primary leading-tight">Sarah Jenkins</p>
+<p class="text-[10px] text-secondary uppercase font-bold">CFO • Admin</p>
+</div>
+<img alt="User Profile" class="w-10 h-10 rounded-full border-2 border-outline-variant group-hover:border-primary transition-colors" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCxplTcvPtn05HWk5iT6ytC5u5KOTt6GaGOiClmxnMH6llLDIsRKUDHzkDLk_AR4d0AkPMmnYF5imT9RdwNdunBxZ2YMtfBPAcdFAhdN4AP53nJOaDck_HMewkgVbjirzZ3A_hcBrqWTxNn17rNg3_LFG1v-ad6K7qEmv-h4hrueuSasAbXw85g6pFKUEmOktWyNpHOXQQ2BMZ8gSgK3PYutOHAgZgPB88SquRrCR648hVlW03m6ZxzrLRNcHDq3J8Svn3D1vNbESgg"/>
+</div>
+</div>
+</header>
+<!-- Page Content -->
+<div class="flex-1 overflow-y-auto custom-scrollbar bg-background">
+<div class="max-w-[1280px] mx-auto p-gutter">
+<!-- Header Section -->
+<div class="mb-8">
+<h1 class="font-headline-md text-display-lg text-primary mb-2">Settings</h1>
+<p class="text-body-lg text-secondary max-w-2xl">Manage your global application preferences and financial configurations.</p>
+</div>
+<!-- Layout: Sidebar-driven settings tabs -->
+<div class="flex gap-10">
+<!-- Internal Settings Navigation -->
+<div class="w-64 shrink-0">
+<nav class="space-y-1">
+<a class="group flex items-center justify-between px-4 py-3 rounded-lg text-secondary hover:bg-surface-container-low transition-all" href="#">
+<span class="font-medium">General</span>
+<span class="material-symbols-outlined text-[18px] opacity-0 group-hover:opacity-100" data-icon="chevron_right">chevron_right</span>
+</a>
+<a class="group flex items-center justify-between px-4 py-3 rounded-lg text-secondary hover:bg-surface-container-low transition-all" href="#">
+<span class="font-medium">Users &amp; Roles</span>
+<span class="material-symbols-outlined text-[18px] opacity-0 group-hover:opacity-100" data-icon="chevron_right">chevron_right</span>
+</a>
+<a class="group flex items-center justify-between px-4 py-3 rounded-lg bg-primary-container text-white shadow-md" href="#">
+<span class="font-bold">Currency &amp; Region</span>
+<span class="material-symbols-outlined text-[18px]" data-icon="chevron_right">chevron_right</span>
+</a>
+<a class="group flex items-center justify-between px-4 py-3 rounded-lg text-secondary hover:bg-surface-container-low transition-all" href="#">
+<span class="font-medium">Tax Configurations</span>
+<span class="material-symbols-outlined text-[18px] opacity-0 group-hover:opacity-100" data-icon="chevron_right">chevron_right</span>
+</a>
+<a class="group flex items-center justify-between px-4 py-3 rounded-lg text-secondary hover:bg-surface-container-low transition-all" href="#">
+<span class="font-medium">Integrations</span>
+<span class="material-symbols-outlined text-[18px] opacity-0 group-hover:opacity-100" data-icon="chevron_right">chevron_right</span>
+</a>
+</nav>
+<div class="mt-12 p-4 bg-tertiary-container/10 rounded-xl border border-tertiary-container/20">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-on-tertiary-container" data-icon="info">info</span>
+<div>
+<p class="text-body-sm font-bold text-on-tertiary-container mb-1">Global Impact</p>
+<p class="text-[11px] text-on-tertiary-container/80 leading-relaxed">Changes here affect all company entities and ledger reporting cycles immediately.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Content Area -->
+<div class="flex-1 space-y-8 pb-12">
+<!-- Section: Currency & Region -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden" id="currency-region">
+<div class="p-6 border-b border-outline-variant bg-surface-bright flex justify-between items-center">
+<div>
+<h2 class="font-headline-sm text-primary">Currency &amp; Region</h2>
+<p class="text-body-sm text-secondary">Control reporting units and localization standards.</p>
+</div>
+<button class="bg-primary text-on-primary px-6 py-2 rounded-lg font-bold text-body-md hover:opacity-90 active:scale-95 transition-all">Save Changes</button>
+</div>
+<div class="p-8 space-y-10">
+<!-- Base Currency -->
+<div class="grid grid-cols-12 gap-8 items-start">
+<div class="col-span-4">
+<h3 class="font-bold text-primary mb-1">Base Currency</h3>
+<p class="text-body-sm text-secondary">The primary reporting unit for all consolidated financial statements.</p>
+</div>
+<div class="col-span-8 space-y-3">
+<select class="w-full max-w-sm border-outline-variant rounded-lg p-3 text-body-md focus:ring-primary focus:border-primary">
+<option value="USD">USD - United States Dollar ($)</option>
+<option value="EUR">EUR - Euro (€)</option>
+<option value="GBP">GBP - British Pound Sterling (£)</option>
+<option value="JPY">JPY - Japanese Yen (¥)</option>
+</select>
+<div class="flex gap-2 p-3 bg-surface-container rounded-lg max-w-sm">
+<span class="material-symbols-outlined text-secondary text-lg" data-icon="tips_and_updates">tips_and_updates</span>
+<p class="text-[11px] text-secondary-fixed-variant leading-normal">
+<strong>Note:</strong> Changing the base currency will trigger a revaluation of all historical ledgers based on historical exchange rates.
+                                                </p>
+</div>
+</div>
+</div>
+<div class="h-[1px] bg-outline-variant/30"></div>
+<!-- Multi-Currency -->
+<div class="grid grid-cols-12 gap-8 items-center">
+<div class="col-span-4">
+<h3 class="font-bold text-primary mb-1">Multi-Currency Support</h3>
+<p class="text-body-sm text-secondary">Enable tracking and payments in multiple foreign currencies.</p>
+</div>
+<div class="col-span-8">
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-12 h-6 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+<span class="ml-3 text-body-md font-medium text-primary">Enabled</span>
+</label>
+</div>
+</div>
+<!-- Active Currencies Table -->
+<div class="bg-surface-container-low rounded-xl p-6 border border-outline-variant">
+<div class="flex justify-between items-center mb-4">
+<h4 class="font-bold text-primary">Active Currencies</h4>
+<button class="flex items-center gap-2 text-primary font-bold text-body-sm hover:underline">
+<span class="material-symbols-outlined text-lg" data-icon="add_circle">add_circle</span>
+                                                Add Currency
+                                            </button>
+</div>
+<table class="w-full text-left">
+<thead class="border-b border-outline-variant">
+<tr class="text-[11px] font-bold text-secondary uppercase tracking-wider">
+<th class="py-3 px-2">Currency</th>
+<th class="py-3 px-2">Symbol</th>
+<th class="py-3 px-2">Source</th>
+<th class="py-3 px-2">Rate (to USD)</th>
+<th class="py-3 px-2 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/30">
+<tr class="group hover:bg-surface-container-high transition-colors">
+<td class="py-4 px-2 font-medium">EUR - Euro</td>
+<td class="py-4 px-2 text-data-numeric">€</td>
+<td class="py-4 px-2">
+<span class="bg-on-tertiary-container/10 text-on-tertiary-container text-[10px] font-bold px-2 py-0.5 rounded-full">Live API</span>
+</td>
+<td class="py-4 px-2 text-data-numeric">0.9241</td>
+<td class="py-4 px-2 text-right">
+<button class="text-outline hover:text-primary"><span class="material-symbols-outlined text-[20px]" data-icon="more_vert">more_vert</span></button>
+</td>
+</tr>
+<tr class="group hover:bg-surface-container-high transition-colors">
+<td class="py-4 px-2 font-medium">GBP - British Pound</td>
+<td class="py-4 px-2 text-data-numeric">£</td>
+<td class="py-4 px-2">
+<span class="bg-secondary-container text-on-secondary-container text-[10px] font-bold px-2 py-0.5 rounded-full">Manual Override</span>
+</td>
+<td class="py-4 px-2 text-data-numeric">0.7852</td>
+<td class="py-4 px-2 text-right">
+<button class="text-outline hover:text-primary"><span class="material-symbols-outlined text-[20px]" data-icon="more_vert">more_vert</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="h-[1px] bg-outline-variant/30"></div>
+<!-- Formatting -->
+<div class="grid grid-cols-12 gap-8 items-start">
+<div class="col-span-4">
+<h3 class="font-bold text-primary mb-1">Number &amp; Date Format</h3>
+<p class="text-body-sm text-secondary">Set the display standards for numeric and chronological data.</p>
+</div>
+<div class="col-span-8 grid grid-cols-2 gap-4">
+<div class="space-y-2">
+<label class="text-[11px] font-bold uppercase text-secondary">Number Format</label>
+<select class="w-full border-outline-variant rounded-lg p-2 text-body-md focus:ring-primary">
+<option>1,234.56 (US/UK)</option>
+<option>1.234,56 (EU/BR)</option>
+<option>1 234,56 (FR)</option>
+</select>
+</div>
+<div class="space-y-2">
+<label class="text-[11px] font-bold uppercase text-secondary">Date Format</label>
+<select class="w-full border-outline-variant rounded-lg p-2 text-body-md focus:ring-primary">
+<option>MM/DD/YYYY</option>
+<option>DD/MM/YYYY</option>
+<option>YYYY-MM-DD</option>
+</select>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section: Tax Configurations -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden" id="tax-configurations">
+<div class="p-6 border-b border-outline-variant bg-surface-bright">
+<h2 class="font-headline-sm text-primary">Tax Configurations</h2>
+<p class="text-body-sm text-secondary">Manage regional tax compliance and reporting identifiers.</p>
+</div>
+<div class="p-8 space-y-10">
+<!-- Tax System -->
+<div class="grid grid-cols-12 gap-8 items-start">
+<div class="col-span-4">
+<h3 class="font-bold text-primary mb-1">Tax System</h3>
+<p class="text-body-sm text-secondary">Determines the logic for tax calculation and line items.</p>
+</div>
+<div class="col-span-8 flex gap-4">
+<label class="flex-1 flex items-center justify-center p-4 border-2 border-primary rounded-xl bg-primary/5 cursor-pointer">
+<input checked="" class="hidden" name="tax_system" type="radio"/>
+<div class="text-center">
+<p class="font-bold text-primary">VAT / GST</p>
+<p class="text-[10px] text-secondary">Value Added Tax</p>
+</div>
+</label>
+<label class="flex-1 flex items-center justify-center p-4 border-2 border-outline-variant rounded-xl hover:bg-surface-container transition-all cursor-pointer">
+<input class="hidden" name="tax_system" type="radio"/>
+<div class="text-center">
+<p class="font-bold text-secondary">Sales Tax</p>
+<p class="text-[10px] text-secondary">Origin/Destination based</p>
+</div>
+</label>
+<label class="flex-1 flex items-center justify-center p-4 border-2 border-outline-variant rounded-xl hover:bg-surface-container transition-all cursor-pointer">
+<input class="hidden" name="tax_system" type="radio"/>
+<div class="text-center">
+<p class="font-bold text-secondary">None</p>
+<p class="text-[10px] text-secondary">Tax-exempt reporting</p>
+</div>
+</label>
+</div>
+</div>
+<div class="h-[1px] bg-outline-variant/30"></div>
+<!-- Tax Rates -->
+<div class="grid grid-cols-12 gap-8 items-start">
+<div class="col-span-4">
+<h3 class="font-bold text-primary mb-1">Tax Rates</h3>
+<p class="text-body-sm text-secondary">Define individual rates applied to goods and services.</p>
+</div>
+<div class="col-span-8 space-y-4">
+<div class="flex items-center justify-between p-4 bg-surface-container-low border border-outline-variant rounded-lg">
+<div>
+<p class="font-bold text-primary">Standard VAT (15%)</p>
+<p class="text-[11px] text-secondary">Applied to default transactions</p>
+</div>
+<div class="flex gap-2">
+<button class="p-2 text-secondary hover:text-primary hover:bg-white rounded transition-all"><span class="material-symbols-outlined text-[20px]" data-icon="edit">edit</span></button>
+<button class="p-2 text-secondary hover:text-error hover:bg-white rounded transition-all"><span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span></button>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface-container-low border border-outline-variant rounded-lg">
+<div>
+<p class="font-bold text-primary">Reduced Rate (5%)</p>
+<p class="text-[11px] text-secondary">Essential items and specific services</p>
+</div>
+<div class="flex gap-2">
+<button class="p-2 text-secondary hover:text-primary hover:bg-white rounded transition-all"><span class="material-symbols-outlined text-[20px]" data-icon="edit">edit</span></button>
+<button class="p-2 text-secondary hover:text-error hover:bg-white rounded transition-all"><span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span></button>
+</div>
+</div>
+<button class="w-full py-3 border-2 border-dashed border-outline-variant text-secondary font-bold text-body-sm rounded-lg hover:border-primary hover:text-primary transition-all">
+                                                + Add New Tax Rate
+                                            </button>
+</div>
+</div>
+<div class="h-[1px] bg-outline-variant/30"></div>
+<!-- Tax ID -->
+<div class="grid grid-cols-12 gap-8 items-start">
+<div class="col-span-4">
+<h3 class="font-bold text-primary mb-1">Tax Identifiers</h3>
+<p class="text-body-sm text-secondary">Official government registration details for billing.</p>
+</div>
+<div class="col-span-8 grid grid-cols-2 gap-4">
+<div class="space-y-1">
+<label class="text-[11px] font-bold uppercase text-secondary">Tax ID / VAT Number</label>
+<input class="w-full border-outline-variant rounded-lg p-2 text-body-md focus:ring-primary" placeholder="e.g., GB 123 4567 89" type="text"/>
+</div>
+<div class="space-y-1">
+<label class="text-[11px] font-bold uppercase text-secondary">Business Registration No.</label>
+<input class="w-full border-outline-variant rounded-lg p-2 text-body-md focus:ring-primary" placeholder="e.g., 01234567" type="text"/>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Footer Actions -->
+<div class="flex justify-end gap-4">
+<button class="px-8 py-3 text-primary font-bold hover:bg-surface-container rounded-lg transition-all">Discard Changes</button>
+<button class="px-8 py-3 bg-primary text-on-primary font-bold rounded-lg shadow-lg hover:shadow-xl active:scale-95 transition-all">Save &amp; Sync Ledger</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Micro-interaction Scripts -->
+<script>
+        // Toggle interaction for active tab selection in the settings inner nav
+        const settingsLinks = document.querySelectorAll('#internal-nav a');
+        settingsLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                // In a real app, this would route. Here we just visually toggle.
+                settingsLinks.forEach(l => l.classList.remove('bg-primary-container', 'text-white'));
+                settingsLinks.forEach(l => l.classList.add('text-secondary'));
+                link.classList.remove('text-secondary');
+                link.classList.add('bg-primary-container', 'text-white');
+            });
+        });
+
+        // Simple Smooth Scroll Logic for sections
+        document.querySelectorAll('nav a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body></html>

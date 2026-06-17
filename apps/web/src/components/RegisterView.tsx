@@ -10,15 +10,15 @@ interface Props {
 }
 
 function amountCell(n: Numeric) {
-  const cls = n.num < 0 ? "num neg" : "num";
+  const cls = `num${n.num < 0 ? " neg" : ""}`;
   return <td className={cls}>{n.num === 0 ? "—" : formatMoney(n)}</td>;
 }
 
-// Reconcile flags cycle unmarked → cleared → reconciled on click. Each maps to
-// a compact glyph and a title, matching GnuCash's n/c/y states.
-const RECONCILE_CYCLE: Record<string, string> = { n: "c", c: "y", y: "n" };
-const RECONCILE_GLYPH: Record<string, string> = { n: "○", c: "c", y: "✓" };
-const RECONCILE_TITLE: Record<string, string> = {
+// Reconcile flags cycle n → c → y on click. Each maps to a glyph and title,
+// matching GnuCash's states.
+const RECONCILE_CYCLE:  Record<string, string> = { n: "c", c: "y", y: "n" };
+const RECONCILE_GLYPH:  Record<string, string> = { n: "○", c: "c", y: "✓" };
+const RECONCILE_TITLE:  Record<string, string> = {
   n: "Unreconciled — click to mark cleared",
   c: "Cleared — click to mark reconciled",
   y: "Reconciled — click to unmark",
@@ -73,6 +73,7 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
           </div>
           <h1>{account.name}</h1>
         </div>
+
         <div style={{ display: "flex", alignItems: "flex-end", gap: "1.4rem" }}>
           {currentBalance && (
             <div className="register__balance">
@@ -82,9 +83,11 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
               </div>
             </div>
           )}
-          <button className="btn btn--accent" onClick={onNewTransaction}>
-            + New transaction
-          </button>
+          <div className="register__actions">
+            <button className="btn btn--primary" onClick={onNewTransaction}>
+              + New transaction
+            </button>
+          </div>
         </div>
       </header>
 
@@ -105,7 +108,7 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
               <th className="num">Amount</th>
               <th className="num">Balance</th>
               <th className="recon-col" title="Reconciled">R</th>
-              <th className="row-actions__head" aria-label="Actions" />
+              <th className="row-actions" aria-label="Actions" />
             </tr>
           </thead>
           <tbody>

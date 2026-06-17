@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OpenLedger | Cash Flow Forecasting</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Hanken+Grotesk:wght@600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<!-- Icons -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "on-tertiary-fixed-variant": "#00522f",
+                "tertiary-fixed": "#91f8b8",
+                "surface-container-highest": "#e0e3e5",
+                "inverse-on-surface": "#eef1f3",
+                "surface-bright": "#f7fafc",
+                "on-tertiary-container": "#4bb278",
+                "primary-container": "#1a365d",
+                "outline-variant": "#c4c6cf",
+                "on-secondary": "#ffffff",
+                "on-secondary-container": "#596376",
+                "on-primary-container": "#86a0cd",
+                "on-error": "#ffffff",
+                "on-surface-variant": "#43474e",
+                "surface-dim": "#d7dadc",
+                "secondary": "#555f71",
+                "surface-container": "#ebeef0",
+                "on-surface": "#181c1e",
+                "on-primary-fixed-variant": "#2d476f",
+                "inverse-surface": "#2d3133",
+                "secondary-fixed-dim": "#bdc7dc",
+                "secondary-container": "#d6e0f6",
+                "tertiary-container": "#003f23",
+                "tertiary-fixed-dim": "#74db9d",
+                "on-primary": "#ffffff",
+                "on-tertiary": "#ffffff",
+                "surface-container-high": "#e5e9eb",
+                "surface": "#f7fafc",
+                "surface-container-lowest": "#ffffff",
+                "error-container": "#ffdad6",
+                "surface-tint": "#455f88",
+                "primary-fixed-dim": "#adc7f7",
+                "on-background": "#181c1e",
+                "background": "#f7fafc",
+                "primary-fixed": "#d6e3ff",
+                "on-secondary-fixed-variant": "#3d4759",
+                "inverse-primary": "#adc7f7",
+                "surface-container-low": "#f1f4f6",
+                "secondary-fixed": "#d9e3f9",
+                "outline": "#74777f",
+                "on-secondary-fixed": "#121c2c",
+                "error": "#ba1a1a",
+                "on-tertiary-fixed": "#002110",
+                "tertiary": "#002713",
+                "surface-variant": "#e0e3e5",
+                "primary": "#002045",
+                "on-primary-fixed": "#001b3c",
+                "on-error-container": "#93000a"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+            },
+            "spacing": {
+                "stack-loose": "2rem",
+                "sidebar-width": "260px",
+                "container-max-width": "1280px",
+                "margin-page": "2rem",
+                "stack-tight": "0.5rem",
+                "stack-default": "1rem",
+                "gutter": "1.5rem"
+            },
+            "fontFamily": {
+                "body-sm": ["Inter"],
+                "body-md": ["Inter"],
+                "headline-sm": ["Hanken Grotesk"],
+                "headline-md": ["Hanken Grotesk"],
+                "display-lg": ["Hanken Grotesk"],
+                "label-caps": ["Inter"],
+                "body-lg": ["Inter"],
+                "data-numeric": ["JetBrains Mono"]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .chart-gradient { background: linear-gradient(180deg, rgba(214, 227, 255, 0.3) 0%, rgba(214, 227, 255, 0) 100%); }
+    </style>
+</head>
+<body class="bg-background text-on-surface">
+<!-- SideNavBar (Execution from JSON) -->
+<aside class="fixed left-0 top-0 h-full w-sidebar-width bg-primary dark:bg-primary-container flex flex-col z-40">
+<div class="p-6">
+<h1 class="font-headline-sm text-headline-sm text-on-primary dark:text-on-primary-container font-bold">OpenLedger</h1>
+<p class="font-body-sm text-body-sm text-on-primary/60">Enterprise Finance</p>
+</div>
+<nav class="flex-1 px-3 space-y-1 overflow-y-auto no-scrollbar">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined">account_balance</span>
+<span class="font-body-md text-body-md">Accounts</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-body-md text-body-md">Transactions</span>
+</a>
+<!-- Reports is active for Forecasting -->
+<a class="flex items-center gap-3 px-4 py-3 bg-on-primary-fixed-variant/10 text-on-primary border-l-4 border-tertiary-fixed cursor-pointer" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-md text-body-md">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-body-md text-body-md">Budgeting</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</nav>
+<div class="mt-auto p-4 space-y-4">
+<button class="w-full bg-tertiary-fixed text-on-tertiary-fixed py-2.5 rounded-lg font-body-md text-body-md font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                New Transaction
+            </button>
+<div class="border-t border-on-primary/10 pt-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-on-primary/60 hover:text-on-primary text-body-md transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+                    Help
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-primary/60 hover:text-on-primary text-body-md transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+                    Logout
+                </a>
+</div>
+</div>
+</aside>
+<!-- TopNavBar (Execution from JSON) -->
+<header class="sticky top-0 z-30 w-full ml-sidebar-width bg-surface dark:bg-surface-dim border-b border-outline-variant dark:border-outline shadow-sm flex justify-between items-center h-16 px-gutter">
+<div class="flex items-center gap-8">
+<div class="relative group">
+<span class="absolute inset-y-0 left-3 flex items-center text-outline group-focus-within:text-primary">
+<span class="material-symbols-outlined">search</span>
+</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-container-low border-none rounded-full w-64 text-body-md focus:ring-2 focus:ring-primary focus:bg-surface transition-all" placeholder="Search reports..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="text-secondary dark:text-secondary-fixed hover:text-primary dark:hover:text-primary-fixed transition-all relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<button class="text-secondary dark:text-secondary-fixed hover:text-primary dark:hover:text-primary-fixed transition-all">
+<span class="material-symbols-outlined">history</span>
+</button>
+<div class="flex items-center gap-3 pl-4 border-l border-outline-variant">
+<div class="text-right hidden sm:block">
+<p class="font-body-md text-body-md font-bold text-primary">Alex Thompson</p>
+<p class="text-[11px] text-outline font-label-caps uppercase tracking-wider">CFO Admin</p>
+</div>
+<img alt="User Profile" class="w-10 h-10 rounded-full border-2 border-primary-fixed" data-alt="Professional headshot of a senior financial executive in a corporate environment. The image is crisp with soft bokeh, high-key lighting, and neutral grey backgrounds, reflecting an authoritative yet modern corporate modernist aesthetic consistent with high-end financial software platforms." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVxoPergtAkU3UY-uA1ogYcnvaIKocOLK3ISfc0GGq4PJbA5QWCtV9fK-nUltwpXdbUD6ze3nLDDnvIwmiiwbnmaajS1FQYSWRXdHO07cgjEG5EZEFzrUGBn9t5nuwWnH5STK68eeG98v3U6qnyIejdgBzHmtYfaIYQNP8ILXQpHrHsSywzcvT5KtS11VjZreN9Gx-5IMrSGofYXZc7Mb3MG896cJ2HdP8dknxmx3IIq_JPSiHC7K9hu8Ma6psZsXYB7s_W-4nbH7z"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-sidebar-width p-margin-page max-w-container-max-width mx-auto">
+<!-- Page Header -->
+<div class="flex justify-between items-end mb-8">
+<div>
+<nav class="flex text-outline mb-2">
+<span class="text-body-sm font-body-sm">Reports</span>
+<span class="mx-2 text-body-sm">/</span>
+<span class="text-body-sm font-body-sm font-bold text-primary">Cash Flow Forecasting</span>
+</nav>
+<h2 class="font-headline-md text-headline-md text-primary">12-Month Projected Liquidity</h2>
+<p class="text-on-surface-variant font-body-md">Simulating balances based on recurring flows and pending targets.</p>
+</div>
+<div class="flex gap-3">
+<button class="bg-surface-container border border-outline-variant px-4 py-2 rounded-lg font-body-md text-body-md flex items-center gap-2 hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                    Jan 2024 - Dec 2024
+                </button>
+<button class="bg-primary text-on-primary px-4 py-2 rounded-lg font-body-md text-body-md flex items-center gap-2 hover:bg-primary-container transition-all">
+<span class="material-symbols-outlined text-[18px]">file_download</span>
+                    Export PDF
+                </button>
+</div>
+</div>
+<!-- Dashboard Layout: Bento Grid -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Main Forecast Chart Area -->
+<div class="col-span-12 lg:col-span-9 space-y-6">
+<!-- Large Chart Card -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 relative overflow-hidden shadow-sm">
+<div class="flex justify-between items-center mb-8">
+<div>
+<h3 class="font-headline-sm text-headline-sm text-primary">Net Cash Position</h3>
+<div class="flex items-center gap-4 mt-1">
+<div class="flex items-center gap-1">
+<span class="w-3 h-3 rounded-full bg-primary"></span>
+<span class="text-body-sm text-outline">Realistic (Projected)</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="w-3 h-3 rounded-full border-2 border-dashed border-tertiary-container"></span>
+<span class="text-body-sm text-outline">Optimistic (+12%)</span>
+</div>
+</div>
+</div>
+<div class="text-right">
+<p class="text-label-caps font-label-caps text-outline uppercase">Dec 2024 Target</p>
+<p class="font-data-numeric text-headline-md text-on-tertiary-fixed-variant">$4,280,000.00</p>
+</div>
+</div>
+<!-- Placeholder for Interactive Chart: High-fidelity visual representation -->
+<div class="h-96 w-full bg-surface-container-low rounded-lg relative overflow-hidden group">
+<div class="absolute inset-0 chart-gradient"></div>
+<!-- SVG Chart Simulation -->
+<svg class="absolute inset-0 w-full h-full" preserveaspectratio="none" viewbox="0 0 1000 400">
+<!-- Grid Lines -->
+<line stroke="#e0e3e5" stroke-dasharray="4" x1="0" x2="1000" y1="350" y2="350"></line>
+<line stroke="#e0e3e5" stroke-dasharray="4" x1="0" x2="1000" y1="250" y2="250"></line>
+<line stroke="#e0e3e5" stroke-dasharray="4" x1="0" x2="1000" y1="150" y2="150"></line>
+<!-- Main Projection Path (Realistic) -->
+<path d="M0,320 C100,310 150,280 200,290 S300,220 400,240 S500,180 600,150 S800,120 1000,100" fill="none" stroke="url(#line-grad)" stroke-linecap="round" stroke-width="4"></path>
+<!-- Optimistic Projection Path -->
+<path d="M400,240 C500,160 600,120 700,80 S900,40 1000,30" fill="none" stroke="#4bb278" stroke-dasharray="6" stroke-width="2"></path>
+<defs>
+<lineargradient id="line-grad" x1="0%" x2="100%" y1="0%" y2="0%">
+<stop offset="0%" stop-color="#002045"></stop>
+<stop offset="100%" stop-color="#455f88"></stop>
+</lineargradient>
+</defs>
+</svg>
+<!-- Tooltip Placeholder -->
+<div class="absolute top-24 left-1/2 -translate-x-1/2 bg-primary text-on-primary px-4 py-2 rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+<p class="font-label-caps text-label-caps">JUNE 2024</p>
+<p class="font-data-numeric text-body-lg">$2,840,000</p>
+</div>
+<!-- X-Axis Labels -->
+<div class="absolute bottom-4 inset-x-0 flex justify-between px-6 text-label-caps font-label-caps text-outline">
+<span>JAN</span><span>FEB</span><span>MAR</span><span>APR</span><span>MAY</span><span>JUN</span><span>JUL</span><span>AUG</span><span>SEP</span><span>OCT</span><span>NOV</span><span>DEC</span>
+</div>
+</div>
+</div>
+<!-- Secondary Stats Row -->
+<div class="grid grid-cols-3 gap-6">
+<div class="bg-surface-container-low border border-outline-variant p-5 rounded-xl">
+<p class="text-label-caps font-label-caps text-outline mb-1">CASH RUNWAY</p>
+<p class="font-headline-sm text-headline-sm text-primary">18.4 Months</p>
+<div class="flex items-center gap-1 mt-2 text-on-tertiary-container">
+<span class="material-symbols-outlined text-[16px]">trending_up</span>
+<span class="text-body-sm">+2.1 from last qtr</span>
+</div>
+</div>
+<div class="bg-surface-container-low border border-outline-variant p-5 rounded-xl">
+<p class="text-label-caps font-label-caps text-outline mb-1">BURN RATE (AVG)</p>
+<p class="font-headline-sm text-headline-sm text-primary">$142,500<span class="text-body-md font-normal text-outline">/mo</span></p>
+<div class="flex items-center gap-1 mt-2 text-error">
+<span class="material-symbols-outlined text-[16px]">trending_down</span>
+<span class="text-body-sm">+4% vs target</span>
+</div>
+</div>
+<div class="bg-surface-container-low border border-outline-variant p-5 rounded-xl">
+<p class="text-label-caps font-label-caps text-outline mb-1">NET INFLOW ADJ.</p>
+<p class="font-headline-sm text-headline-sm text-primary">+$840k</p>
+<div class="flex items-center gap-1 mt-2 text-on-tertiary-container">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+<span class="text-body-sm">Accounts Healthy</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Scenarios & Sidebar Area -->
+<div class="col-span-12 lg:col-span-3 space-y-6">
+<!-- Scenario Toggle Sidebar -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+<h4 class="font-label-caps text-label-caps text-outline mb-6">PROJECTION SCENARIOS</h4>
+<div class="space-y-3">
+<label class="block group cursor-pointer">
+<input class="hidden peer" name="scenario" type="radio" value="optimistic"/>
+<div class="p-4 border border-outline-variant rounded-lg transition-all group-hover:bg-surface-container-low peer-checked:border-tertiary-fixed peer-checked:bg-on-tertiary-fixed/5 peer-checked:ring-1 peer-checked:ring-tertiary-fixed">
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md font-bold text-primary">Optimistic</span>
+<span class="material-symbols-outlined text-on-tertiary-container peer-checked:block hidden">check_circle</span>
+</div>
+<p class="text-body-sm text-outline mt-1">+15% sales growth, 0% churn increase.</p>
+</div>
+</label>
+<label class="block group cursor-pointer">
+<input checked="" class="hidden peer" name="scenario" type="radio" value="realistic"/>
+<div class="p-4 border border-outline-variant rounded-lg transition-all group-hover:bg-surface-container-low peer-checked:border-primary-fixed peer-checked:bg-primary-fixed/20 peer-checked:ring-1 peer-checked:ring-primary">
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md font-bold text-primary">Realistic</span>
+<span class="material-symbols-outlined text-primary">radio_button_checked</span>
+</div>
+<p class="text-body-sm text-outline mt-1">Based on historical 3-yr moving average.</p>
+</div>
+</label>
+<label class="block group cursor-pointer">
+<input class="hidden peer" name="scenario" type="radio" value="pessimistic"/>
+<div class="p-4 border border-outline-variant rounded-lg transition-all group-hover:bg-surface-container-low peer-checked:border-error/40 peer-checked:bg-error-container/20 peer-checked:ring-1 peer-checked:ring-error">
+<div class="flex items-center justify-between">
+<span class="font-body-md text-body-md font-bold text-primary">Pessimistic</span>
+<span class="material-symbols-outlined text-error peer-checked:block hidden">error</span>
+</div>
+<p class="text-body-sm text-outline mt-1">-10% revenue dip, vendor price hikes.</p>
+</div>
+</label>
+</div>
+<button class="w-full mt-6 py-2 text-body-sm font-bold text-primary hover:bg-surface-container transition-colors rounded">
+                        Manage Custom Scenarios
+                    </button>
+</section>
+<!-- Major Inflows/Outflows List -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+<h4 class="font-label-caps text-label-caps text-outline mb-6">MAJOR UPCOMING EVENTS</h4>
+<div class="space-y-6">
+<!-- Inflow Item -->
+<div class="flex gap-4">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed/20 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-tertiary-fixed-variant">south_west</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<p class="font-body-md text-body-md font-bold truncate">Acme Corp Annual</p>
+<p class="font-data-numeric text-body-sm text-on-tertiary-fixed-variant">+$420k</p>
+</div>
+<p class="text-body-sm text-outline">Expected May 12</p>
+</div>
+</div>
+<!-- Outflow Item -->
+<div class="flex gap-4">
+<div class="w-10 h-10 rounded-full bg-error-container/20 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-error">north_east</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<p class="font-body-md text-body-md font-bold truncate">Server Infrastructure</p>
+<p class="font-data-numeric text-body-sm text-error">($125k)</p>
+</div>
+<p class="text-body-sm text-outline">Due Jun 01</p>
+</div>
+</div>
+<!-- Inflow Item -->
+<div class="flex gap-4">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed/20 flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-on-tertiary-fixed-variant">south_west</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex justify-between items-start">
+<p class="font-body-md text-body-md font-bold truncate">Tax Rebate Q1</p>
+<p class="font-data-numeric text-body-sm text-on-tertiary-fixed-variant">+$68k</p>
+</div>
+<p class="text-body-sm text-outline">Expected Jul 15</p>
+</div>
+</div>
+</div>
+<button class="w-full mt-8 border border-outline-variant py-2.5 rounded-lg text-body-md font-medium text-primary hover:bg-surface-container transition-all">
+                        View Full Schedule
+                    </button>
+</section>
+</div>
+</div>
+<!-- Lower Section: Scenario Impact Table -->
+<div class="mt-8 bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+<div class="p-6 border-b border-outline-variant">
+<h3 class="font-headline-sm text-headline-sm text-primary">Monthly Breakdown by Scenario</h3>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline uppercase">Fiscal Period</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline uppercase text-right">Optimistic</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline uppercase text-right bg-primary-container/5">Realistic (Current)</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline uppercase text-right">Pessimistic</th>
+<th class="px-6 py-4 font-label-caps text-label-caps text-outline uppercase text-right">Confidence Score</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container transition-colors cursor-default">
+<td class="px-6 py-4 font-body-md text-body-md font-bold">May 2024</td>
+<td class="px-6 py-4 font-data-numeric text-on-tertiary-fixed-variant text-right">$2,450,000</td>
+<td class="px-6 py-4 font-data-numeric text-primary text-right bg-primary-container/5">$2,100,000</td>
+<td class="px-6 py-4 font-data-numeric text-error text-right">$1,850,000</td>
+<td class="px-6 py-4 text-right">
+<span class="bg-on-tertiary-fixed-variant/10 text-on-tertiary-fixed-variant px-2 py-1 rounded text-[11px] font-bold">98% High</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors cursor-default">
+<td class="px-6 py-4 font-body-md text-body-md font-bold">Jun 2024</td>
+<td class="px-6 py-4 font-data-numeric text-on-tertiary-fixed-variant text-right">$2,980,000</td>
+<td class="px-6 py-4 font-data-numeric text-primary text-right bg-primary-container/5">$2,420,000</td>
+<td class="px-6 py-4 font-data-numeric text-error text-right">$2,020,000</td>
+<td class="px-6 py-4 text-right">
+<span class="bg-on-tertiary-fixed-variant/10 text-on-tertiary-fixed-variant px-2 py-1 rounded text-[11px] font-bold">94% High</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors cursor-default">
+<td class="px-6 py-4 font-body-md text-body-md font-bold">Jul 2024</td>
+<td class="px-6 py-4 font-data-numeric text-on-tertiary-fixed-variant text-right">$3,120,000</td>
+<td class="px-6 py-4 font-data-numeric text-primary text-right bg-primary-container/5">$2,580,000</td>
+<td class="px-6 py-4 font-data-numeric text-error text-right">$1,980,000</td>
+<td class="px-6 py-4 text-right">
+<span class="bg-primary-fixed/30 text-on-primary-fixed-variant px-2 py-1 rounded text-[11px] font-bold">85% Med</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-container transition-colors cursor-default">
+<td class="px-6 py-4 font-body-md text-body-md font-bold">Aug 2024</td>
+<td class="px-6 py-4 font-data-numeric text-on-tertiary-fixed-variant text-right">$3,650,000</td>
+<td class="px-6 py-4 font-data-numeric text-primary text-right bg-primary-container/5">$3,040,000</td>
+<td class="px-6 py-4 font-data-numeric text-error text-right">$2,300,000</td>
+<td class="px-6 py-4 text-right">
+<span class="bg-secondary-container text-secondary px-2 py-1 rounded text-[11px] font-bold">72% Low</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 bg-surface-container-low text-center">
+<button class="text-body-sm font-bold text-primary hover:underline">View Historical Accuracy Performance</button>
+</div>
+</div>
+</main>
+<!-- Micro-interaction Scripts -->
+<script>
+        // Simple interactive effect for scenario cards
+        document.querySelectorAll('input[name="scenario"]').forEach(input => {
+            input.addEventListener('change', (e) => {
+                // In a real app, this would trigger a chart re-render
+                console.log('Scenario switched to:', e.target.value);
+            });
+        });
+    </script>
+</body></html>

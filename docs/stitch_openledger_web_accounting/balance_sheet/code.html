@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Balance Sheet | OpenLedger</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Hanken+Grotesk:wght@600;700;800&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-bright": "#f7fafc",
+                        "on-surface": "#181c1e",
+                        "surface-container-lowest": "#ffffff",
+                        "on-surface-variant": "#43474e",
+                        "on-secondary-fixed": "#121c2c",
+                        "primary-fixed-dim": "#adc7f7",
+                        "on-secondary-container": "#596376",
+                        "on-tertiary-fixed-variant": "#00522f",
+                        "on-error-container": "#93000a",
+                        "secondary-container": "#d6e0f6",
+                        "on-primary-fixed": "#001b3c",
+                        "on-background": "#181c1e",
+                        "surface-variant": "#e0e3e5",
+                        "on-error": "#ffffff",
+                        "tertiary": "#002713",
+                        "on-tertiary-fixed": "#002110",
+                        "on-primary": "#ffffff",
+                        "inverse-on-surface": "#eef1f3",
+                        "outline-variant": "#c4c6cf",
+                        "surface-container-high": "#e5e9eb",
+                        "primary": "#002045",
+                        "on-secondary-fixed-variant": "#3d4759",
+                        "on-secondary": "#ffffff",
+                        "tertiary-container": "#003f23",
+                        "surface-tint": "#455f88",
+                        "on-primary-fixed-variant": "#2d476f",
+                        "inverse-surface": "#2d3133",
+                        "surface-dim": "#d7dadc",
+                        "outline": "#74777f",
+                        "on-primary-container": "#86a0cd",
+                        "background": "#f7fafc",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed-dim": "#74db9d",
+                        "secondary": "#555f71",
+                        "surface-container-highest": "#e0e3e5",
+                        "error": "#ba1a1a",
+                        "surface": "#f7fafc",
+                        "secondary-fixed": "#d9e3f9",
+                        "primary-container": "#1a365d",
+                        "inverse-primary": "#adc7f7",
+                        "surface-container-low": "#f1f4f6",
+                        "surface-container": "#ebeef0",
+                        "secondary-fixed-dim": "#bdc7dc",
+                        "tertiary-fixed": "#91f8b8",
+                        "on-tertiary-container": "#4bb278",
+                        "primary-fixed": "#d6e3ff",
+                        "on-tertiary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "stack-loose": "2rem",
+                        "stack-default": "1rem",
+                        "margin-page": "2rem",
+                        "gutter": "1.5rem",
+                        "container-max-width": "1280px",
+                        "sidebar-width": "260px",
+                        "stack-tight": "0.5rem"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Hanken Grotesk"],
+                        "data-numeric": ["JetBrains Mono"],
+                        "label-caps": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-sm": ["Hanken Grotesk"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "body-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["40px", {"lineHeight": "48px", "fontWeight": "700"}],
+                        "data-numeric": ["14px", {"lineHeight": "20px", "letterSpacing": "-0.02em", "fontWeight": "500"}],
+                        "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .ledger-row:hover { background-color: rgba(0, 32, 69, 0.03); }
+        .collapsible-content { transition: max-height 0.3s ease-out; overflow: hidden; }
+        .collapsed .collapsible-content { max-height: 0; }
+        .collapsed .chevron-icon { transform: rotate(-90deg); }
+    </style>
+</head>
+<body class="bg-surface-bright text-on-surface font-body-md min-h-screen">
+<!-- SideNavBar (Authority: JSON) -->
+<aside class="fixed left-0 top-0 h-full w-sidebar-width bg-primary dark:bg-primary-container flex flex-col z-40">
+<div class="p-6">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-on-primary-fixed-variant rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<div>
+<h1 class="font-headline-sm text-headline-sm text-on-primary">OpenLedger</h1>
+<p class="text-[10px] text-on-primary/60 font-label-caps tracking-widest">ENTERPRISE FINANCE</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 px-3 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="account_balance">account_balance</span>
+<span>Accounts</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span>Transactions</span>
+</a>
+<!-- Active Tab: Reports -->
+<a class="flex items-center gap-3 px-4 py-3 bg-on-primary-fixed-variant/10 text-on-primary border-l-4 border-tertiary-fixed transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="analytics" style="font-variation-settings: 'FILL' 1;">analytics</span>
+<span class="font-bold">Reports</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span>Budgeting</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<div class="mt-auto border-t border-on-primary/10 p-4 space-y-1">
+<button class="w-full mb-4 flex items-center justify-center gap-2 bg-on-primary-fixed-variant text-primary font-bold py-2.5 rounded-lg active:scale-95 transition-transform">
+<span class="material-symbols-outlined">add_circle</span>
+                New Transaction
+            </button>
+<a class="flex items-center gap-3 px-4 py-2 text-on-primary/60 hover:text-on-primary transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="text-body-sm">Help</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-primary/60 hover:text-on-primary transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-body-sm">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width min-h-screen">
+<!-- TopNavBar (Authority: JSON) -->
+<header class="sticky top-0 z-30 w-full bg-surface border-b border-outline-variant shadow-sm flex justify-between items-center h-16 px-gutter">
+<div class="flex items-center gap-6">
+<h2 class="font-headline-sm text-headline-sm font-bold text-primary">Balance Sheet</h2>
+<div class="flex items-center gap-2 bg-surface-container rounded-full px-4 py-1.5 border border-outline-variant">
+<span class="material-symbols-outlined text-secondary text-sm">calendar_today</span>
+<span class="text-body-sm font-medium">As of Dec 31, 2023</span>
+<span class="material-symbols-outlined text-secondary text-sm">arrow_drop_down</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative focus-within:ring-2 focus-within:ring-primary rounded-lg">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary">search</span>
+<input class="bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 text-body-sm w-64 focus:ring-0" placeholder="Search report items..." type="text"/>
+</div>
+<button class="p-2 text-secondary hover:text-primary transition-all">
+<span class="material-symbols-outlined">history</span>
+</button>
+<button class="p-2 text-secondary hover:text-primary transition-all relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<div class="h-8 w-[1px] bg-outline-variant mx-2"></div>
+<div class="flex items-center gap-3">
+<div class="text-right hidden sm:block">
+<p class="text-body-sm font-bold leading-none">Alexander Chen</p>
+<p class="text-[10px] text-secondary">CFO, TechCorp</p>
+</div>
+<img alt="User Profile" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdLUs_fuDx9pH7trXiFvh3fGc8NyyuLtFb7SxZ_qbqCx7xu28iAaQxzYDtlADvhQYVLeMUVaiWz2vZC1C2zDW2xd3ttdm4yjgQO7DBjea3COAmk4JQ1m-h2EpxVyrcKs6PTlyjhc_0gTklOq9MVLIWbo4RYtv6FMwucYHjQdmqRpyUrcSVWUNB9VZZao059O5pkmSIZF_Ew4RTNbAkdbcSr4U1HzkR-v_XzoO6m8ngQArJ0Lyti_qr5S6vtlqSQfFkchIpT_WzNS1I"/>
+</div>
+</div>
+</header>
+<!-- Report Canvas -->
+<div class="max-w-container-max-width mx-auto p-gutter">
+<!-- Report Actions & Status -->
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+<div class="flex items-center gap-4 bg-tertiary-fixed/20 px-4 py-3 rounded-xl border border-tertiary-fixed/30">
+<div class="w-10 h-10 bg-on-tertiary-container/10 text-on-tertiary-container rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<div>
+<h3 class="font-bold text-body-md text-on-tertiary-fixed-variant">Books are in Balance</h3>
+<p class="text-body-sm opacity-80">Total Assets exactly match Liabilities + Equity.</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="px-4 py-2 text-body-sm font-medium border border-outline-variant rounded-lg hover:bg-surface-container transition-colors flex items-center gap-2" id="expandAll">
+<span class="material-symbols-outlined text-sm">unfold_more</span>
+                        Expand All
+                    </button>
+<button class="px-4 py-2 text-body-sm font-medium border border-outline-variant rounded-lg hover:bg-surface-container transition-colors flex items-center gap-2" id="collapseAll">
+<span class="material-symbols-outlined text-sm">unfold_less</span>
+                        Collapse All
+                    </button>
+<button class="px-4 py-2 bg-primary text-on-primary text-body-sm font-bold rounded-lg hover:bg-primary-container transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">download</span>
+                        Export PDF
+                    </button>
+</div>
+</div>
+<!-- Balance Sheet Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-gutter">
+<!-- ASSETS COLUMN -->
+<div class="space-y-6">
+<div class="flex items-center justify-between border-b-2 border-primary pb-2">
+<h3 class="font-headline-sm text-headline-sm font-bold text-primary">Assets</h3>
+<span class="font-data-numeric text-body-lg font-bold text-primary">$4,852,400.00</span>
+</div>
+<!-- Current Assets -->
+<div class="collapsible-section" id="section-current-assets">
+<div class="flex items-center justify-between py-2 cursor-pointer group" onclick="toggleSection('section-current-assets')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary chevron-icon transition-transform">expand_more</span>
+<h4 class="font-bold text-body-md uppercase tracking-wider text-secondary">Current Assets</h4>
+</div>
+<span class="font-data-numeric font-bold">$2,140,000.00</span>
+</div>
+<div class="collapsible-content pl-6 space-y-1">
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Cash and Cash Equivalents</span>
+<span class="font-data-numeric">$845,000.00</span>
+</div>
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Accounts Receivable</span>
+<span class="font-data-numeric">$1,250,000.00</span>
+</div>
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Inventory</span>
+<span class="font-data-numeric">$45,000.00</span>
+</div>
+</div>
+</div>
+<!-- Fixed Assets -->
+<div class="collapsible-section" id="section-fixed-assets">
+<div class="flex items-center justify-between py-2 cursor-pointer group" onclick="toggleSection('section-fixed-assets')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary chevron-icon transition-transform">expand_more</span>
+<h4 class="font-bold text-body-md uppercase tracking-wider text-secondary">Fixed Assets</h4>
+</div>
+<span class="font-data-numeric font-bold">$2,712,400.00</span>
+</div>
+<div class="collapsible-content pl-6 space-y-1">
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Property &amp; Equipment</span>
+<span class="font-data-numeric">$3,100,000.00</span>
+</div>
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Accumulated Depreciation</span>
+<span class="font-data-numeric text-error">($387,600.00)</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-high p-4 rounded-xl flex justify-between items-center border border-outline-variant">
+<span class="font-bold text-primary">Total Assets</span>
+<span class="font-data-numeric text-headline-sm font-bold text-primary">$4,852,400.00</span>
+</div>
+</div>
+<!-- LIABILITIES COLUMN -->
+<div class="space-y-6">
+<div class="flex items-center justify-between border-b-2 border-secondary pb-2">
+<h3 class="font-headline-sm text-headline-sm font-bold text-secondary">Liabilities</h3>
+<span class="font-data-numeric text-body-lg font-bold text-secondary">$1,620,000.00</span>
+</div>
+<!-- Current Liabilities -->
+<div class="collapsible-section" id="section-current-liab">
+<div class="flex items-center justify-between py-2 cursor-pointer group" onclick="toggleSection('section-current-liab')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary chevron-icon transition-transform">expand_more</span>
+<h4 class="font-bold text-body-md uppercase tracking-wider text-secondary">Current Liabilities</h4>
+</div>
+<span class="font-data-numeric font-bold">$540,000.00</span>
+</div>
+<div class="collapsible-content pl-6 space-y-1">
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Accounts Payable</span>
+<span class="font-data-numeric">$320,000.00</span>
+</div>
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Short-term Debt</span>
+<span class="font-data-numeric">$150,000.00</span>
+</div>
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Accrued Expenses</span>
+<span class="font-data-numeric">$70,000.00</span>
+</div>
+</div>
+</div>
+<!-- Long-term Liabilities -->
+<div class="collapsible-section" id="section-long-liab">
+<div class="flex items-center justify-between py-2 cursor-pointer group" onclick="toggleSection('section-long-liab')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary chevron-icon transition-transform">expand_more</span>
+<h4 class="font-bold text-body-md uppercase tracking-wider text-secondary">Long-term Liabilities</h4>
+</div>
+<span class="font-data-numeric font-bold">$1,080,000.00</span>
+</div>
+<div class="collapsible-content pl-6 space-y-1">
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Deferred Tax Liability</span>
+<span class="font-data-numeric">$80,000.00</span>
+</div>
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Long-term Notes Payable</span>
+<span class="font-data-numeric">$1,000,000.00</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-high p-4 rounded-xl flex justify-between items-center border border-outline-variant">
+<span class="font-bold text-secondary">Total Liabilities</span>
+<span class="font-data-numeric text-headline-sm font-bold text-secondary">$1,620,000.00</span>
+</div>
+</div>
+<!-- EQUITY COLUMN -->
+<div class="space-y-6">
+<div class="flex items-center justify-between border-b-2 border-on-tertiary-container pb-2">
+<h3 class="font-headline-sm text-headline-sm font-bold text-on-tertiary-container">Equity</h3>
+<span class="font-data-numeric text-body-lg font-bold text-on-tertiary-container">$3,232,400.00</span>
+</div>
+<!-- Shareholders Equity -->
+<div class="collapsible-section" id="section-equity">
+<div class="flex items-center justify-between py-2 cursor-pointer group" onclick="toggleSection('section-equity')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary chevron-icon transition-transform">expand_more</span>
+<h4 class="font-bold text-body-md uppercase tracking-wider text-secondary">Shareholders' Equity</h4>
+</div>
+<span class="font-data-numeric font-bold">$3,232,400.00</span>
+</div>
+<div class="collapsible-content pl-6 space-y-1">
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Common Stock</span>
+<span class="font-data-numeric">$500,000.00</span>
+</div>
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Retained Earnings</span>
+<span class="font-data-numeric">$2,412,400.00</span>
+</div>
+<div class="flex justify-between py-2 text-body-sm ledger-row px-2 rounded">
+<span class="text-on-surface-variant">Additional Paid-in Capital</span>
+<span class="font-data-numeric">$320,000.00</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-high p-4 rounded-xl flex justify-between items-center border border-outline-variant">
+<span class="font-bold text-on-tertiary-container">Total Equity</span>
+<span class="font-data-numeric text-headline-sm font-bold text-on-tertiary-container">$3,232,400.00</span>
+</div>
+<!-- Final Balance Summary Card -->
+<div class="mt-12 bg-primary rounded-2xl p-6 text-on-primary shadow-lg ring-1 ring-primary-container relative overflow-hidden">
+<div class="absolute -right-4 -bottom-4 opacity-10">
+<span class="material-symbols-outlined text-[120px]">account_balance</span>
+</div>
+<div class="relative z-10">
+<p class="text-on-primary/60 font-label-caps uppercase mb-2">Liability + Equity Total</p>
+<div class="flex items-end justify-between">
+<h2 class="text-display-lg font-display-lg tracking-tight">$4,852,400.00</h2>
+<div class="flex items-center gap-1 bg-on-tertiary-container/20 text-tertiary-fixed px-3 py-1 rounded-full border border-tertiary-fixed/30">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="text-[10px] font-bold uppercase tracking-widest">Balanced</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Contextual Data Visual -->
+<div class="mt-stack-loose grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<div class="bg-surface-container-lowest p-gutter rounded-2xl border border-outline-variant">
+<h4 class="font-bold text-body-md mb-6">Asset Composition</h4>
+<div class="flex items-center h-8 w-full rounded-full overflow-hidden bg-surface-container">
+<div class="h-full bg-primary" style="width: 44%" title="Current Assets: 44%"></div>
+<div class="h-full bg-on-primary-container" style="width: 56%" title="Fixed Assets: 56%"></div>
+</div>
+<div class="flex gap-4 mt-4">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 bg-primary rounded-full"></div>
+<span class="text-body-sm text-on-surface-variant">Current (44%)</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 bg-on-primary-container rounded-full"></div>
+<span class="text-body-sm text-on-surface-variant">Fixed (56%)</span>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-lowest p-gutter rounded-2xl border border-outline-variant">
+<h4 class="font-bold text-body-md mb-4">Leverage Analysis</h4>
+<div class="flex justify-between items-end gap-2 h-24">
+<div class="flex-1 bg-surface-container-high rounded-t-lg relative group">
+<div class="absolute bottom-0 left-0 w-full bg-secondary rounded-t-lg h-[33%]" title="Liabilities"></div>
+</div>
+<div class="flex-1 bg-surface-container-high rounded-t-lg relative group">
+<div class="absolute bottom-0 left-0 w-full bg-on-tertiary-container rounded-t-lg h-[67%]" title="Equity"></div>
+</div>
+</div>
+<div class="flex justify-around mt-4 text-body-sm font-bold text-on-surface-variant">
+<span>Liabilities</span>
+<span>Equity</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        function toggleSection(id) {
+            const el = document.getElementById(id);
+            el.classList.toggle('collapsed');
+        }
+
+        document.getElementById('expandAll').addEventListener('click', () => {
+            document.querySelectorAll('.collapsible-section').forEach(section => {
+                section.classList.remove('collapsed');
+            });
+        });
+
+        document.getElementById('collapseAll').addEventListener('click', () => {
+            document.querySelectorAll('.collapsible-section').forEach(section => {
+                section.classList.add('collapsed');
+            });
+        });
+
+        // Initialize state
+        window.addEventListener('DOMContentLoaded', () => {
+            // All sections expanded by default
+        });
+    </script>
+</body></html>

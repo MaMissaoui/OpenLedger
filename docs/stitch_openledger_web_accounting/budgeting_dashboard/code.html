@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OpenLedger - Budgeting Dashboard</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Hanken+Grotesk:wght@600;700;800&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed-variant": "#00522f",
+                    "tertiary-fixed": "#91f8b8",
+                    "surface-container-highest": "#e0e3e5",
+                    "inverse-on-surface": "#eef1f3",
+                    "surface-bright": "#f7fafc",
+                    "on-tertiary-container": "#4bb278",
+                    "primary-container": "#1a365d",
+                    "outline-variant": "#c4c6cf",
+                    "on-secondary": "#ffffff",
+                    "on-secondary-container": "#596376",
+                    "on-primary-container": "#86a0cd",
+                    "on-error": "#ffffff",
+                    "on-surface-variant": "#43474e",
+                    "surface-dim": "#d7dadc",
+                    "secondary": "#555f71",
+                    "surface-container": "#ebeef0",
+                    "on-surface": "#181c1e",
+                    "on-primary-fixed-variant": "#2d476f",
+                    "inverse-surface": "#2d3133",
+                    "secondary-fixed-dim": "#bdc7dc",
+                    "secondary-container": "#d6e0f6",
+                    "tertiary-container": "#003f23",
+                    "tertiary-fixed-dim": "#74db9d",
+                    "on-primary": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "surface-container-high": "#e5e9eb",
+                    "surface": "#f7fafc",
+                    "surface-container-lowest": "#ffffff",
+                    "error-container": "#ffdad6",
+                    "surface-tint": "#455f88",
+                    "primary-fixed-dim": "#adc7f7",
+                    "on-background": "#181c1e",
+                    "background": "#f7fafc",
+                    "primary-fixed": "#d6e3ff",
+                    "on-secondary-fixed-variant": "#3d4759",
+                    "inverse-primary": "#adc7f7",
+                    "surface-container-low": "#f1f4f6",
+                    "secondary-fixed": "#d9e3f9",
+                    "outline": "#74777f",
+                    "on-secondary-fixed": "#121c2c",
+                    "error": "#ba1a1a",
+                    "on-tertiary-fixed": "#002110",
+                    "tertiary": "#002713",
+                    "surface-variant": "#e0e3e5",
+                    "primary": "#002045",
+                    "on-primary-fixed": "#001b3c",
+                    "on-error-container": "#93000a"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "stack-loose": "2rem",
+                    "sidebar-width": "260px",
+                    "container-max-width": "1280px",
+                    "margin-page": "2rem",
+                    "stack-tight": "0.5rem",
+                    "stack-default": "1rem",
+                    "gutter": "1.5rem"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-sm": ["Hanken Grotesk"],
+                    "headline-md": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "label-caps": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "data-numeric": ["JetBrains Mono"]
+            },
+            "fontSize": {
+                    "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-sm": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "display-lg": ["40px", {"lineHeight": "48px", "fontWeight": "700"}],
+                    "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                    "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "data-numeric": ["14px", {"lineHeight": "20px", "letterSpacing": "-0.02em", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+        }
+        /* Custom scrollbar for data-dense tables */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-background text-on-surface">
+<!-- SideNavBar Shell -->
+<aside class="fixed left-0 top-0 h-full w-sidebar-width bg-primary text-on-primary flex flex-col z-40">
+<div class="p-6">
+<div class="flex items-center gap-3 mb-8">
+<div class="w-8 h-8 bg-on-primary text-primary flex items-center justify-center rounded">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<div>
+<h1 class="font-headline-sm text-headline-sm leading-tight">OpenLedger</h1>
+<p class="text-[10px] uppercase tracking-widest opacity-60">Enterprise Finance</p>
+</div>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md text-body-md">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">account_balance</span>
+<span class="font-body-md text-body-md">Accounts</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-body-md text-body-md">Transactions</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-md text-body-md">Reports</span>
+</a>
+<!-- Active Item: Budgeting -->
+<a class="flex items-center gap-3 px-4 py-3 bg-on-primary-fixed-variant/10 text-on-primary border-l-4 border-tertiary-fixed cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-body-md text-body-md">Budgeting</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-primary/70 hover:text-on-primary hover:bg-on-primary-fixed-variant/5 transition-colors duration-200 cursor-pointer active:scale-95" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto p-6 space-y-4">
+<button class="w-full py-3 px-4 bg-tertiary-fixed text-on-tertiary-fixed font-bold rounded flex items-center justify-center gap-2 hover:bg-tertiary-fixed-dim transition-all active:scale-95">
+<span class="material-symbols-outlined">add</span>
+<span>New Transaction</span>
+</button>
+<div class="pt-4 border-t border-on-primary/10">
+<a class="flex items-center gap-3 px-4 py-2 text-on-primary/70 hover:text-on-primary text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]">help</span>
+                    Help
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-primary/70 hover:text-on-primary text-body-sm transition-colors" href="#">
+<span class="material-symbols-outlined text-[18px]">logout</span>
+                    Logout
+                </a>
+</div>
+</div>
+</aside>
+<!-- TopNavBar Shell -->
+<header class="sticky top-0 z-30 ml-sidebar-width bg-surface border-b border-outline-variant shadow-sm flex justify-between items-center h-16 px-gutter">
+<div class="flex items-center gap-4 flex-1">
+<div class="relative w-full max-w-md group">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full bg-surface-container-low border-none rounded py-2 pl-10 pr-4 text-body-md focus:ring-2 focus:ring-primary" placeholder="Search ledgers, reports, or budgets..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-secondary">
+<button class="hover:text-primary transition-all relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<button class="hover:text-primary transition-all">
+<span class="material-symbols-outlined">history</span>
+</button>
+</div>
+<div class="h-8 w-px bg-outline-variant"></div>
+<div class="flex items-center gap-3">
+<div class="text-right">
+<p class="font-body-md text-primary font-bold">Alex Sterling</p>
+<p class="text-[10px] text-secondary uppercase tracking-tight">Finance Director</p>
+</div>
+<img alt="User Profile" class="w-10 h-10 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIU7d0ulJ_nWy-rYSZj6JUlr7DBrdmx5KfXJDY8I44KtIKUz2c_gJKAH_GiptFG70BynwwCP4oIjfdAuwNu0GmrbPbVBlasaITEj2ELuMIr7JV23L_WUr2grIV98lde3utEVuS8luQ_sfD1z1ka2pKFjWZTk6X0lCMCOoJGilMoDgWKojH6HUixGVW1a2Z0av7LrANodwfG9KUh9ELTmRymoNJ-7KKvotxnl_ANgTCxTh1SsTdxkTvrloonkGMfN7zUBxWrQ3pQwKL"/>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-sidebar-width p-gutter bg-background min-h-screen">
+<div class="max-w-container-max-width mx-auto">
+<!-- Page Header -->
+<div class="mb-stack-loose flex justify-between items-end">
+<div>
+<h2 class="font-headline-md text-headline-md text-primary">Fiscal Year 2024 Budget</h2>
+<p class="font-body-md text-secondary">Monitoring corporate spending and capital allocation efficiency.</p>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 border border-outline text-primary font-bold rounded flex items-center gap-2 hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined">file_download</span>
+                        Export PDF
+                    </button>
+<button class="px-4 py-2 bg-primary text-on-primary font-bold rounded flex items-center gap-2 hover:bg-primary-container transition-all">
+<span class="material-symbols-outlined">edit_note</span>
+                        Adjust Allocation
+                    </button>
+</div>
+</div>
+<!-- Bento Grid Dashboard -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Budget Health Summary -->
+<div class="col-span-12 lg:col-span-8 bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+<div class="flex justify-between items-center mb-6">
+<h3 class="font-headline-sm text-headline-sm text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary-fixed-dim">health_and_safety</span>
+                            Budget Health
+                        </h3>
+<div class="flex items-center gap-4 text-body-sm">
+<span class="flex items-center gap-1"><span class="w-3 h-3 bg-primary rounded-full"></span> Actual</span>
+<span class="flex items-center gap-1"><span class="w-3 h-3 bg-outline-variant rounded-full"></span> Budgeted</span>
+</div>
+</div>
+<div class="space-y-6">
+<!-- Summary Stats -->
+<div class="grid grid-cols-3 gap-4">
+<div class="bg-surface-container-low p-4 rounded">
+<p class="text-label-caps text-secondary mb-1">TOTAL SPENT</p>
+<p class="font-display-lg text-[32px] font-bold text-primary">$1,240,490</p>
+<p class="text-body-sm text-on-tertiary-container mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">trending_down</span> 4.2% vs Last Mo
+                                </p>
+</div>
+<div class="bg-surface-container-low p-4 rounded">
+<p class="text-label-caps text-secondary mb-1">TOTAL BUDGET</p>
+<p class="font-display-lg text-[32px] font-bold text-primary">$1,850,000</p>
+<p class="text-body-sm text-secondary mt-1">67% Utilization</p>
+</div>
+<div class="bg-surface-container-low p-4 rounded">
+<p class="text-label-caps text-secondary mb-1">REMAINING</p>
+<p class="font-display-lg text-[32px] font-bold text-on-tertiary-container">$609,510</p>
+<p class="text-body-sm text-secondary mt-1">Projection: On Track</p>
+</div>
+</div>
+<!-- Progress Section -->
+<div class="space-y-4">
+<div class="flex justify-between text-body-sm font-bold text-primary mb-1">
+<span>Global Spending Cap</span>
+<span>67% Used</span>
+</div>
+<div class="w-full h-3 bg-surface-container rounded-full overflow-hidden">
+<div class="h-full bg-primary" style="width: 67%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Top Budget Variances -->
+<div class="col-span-12 lg:col-span-4 bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm overflow-hidden">
+<h3 class="font-headline-sm text-headline-sm text-primary mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-error">warning</span>
+                        Top Variances
+                    </h3>
+<div class="space-y-4">
+<div class="group cursor-pointer hover:bg-surface-container-low p-3 -mx-3 rounded transition-all">
+<div class="flex justify-between items-start mb-1">
+<div>
+<p class="font-bold text-primary">Cloud Infrastructure</p>
+<p class="text-body-sm text-secondary">DevOps &amp; AWS</p>
+</div>
+<span class="bg-error-container text-error px-2 py-0.5 rounded-full text-[11px] font-bold">+18.4%</span>
+</div>
+<div class="flex justify-between items-end">
+<span class="font-data-numeric text-error">($42,400)</span>
+<span class="text-body-sm text-secondary">of $230,000</span>
+</div>
+</div>
+<div class="group cursor-pointer hover:bg-surface-container-low p-3 -mx-3 rounded transition-all">
+<div class="flex justify-between items-start mb-1">
+<div>
+<p class="font-bold text-primary">Legal &amp; Compliance</p>
+<p class="text-body-sm text-secondary">Q3 Audit Fees</p>
+</div>
+<span class="bg-error-container text-error px-2 py-0.5 rounded-full text-[11px] font-bold">+12.1%</span>
+</div>
+<div class="flex justify-between items-end">
+<span class="font-data-numeric text-error">($14,200)</span>
+<span class="text-body-sm text-secondary">of $117,000</span>
+</div>
+</div>
+<div class="group cursor-pointer hover:bg-surface-container-low p-3 -mx-3 rounded transition-all">
+<div class="flex justify-between items-start mb-1">
+<div>
+<p class="font-bold text-primary">Office Operations</p>
+<p class="text-body-sm text-secondary">Supplies &amp; Utilities</p>
+</div>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed-variant px-2 py-0.5 rounded-full text-[11px] font-bold">-4.5%</span>
+</div>
+<div class="flex justify-between items-end">
+<span class="font-data-numeric text-on-tertiary-container">$2,800</span>
+<span class="text-body-sm text-secondary">of $62,000</span>
+</div>
+</div>
+</div>
+<button class="w-full mt-6 py-2 text-body-sm font-bold text-primary border border-outline rounded hover:bg-surface-container-low">View All Variances</button>
+</div>
+<!-- Budget Envelopes Details -->
+<div class="col-span-12 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm">
+<div class="p-6 border-b border-outline-variant flex justify-between items-center">
+<h3 class="font-headline-sm text-headline-sm text-primary">Budget Envelopes</h3>
+<div class="flex gap-2">
+<div class="flex items-center gap-2 bg-surface-container-low rounded px-3 py-1 text-body-sm border border-outline-variant">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+<span>October 2023 - September 2024</span>
+</div>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low text-label-caps text-secondary">
+<th class="px-6 py-3 font-bold border-b border-outline-variant">CATEGORY</th>
+<th class="px-6 py-3 font-bold border-b border-outline-variant">ENVELOPE TYPE</th>
+<th class="px-6 py-3 font-bold border-b border-outline-variant">BUDGETED</th>
+<th class="px-6 py-3 font-bold border-b border-outline-variant">ACTUAL</th>
+<th class="px-6 py-3 font-bold border-b border-outline-variant">UTILIZATION</th>
+<th class="px-6 py-3 font-bold border-b border-outline-variant">REMAINING</th>
+</tr>
+</thead>
+<tbody class="text-body-md divide-y divide-outline-variant">
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">groups</span>
+</div>
+<span class="font-bold">Human Resources</span>
+</div>
+</td>
+<td class="px-6 py-4"><span class="px-2 py-1 bg-surface-container rounded text-body-sm">Operational</span></td>
+<td class="px-6 py-4 font-data-numeric">$850,000</td>
+<td class="px-6 py-4 font-data-numeric text-primary">$792,300</td>
+<td class="px-6 py-4">
+<div class="w-32">
+<div class="flex justify-between text-[10px] mb-1">
+<span>93%</span>
+</div>
+<div class="w-full h-1.5 bg-outline-variant rounded-full">
+<div class="h-full bg-primary" style="width: 93%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-data-numeric text-on-tertiary-container">$57,700</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">campaign</span>
+</div>
+<span class="font-bold">Marketing &amp; Growth</span>
+</div>
+</td>
+<td class="px-6 py-4"><span class="px-2 py-1 bg-surface-container rounded text-body-sm">Discretionary</span></td>
+<td class="px-6 py-4 font-data-numeric">$420,000</td>
+<td class="px-6 py-4 font-data-numeric text-primary">$180,500</td>
+<td class="px-6 py-4">
+<div class="w-32">
+<div class="flex justify-between text-[10px] mb-1">
+<span>43%</span>
+</div>
+<div class="w-full h-1.5 bg-outline-variant rounded-full">
+<div class="h-full bg-primary" style="width: 43%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-data-numeric text-on-tertiary-container">$239,500</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">precision_manufacturing</span>
+</div>
+<span class="font-bold">R&amp;D Projects</span>
+</div>
+</td>
+<td class="px-6 py-4"><span class="px-2 py-1 bg-surface-container rounded text-body-sm">Capital</span></td>
+<td class="px-6 py-4 font-data-numeric">$350,000</td>
+<td class="px-6 py-4 font-data-numeric text-error">$375,000</td>
+<td class="px-6 py-4">
+<div class="w-32">
+<div class="flex justify-between text-[10px] mb-1">
+<span class="text-error">107%</span>
+</div>
+<div class="w-full h-1.5 bg-error-container rounded-full overflow-hidden">
+<div class="h-full bg-error" style="width: 100%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-data-numeric text-error">($25,000)</td>
+</tr>
+<tr class="hover:bg-surface-container-low transition-colors group">
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">apartment</span>
+</div>
+<span class="font-bold">Real Estate &amp; Fac.</span>
+</div>
+</td>
+<td class="px-6 py-4"><span class="px-2 py-1 bg-surface-container rounded text-body-sm">Fixed</span></td>
+<td class="px-6 py-4 font-data-numeric">$230,000</td>
+<td class="px-6 py-4 font-data-numeric text-primary">$92,690</td>
+<td class="px-6 py-4">
+<div class="w-32">
+<div class="flex justify-between text-[10px] mb-1">
+<span>40%</span>
+</div>
+<div class="w-full h-1.5 bg-outline-variant rounded-full">
+<div class="h-full bg-primary" style="width: 40%"></div>
+</div>
+</div>
+</td>
+<td class="px-6 py-4 font-data-numeric text-on-tertiary-container">$137,310</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 border-t border-outline-variant bg-surface-container-low flex justify-between items-center text-body-sm">
+<span class="text-secondary">Displaying 4 of 24 budget categories</span>
+<div class="flex gap-1">
+<button class="p-1 border border-outline-variant rounded hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined text-[20px]">chevron_left</span>
+</button>
+<button class="p-1 border border-outline-variant rounded bg-primary text-on-primary px-3">1</button>
+<button class="p-1 border border-outline-variant rounded hover:bg-surface-container px-3">2</button>
+<button class="p-1 border border-outline-variant rounded hover:bg-surface-container px-3">3</button>
+<button class="p-1 border border-outline-variant rounded hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Forecast Widget -->
+<div class="col-span-12 lg:col-span-6 bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm relative overflow-hidden">
+<div class="relative z-10">
+<h3 class="font-headline-sm text-headline-sm text-primary mb-2">Quarterly Forecast</h3>
+<p class="text-body-md text-secondary mb-6">Estimated spend based on current burn rates.</p>
+<div class="space-y-4">
+<div class="flex items-end gap-2">
+<div class="flex-1 bg-surface-container h-32 relative rounded-t">
+<div class="absolute bottom-0 w-full bg-primary/20 h-[60%] rounded-t"></div>
+<p class="absolute -top-6 left-0 text-[10px] font-bold text-secondary">Q1 (Actual)</p>
+</div>
+<div class="flex-1 bg-surface-container h-32 relative rounded-t">
+<div class="absolute bottom-0 w-full bg-primary/40 h-[75%] rounded-t"></div>
+<p class="absolute -top-6 left-0 text-[10px] font-bold text-secondary">Q2 (Actual)</p>
+</div>
+<div class="flex-1 bg-surface-container h-32 relative rounded-t">
+<div class="absolute bottom-0 w-full bg-primary/60 h-[85%] rounded-t border-t-2 border-dashed border-primary"></div>
+<p class="absolute -top-6 left-0 text-[10px] font-bold text-primary">Q3 (Projected)</p>
+</div>
+<div class="flex-1 bg-surface-container h-32 relative rounded-t">
+<div class="absolute bottom-0 w-full bg-primary h-[95%] rounded-t border-t-2 border-dashed border-primary"></div>
+<p class="absolute -top-6 left-0 text-[10px] font-bold text-primary">Q4 (Projected)</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Background Visual Decor -->
+<div class="absolute top-0 right-0 p-8 opacity-5 select-none pointer-events-none">
+<span class="material-symbols-outlined text-[120px]">auto_graph</span>
+</div>
+</div>
+<!-- Quick Insights -->
+<div class="col-span-12 lg:col-span-6 bg-surface-container-lowest border border-outline-variant rounded-xl p-6 shadow-sm">
+<h3 class="font-headline-sm text-headline-sm text-primary mb-4">AI Budget Insights</h3>
+<div class="space-y-3">
+<div class="flex gap-4 p-4 bg-tertiary-fixed/10 border-l-4 border-tertiary-fixed rounded">
+<span class="material-symbols-outlined text-on-tertiary-container">lightbulb</span>
+<div>
+<p class="font-bold text-primary text-body-md">Optimization Opportunity</p>
+<p class="text-body-sm text-secondary">Switching to annual billing for SaaS subscriptions could save $12,400 in the 'Software' envelope over the next 12 months.</p>
+</div>
+</div>
+<div class="flex gap-4 p-4 bg-error-container/10 border-l-4 border-error rounded">
+<span class="material-symbols-outlined text-error">priority_high</span>
+<div>
+<p class="font-bold text-primary text-body-md">Burn Rate Alert</p>
+<p class="text-body-sm text-secondary">Current cloud infrastructure spend is accelerating. You will exceed Q4 budget by Nov 12th if trend continues.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Global FAB -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:bg-primary-container transition-all active:scale-90 group z-50">
+<span class="material-symbols-outlined text-[28px] group-hover:rotate-90 transition-transform duration-300">add</span>
+</button>
+<script>
+        // Micro-interactions and Tab Logic
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                if (link.textContent.trim() === 'Budgeting') return; // Stay on page
+                
+                // Visual feedback for non-functional links in this demo
+                const ripple = document.createElement('div');
+                ripple.className = 'absolute inset-0 bg-white/10 animate-ping rounded';
+                link.appendChild(ripple);
+                setTimeout(() => ripple.remove(), 400);
+            });
+        });
+
+        // Simple visibility check for elements on scroll
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('opacity-100', 'translate-y-0');
+                    entry.target.classList.remove('opacity-0', 'translate-y-4');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.col-span-12, .col-span-6').forEach(el => {
+            el.classList.add('transition-all', 'duration-500', 'opacity-0', 'translate-y-4');
+            observer.observe(el);
+        });
+    </script>
+</body></html>

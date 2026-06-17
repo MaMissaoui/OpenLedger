@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./lib/api";
 import { SetupLedger } from "./SetupLedger";
+import { DashboardView } from "./components/DashboardView";
 import { AccountTree } from "./components/AccountTree";
 import { RegisterView } from "./components/RegisterView";
 import { ReportsView } from "./components/ReportsView";
@@ -13,10 +14,18 @@ import { ScheduledTransactionsView } from "./components/ScheduledTransactionsVie
 import BudgetView from "./components/BudgetView";
 import BusinessView from "./components/BusinessView";
 
-type View = "ledger" | "reports" | "portfolio" | "scheduled" | "budget" | "business";
+type View = "dashboard" | "ledger" | "reports" | "portfolio" | "scheduled" | "budget" | "business";
 
-// ── icon set (simple 18×18 SVG outlines) ──────────────────────────────────────
+// ── icon set (18×18 SVG outlines) ────────────────────────────────────────────
 const Icon = {
+  dashboard: (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="6" height="6" rx="1" />
+      <rect x="10" y="2" width="6" height="4" rx="1" />
+      <rect x="2" y="11" width="6" height="5" rx="1" />
+      <rect x="10" y="9" width="6" height="7" rx="1" />
+    </svg>
+  ),
   ledger: (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 2h9l3 3v11a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" />
@@ -66,21 +75,30 @@ const Icon = {
       <path d="M7 17H3a1 1 0 01-1-1V2a1 1 0 011-1h4M12 13l4-4-4-4M16 9H7" />
     </svg>
   ),
+  plus: (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M9 3v12M3 9h12" />
+    </svg>
+  ),
+  // Panel-with-chevron glyphs — read clearly as "slide this side panel
+  // closed/open." (Lucide panel-left-close / panel-left-open, 24px grid.)
   collapseMenu: (
-    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 5l-3 4 3 4" />
-      <path d="M10 5h4M10 9h4M10 13h4" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+      <path d="m16 15-3-3 3-3" />
     </svg>
   ),
   expandMenu: (
-    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 5h4M4 9h4M4 13h4" />
-      <path d="M11 5l3 4-3 4" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M9 3v18" />
+      <path d="m14 9 3 3-3 3" />
     </svg>
   ),
 };
 
-// ── nav item ──────────────────────────────────────────────────────────────────
+// ── nav item ─────────────────────────────────────────────────────────────────
 function NavItem({
   label,
   icon,
@@ -122,7 +140,7 @@ export function Ledger() {
   const [editTxGuid, setEditTxGuid] = useState<string | null>(null);
   const [showNewAccount, setShowNewAccount] = useState(false);
   const [showTrade, setShowTrade] = useState(false);
-  const [view, setView] = useState<View>("ledger");
+  const [view, setView] = useState<View>("dashboard");
   const [collapsed, setCollapsed] = useState(false);
 
   const postable = (accounts.data ?? []).filter((a) => !a.placeholder && a.type !== "ROOT");
@@ -151,11 +169,12 @@ export function Ledger() {
     <div className="shell">
       {/* ── left sidebar ── */}
       <nav className={`sidenav${collapsed ? " sidenav--collapsed" : ""}`}>
+        {/* Brand */}
         <div className="sidenav__brand">
           <span className="sidenav__brand-mark">OL</span>
           <div className="sidenav__brand-text">
             <span className="sidenav__brand-name">OpenLedger</span>
-            <span className="sidenav__brand-tag">double-entry</span>
+            <span className="sidenav__brand-tag">Enterprise Finance</span>
           </div>
           <button
             className="sidenav__toggle"
@@ -166,16 +185,29 @@ export function Ledger() {
           </button>
         </div>
 
+        {/* Nav */}
         <div className="sidenav__nav">
-          <NavItem label="Ledger" icon={Icon.ledger} active={view === "ledger"} collapsed={collapsed} onClick={() => setView("ledger")} />
-          <NavItem label="Reports" icon={Icon.reports} active={view === "reports"} collapsed={collapsed} onClick={() => setView("reports")} />
-          <NavItem label="Portfolio" icon={Icon.portfolio} active={view === "portfolio"} collapsed={collapsed} onClick={() => setView("portfolio")} />
-          <NavItem label="Scheduled" icon={Icon.scheduled} active={view === "scheduled"} collapsed={collapsed} onClick={() => setView("scheduled")} />
-          <NavItem label="Budget" icon={Icon.budget} active={view === "budget"} collapsed={collapsed} onClick={() => setView("budget")} />
-          <NavItem label="Business" icon={Icon.business} active={view === "business"} collapsed={collapsed} onClick={() => setView("business")} />
+          <NavItem label="Dashboard"  icon={Icon.dashboard} active={view === "dashboard"} collapsed={collapsed} onClick={() => setView("dashboard")} />
+          <NavItem label="Ledger"     icon={Icon.ledger}    active={view === "ledger"}    collapsed={collapsed} onClick={() => setView("ledger")} />
+          <NavItem label="Reports"    icon={Icon.reports}   active={view === "reports"}   collapsed={collapsed} onClick={() => setView("reports")} />
+          <NavItem label="Portfolio"  icon={Icon.portfolio} active={view === "portfolio"} collapsed={collapsed} onClick={() => setView("portfolio")} />
+          <NavItem label="Scheduled"  icon={Icon.scheduled} active={view === "scheduled"} collapsed={collapsed} onClick={() => setView("scheduled")} />
+          <NavItem label="Budget"     icon={Icon.budget}    active={view === "budget"}    collapsed={collapsed} onClick={() => setView("budget")} />
+          <NavItem label="Business"   icon={Icon.business}  active={view === "business"}  collapsed={collapsed} onClick={() => setView("business")} />
         </div>
 
+        {/* Footer */}
         <div className="sidenav__footer">
+          {/* New Transaction CTA */}
+          <button
+            className="sidenav__cta"
+            onClick={() => { setView("ledger"); setShowNewTx(true); }}
+            title={collapsed ? "New transaction" : undefined}
+          >
+            <span className="sidenav__icon">{Icon.plus}</span>
+            <span className="sidenav__cta-label">New Transaction</span>
+          </button>
+
           <span className="sidenav__book-id mono">book {book.guid.slice(0, 8)}…</span>
           <a
             className="sidenav__link"
@@ -208,7 +240,9 @@ export function Ledger() {
 
       {/* ── main content ── */}
       <div className="shell__content">
-        {view === "reports" ? (
+        {view === "dashboard" ? (
+          <DashboardView book={book} onNavigate={setView} />
+        ) : view === "reports" ? (
           <ReportsView book={book} />
         ) : view === "portfolio" ? (
           <PortfolioView book={book} onTrade={() => setShowTrade(true)} />
