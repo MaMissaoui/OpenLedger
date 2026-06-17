@@ -359,8 +359,22 @@ const TAB_LABELS: Record<BizTab, string> = {
   "ap-aging": "A/P Aging",
 };
 
-export default function BusinessView({ bookGuid, accounts }: { bookGuid: string; accounts: Account[] }) {
-  const [tab, setTab] = useState<BizTab>("customers");
+export default function BusinessView({
+  bookGuid,
+  accounts,
+  initialTab,
+}: {
+  bookGuid: string;
+  accounts: Account[];
+  initialTab?: BizTab;
+}) {
+  const [tab, setTab] = useState<BizTab>(initialTab ?? "customers");
+
+  // Follow the requested tab from the Reports Center, and fall back to Customers
+  // when the caller clears it (e.g. clicking the Business nav while already here).
+  useEffect(() => {
+    setTab(initialTab ?? "customers");
+  }, [initialTab]);
   const [newTrigger, setNewTrigger] = useState(0);
   const [commodities, setCommodities] = useState<Commodity[]>([]);
   const [customers, setCustomers] = useState<Array<{ guid: string; name: string }>>([]);

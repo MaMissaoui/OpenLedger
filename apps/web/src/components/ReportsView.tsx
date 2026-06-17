@@ -10,6 +10,12 @@ interface Props {
 
 type Tab = "balance-sheet" | "income-statement";
 
+interface ReportsViewProps {
+  book: Book;
+  initialTab?: Tab;
+  onBack?: () => void;
+}
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -180,14 +186,20 @@ function IncomeStatementPanel({ book }: Props) {
   );
 }
 
-export function ReportsView({ book }: Props) {
-  const [tab, setTab] = useState<Tab>("balance-sheet");
+export function ReportsView({ book, initialTab, onBack }: ReportsViewProps) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? "balance-sheet");
 
   return (
     <section className="register report">
       <header className="register__header">
         <div className="register__title">
-          <div className="eyebrow">Reports</div>
+          {onBack ? (
+            <button className="back-link" onClick={onBack}>
+              ‹ Reports Center
+            </button>
+          ) : (
+            <div className="eyebrow">Reports</div>
+          )}
           <h1>{tab === "balance-sheet" ? "Balance sheet" : "Income statement"}</h1>
         </div>
         <div className="report__tabs">

@@ -5,6 +5,7 @@ import { SetupLedger } from "./SetupLedger";
 import { DashboardView } from "./components/DashboardView";
 import { AccountTree } from "./components/AccountTree";
 import { RegisterView } from "./components/RegisterView";
+import { ReportsCenterView } from "./components/ReportsCenterView";
 import { ReportsView } from "./components/ReportsView";
 import { PortfolioView } from "./components/PortfolioView";
 import { TransactionDialog } from "./components/TransactionDialog";
@@ -14,7 +15,18 @@ import { ScheduledTransactionsView } from "./components/ScheduledTransactionsVie
 import BudgetView from "./components/BudgetView";
 import BusinessView from "./components/BusinessView";
 
-type View = "dashboard" | "ledger" | "reports" | "portfolio" | "scheduled" | "budget" | "business";
+type View =
+  | "dashboard"
+  | "ledger"
+  | "reports"
+  | "statements"
+  | "portfolio"
+  | "scheduled"
+  | "budget"
+  | "business";
+
+type StatementTab = "balance-sheet" | "income-statement";
+type BizTab = "ar-aging" | "ap-aging";
 
 // ── icon set (18×18 SVG outlines) ────────────────────────────────────────────
 const Icon = {
@@ -142,6 +154,18 @@ export function Ledger() {
   const [showTrade, setShowTrade] = useState(false);
   const [view, setView] = useState<View>("dashboard");
   const [collapsed, setCollapsed] = useState(false);
+  // Drill-down targets selected from the Reports Center hub.
+  const [statementTab, setStatementTab] = useState<StatementTab>("balance-sheet");
+  const [businessTab, setBusinessTab] = useState<BizTab | undefined>(undefined);
+
+  function openStatement(tab: StatementTab) {
+    setStatementTab(tab);
+    setView("statements");
+  }
+  function openReportView(target: "portfolio" | "budget" | "business", bizTab?: BizTab) {
+    setBusinessTab(bizTab);
+    setView(target);
+  }
 
   const postable = (accounts.data ?? []).filter((a) => !a.placeholder && a.type !== "ROOT");
 
@@ -189,11 +213,11 @@ export function Ledger() {
         <div className="sidenav__nav">
           <NavItem label="Dashboard"  icon={Icon.dashboard} active={view === "dashboard"} collapsed={collapsed} onClick={() => setView("dashboard")} />
           <NavItem label="Ledger"     icon={Icon.ledger}    active={view === "ledger"}    collapsed={collapsed} onClick={() => setView("ledger")} />
-          <NavItem label="Reports"    icon={Icon.reports}   active={view === "reports"}   collapsed={collapsed} onClick={() => setView("reports")} />
+          <NavItem label="Reports"    icon={Icon.reports}   active={view === "reports" || view === "statements"} collapsed={collapsed} onClick={() => setView("reports")} />
           <NavItem label="Portfolio"  icon={Icon.portfolio} active={view === "portfolio"} collapsed={collapsed} onClick={() => setView("portfolio")} />
           <NavItem label="Scheduled"  icon={Icon.scheduled} active={view === "scheduled"} collapsed={collapsed} onClick={() => setView("scheduled")} />
           <NavItem label="Budget"     icon={Icon.budget}    active={view === "budget"}    collapsed={collapsed} onClick={() => setView("budget")} />
-          <NavItem label="Business"   icon={Icon.business}  active={view === "business"}  collapsed={collapsed} onClick={() => setView("business")} />
+          <NavItem label="Business"   icon={Icon.business}  active={view === "business"}  collapsed={collapsed} onClick={() => { setBusinessTab(undefined); setView("business"); }} />
         </div>
 
         {/* Footer */}
@@ -243,7 +267,13 @@ export function Ledger() {
         {view === "dashboard" ? (
           <DashboardView book={book} onNavigate={setView} />
         ) : view === "reports" ? (
-          <ReportsView book={book} />
+          <ReportsCenterView
+            book={book}
+            onOpenStatement={openStatement}
+            onOpenView={openReportView}
+          />
+        ) : view === "statements" ? (
+          <ReportsView book={book} initialTab={statementTab} onBack={() => setView("reports")} />
         ) : view === "portfolio" ? (
           <PortfolioView book={book} onTrade={() => setShowTrade(true)} />
         ) : view === "scheduled" ? (
@@ -251,7 +281,7 @@ export function Ledger() {
         ) : view === "budget" ? (
           <BudgetView bookGuid={book.guid} />
         ) : view === "business" ? (
-          <BusinessView bookGuid={book.guid} accounts={accounts.data ?? []} />
+          <BusinessView bookGuid={book.guid} accounts={accounts.data ?? []} initialTab={businessTab} />
         ) : (
           <div className="workspace">
             <AccountTree
