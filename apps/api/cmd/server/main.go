@@ -39,6 +39,7 @@ func main() {
 	structure := app.NewStructureService(repo)
 	price := app.NewPriceService(repo)
 	report := app.NewReportService(repo)
+	forecast := app.NewForecastService(repo)
 	provision := app.NewProvisionService(repo)
 	authz := app.NewAuthzService(repo)
 	importer := app.NewImportService(gnucash.NewReader(), repo)
@@ -53,7 +54,7 @@ func main() {
 	vendor := app.NewVendorService(repo, authz)
 	invoice := app.NewInvoiceService(repo, posting, authz)
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor, invoice)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, forecast, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor, invoice)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

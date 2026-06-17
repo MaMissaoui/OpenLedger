@@ -90,6 +90,7 @@ func newBudgetTestServer(fr *fakeBudgetRepoH) http.Handler {
 		app.NewStructureService(fr.fakeRepo),
 		app.NewPriceService(fr.fakeRepo),
 		app.NewReportService(fr.fakeRepo),
+		app.NewForecastService(fr.fakeRepo),
 		app.NewProvisionService(fr.fakeRepo),
 		app.NewAuthzService(fr.fakeRepo),
 		app.NewImportService(fr.fakeRepo, fr.fakeRepo),

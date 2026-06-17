@@ -93,6 +93,54 @@ func (s ScheduledTransaction) NextDueDate() time.Time {
 	}
 }
 
+// Occurrences returns every due date of this scheduled transaction that falls
+// within (after, until], in chronological order. Unlike NextDueDate it ignores
+// LastPostedDate: this is a forward projection from `after`, independent of
+// posting history. A disabled schedule, or one whose window doesn't intersect
+// the range, yields none. The iteration is bounded so a far-past StartDate with
+// a short period can't loop unboundedly.
+func (s ScheduledTransaction) Occurrences(after, until time.Time) []time.Time {
+	if !s.Enabled {
+		return nil
+	}
+	every := s.Every
+	if every <= 0 {
+		every = 1
+	}
+	after = after.UTC()
+	until = until.UTC()
+
+	var out []time.Time
+	cur := s.StartDate.UTC().Truncate(24 * time.Hour)
+	const maxSteps = 100000 // safety bound against pathological ranges
+	for range maxSteps {
+		if cur.After(until) {
+			break
+		}
+		if !s.EndDate.IsZero() && cur.After(s.EndDate.UTC()) {
+			break
+		}
+		if cur.After(after) {
+			out = append(out, cur)
+		}
+		switch s.Period {
+		case PeriodOnce:
+			return out // a one-shot has at most this single occurrence
+		case PeriodDaily:
+			cur = cur.AddDate(0, 0, every)
+		case PeriodWeekly:
+			cur = cur.AddDate(0, 0, every*7)
+		case PeriodMonthly:
+			cur = cur.AddDate(0, every, 0)
+		case PeriodYearly:
+			cur = cur.AddDate(every, 0, 0)
+		default:
+			return out
+		}
+	}
+	return out
+}
+
 // IsDue reports whether the next due date is on or before asOf.
 func (s ScheduledTransaction) IsDue(asOf time.Time) bool {
 	next := s.NextDueDate()

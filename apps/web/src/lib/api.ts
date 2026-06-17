@@ -6,6 +6,7 @@ import type {
   Budget,
   BudgetReport,
   CapitalGainsReport,
+  CashFlowForecast,
   CashFlowStatement,
   Commodity,
   Customer,
@@ -161,6 +162,13 @@ export const api = {
     if (to) params.set("to", to);
     const q = params.toString() ? `?${params}` : "";
     return request<CashFlowStatement>(`/api/v1/books/${bookGuid}/reports/cash-flow${q}`);
+  },
+  getCashFlowForecast: (bookGuid: string, months = 6, from?: string) => {
+    const params = new URLSearchParams({ months: String(months) });
+    if (from) params.set("from", from);
+    return request<CashFlowForecast>(
+      `/api/v1/books/${bookGuid}/reports/cash-flow-forecast?${params}`,
+    );
   },
   getPortfolio: (bookGuid: string) =>
     request<Portfolio>(`/api/v1/books/${bookGuid}/reports/portfolio`),

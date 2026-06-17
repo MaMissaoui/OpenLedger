@@ -121,6 +121,41 @@ func TestNextDueDate(t *testing.T) {
 	})
 }
 
+func TestOccurrences(t *testing.T) {
+	// Monthly schedule starting Jan 15; project the first half of the year.
+	s := ScheduledTransaction{
+		Enabled: true, Period: PeriodMonthly, Every: 1, StartDate: date(2026, 1, 15),
+	}
+	got := s.Occurrences(date(2026, 1, 1), date(2026, 6, 30))
+	want := []time.Time{
+		date(2026, 1, 15), date(2026, 2, 15), date(2026, 3, 15),
+		date(2026, 4, 15), date(2026, 5, 15), date(2026, 6, 15),
+	}
+	if len(got) != len(want) {
+		t.Fatalf("occurrences = %d, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if !got[i].Equal(want[i]) {
+			t.Errorf("occurrence[%d] = %s, want %s", i, got[i], want[i])
+		}
+	}
+
+	// The lower bound is exclusive: an occurrence exactly on `after` is excluded.
+	if g := s.Occurrences(date(2026, 1, 15), date(2026, 2, 28)); len(g) != 1 || !g[0].Equal(date(2026, 2, 15)) {
+		t.Errorf("exclusive lower bound: got %v, want [Feb 15]", g)
+	}
+
+	// A disabled schedule and a one-shot past its date yield nothing / one.
+	if g := (ScheduledTransaction{Enabled: false, Period: PeriodMonthly, StartDate: date(2026, 1, 1)}).
+		Occurrences(date(2026, 1, 1), date(2026, 12, 31)); g != nil {
+		t.Errorf("disabled schedule: got %v, want nil", g)
+	}
+	once := ScheduledTransaction{Enabled: true, Period: PeriodOnce, StartDate: date(2026, 3, 1)}
+	if g := once.Occurrences(date(2026, 1, 1), date(2026, 12, 31)); len(g) != 1 || !g[0].Equal(date(2026, 3, 1)) {
+		t.Errorf("one-shot: got %v, want [Mar 1]", g)
+	}
+}
+
 func TestIsDue(t *testing.T) {
 	s := ScheduledTransaction{
 		Enabled:   true,

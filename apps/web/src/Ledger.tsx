@@ -8,6 +8,7 @@ import { RegisterView } from "./components/RegisterView";
 import { ReportsCenterView } from "./components/ReportsCenterView";
 import { ReportsView } from "./components/ReportsView";
 import { CashFlowView } from "./components/CashFlowView";
+import { ForecastView } from "./components/ForecastView";
 import { PortfolioView } from "./components/PortfolioView";
 import { TransactionDialog } from "./components/TransactionDialog";
 import { TradeSecurityDialog } from "./components/TradeSecurityDialog";
@@ -22,6 +23,7 @@ type View =
   | "reports"
   | "statements"
   | "cash-flow"
+  | "forecast"
   | "portfolio"
   | "scheduled"
   | "budget"
@@ -215,7 +217,7 @@ export function Ledger() {
         <div className="sidenav__nav">
           <NavItem label="Dashboard"  icon={Icon.dashboard} active={view === "dashboard"} collapsed={collapsed} onClick={() => setView("dashboard")} />
           <NavItem label="Ledger"     icon={Icon.ledger}    active={view === "ledger"}    collapsed={collapsed} onClick={() => setView("ledger")} />
-          <NavItem label="Reports"    icon={Icon.reports}   active={view === "reports" || view === "statements" || view === "cash-flow"} collapsed={collapsed} onClick={() => setView("reports")} />
+          <NavItem label="Reports"    icon={Icon.reports}   active={view === "reports" || view === "statements" || view === "cash-flow" || view === "forecast"} collapsed={collapsed} onClick={() => setView("reports")} />
           <NavItem label="Portfolio"  icon={Icon.portfolio} active={view === "portfolio"} collapsed={collapsed} onClick={() => setView("portfolio")} />
           <NavItem label="Scheduled"  icon={Icon.scheduled} active={view === "scheduled"} collapsed={collapsed} onClick={() => setView("scheduled")} />
           <NavItem label="Budget"     icon={Icon.budget}    active={view === "budget"}    collapsed={collapsed} onClick={() => setView("budget")} />
@@ -273,12 +275,15 @@ export function Ledger() {
             book={book}
             onOpenStatement={openStatement}
             onOpenCashFlow={() => setView("cash-flow")}
+            onOpenForecast={() => setView("forecast")}
             onOpenView={openReportView}
           />
         ) : view === "statements" ? (
           <ReportsView book={book} initialTab={statementTab} onBack={() => setView("reports")} />
         ) : view === "cash-flow" ? (
           <CashFlowView book={book} onBack={() => setView("reports")} />
+        ) : view === "forecast" ? (
+          <ForecastView book={book} onBack={() => setView("reports")} />
         ) : view === "portfolio" ? (
           <PortfolioView book={book} onTrade={() => setShowTrade(true)} />
         ) : view === "scheduled" ? (

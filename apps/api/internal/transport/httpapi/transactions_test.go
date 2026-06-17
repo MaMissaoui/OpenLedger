@@ -258,6 +258,12 @@ func (f *fakeRepo) AccountBalances(_ context.Context, _ string, _, _ *time.Time)
 	return f.reportRows, nil
 }
 
+// ListScheduledTransactions satisfies app.ForecastRepository; these handler
+// tests don't exercise forecasting, so it returns nothing.
+func (f *fakeRepo) ListScheduledTransactions(_ context.Context, _ string) ([]domain.ScheduledTransaction, error) {
+	return nil, nil
+}
+
 // ReadGnuCashSQLite is the fake GnuCashReader: it ignores the path and returns
 // the canned reader data/error the test configured.
 func (f *fakeRepo) ReadGnuCashSQLite(_ context.Context, _ string) (app.GnuCashData, error) {
@@ -318,6 +324,7 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 		app.NewStructureService(repo),
 		app.NewPriceService(repo),
 		app.NewReportService(repo),
+		app.NewForecastService(repo),
 		app.NewProvisionService(repo),
 		app.NewAuthzService(repo),
 		app.NewImportService(repo, repo),

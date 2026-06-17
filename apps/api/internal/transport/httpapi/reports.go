@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/openledger/openledger/apps/api/internal/app"
@@ -125,6 +126,58 @@ func (s *Server) handleCashFlow(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleCashFlowForecast(w http.ResponseWriter, r *http.Request) {
+	bookGUID := r.PathValue("id")
+	if !s.authorizeBook(w, r, bookGUID, app.AccessRead) {
+		return
+	}
+	from, ok := queryTime(w, r, "from", time.Now())
+	if !ok {
+		return
+	}
+	months := queryInt(r, "months", 6)
+	if months < 1 {
+		months = 1
+	}
+	if months > 60 {
+		months = 60
+	}
+	fc, err := s.forecast.Forecast(r.Context(), bookGUID, from, months)
+	if writeStructureError(w, err) {
+		return
+	}
+
+	points := make([]map[string]any, 0, len(fc.Points))
+	for _, p := range fc.Points {
+		points = append(points, map[string]any{
+			"date":          p.Date,
+			"projectedCash": numericAtScale(p.ProjectedCash, 100),
+			"inflow":        numericAtScale(p.Inflow, 100),
+			"outflow":       numericAtScale(p.Outflow, 100),
+		})
+	}
+	events := make([]map[string]any, 0, len(fc.Events))
+	for _, e := range fc.Events {
+		events = append(events, map[string]any{
+			"date":   e.Date,
+			"name":   e.Name,
+			"amount": numericAtScale(e.Amount, 100),
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"bookGuid":     bookGUID,
+		"from":         fc.From,
+		"to":           fc.To,
+		"startingCash": numericAtScale(fc.StartingCash, 100),
+		"endingCash":   numericAtScale(fc.EndingCash, 100),
+		"netChange":    numericAtScale(fc.NetChange, 100),
+		"lowestCash":   numericAtScale(fc.LowestCash, 100),
+		"lowestDate":   fc.LowestDate,
+		"points":       points,
+		"events":       events,
+	})
+}
+
 func cashSectionDTO(sec app.CashFlowSection) map[string]any {
 	lines := make([]map[string]any, 0, len(sec.Lines))
 	for _, l := range sec.Lines {
@@ -152,6 +205,20 @@ func queryTime(w http.ResponseWriter, r *http.Request, key string, def time.Time
 		return time.Time{}, false
 	}
 	return t, true
+}
+
+// queryInt parses an integer query parameter, returning def when absent or
+// malformed.
+func queryInt(r *http.Request, key string, def int) int {
+	raw := r.URL.Query().Get(key)
+	if raw == "" {
+		return def
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return def
+	}
+	return n
 }
 
 func sectionDTO(sec app.ReportSection) map[string]any {

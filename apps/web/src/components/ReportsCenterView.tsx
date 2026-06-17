@@ -13,6 +13,7 @@ interface Props {
   book: Book;
   onOpenStatement: (tab: StatementTab) => void;
   onOpenCashFlow: () => void;
+  onOpenForecast: () => void;
   onOpenView: (view: ReportView, bizTab?: BizTab) => void;
 }
 
@@ -79,7 +80,13 @@ const ICONS: Record<string, React.ReactNode> = {
   ),
 };
 
-export function ReportsCenterView({ book, onOpenStatement, onOpenCashFlow, onOpenView }: Props) {
+export function ReportsCenterView({
+  book,
+  onOpenStatement,
+  onOpenCashFlow,
+  onOpenForecast,
+  onOpenView,
+}: Props) {
   const balanceSheet = useQuery({
     queryKey: ["balance-sheet", book.guid, "center"],
     queryFn: () => api.getBalanceSheet(book.guid, todayISO()),
@@ -180,11 +187,16 @@ export function ReportsCenterView({ book, onOpenStatement, onOpenCashFlow, onOpe
           />
         </LibraryCard>
 
-        <LibraryCard icon={ICONS.planning} title="Planning" count={1}>
+        <LibraryCard icon={ICONS.planning} title="Planning" count={2}>
           <ReportRow
             title="Budget vs. Actuals"
             desc="Variance of actual spend against budget."
             onClick={() => onOpenView("budget")}
+          />
+          <ReportRow
+            title="Cash Flow Forecast"
+            desc="Projected cash from upcoming scheduled transactions."
+            onClick={onOpenForecast}
           />
         </LibraryCard>
       </div>

@@ -193,6 +193,41 @@ paths:
           description: The authenticated user has no membership on this book
         "404":
           description: Book not found
+  /api/v1/books/{id}/reports/cash-flow-forecast:
+    get:
+      summary: Cash flow forecast — projected cash from scheduled transactions
+      operationId: getCashFlowForecast
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: Start of the projection (defaults to now).
+          schema:
+            type: string
+            format: date-time
+        - name: months
+          in: query
+          description: Number of whole months to project (1–60, default 6).
+          schema:
+            type: integer
+            default: 6
+      responses:
+        "200":
+          description: The cash flow forecast
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CashFlowForecast"
+        "400":
+          description: Malformed from timestamp
+        "403":
+          description: The authenticated user has no membership on this book
+        "404":
+          description: Book not found
   /api/v1/books/{id}/reports/portfolio:
     get:
       summary: Portfolio (security holdings) report
@@ -1696,6 +1731,68 @@ components:
           $ref: "#/components/schemas/Numeric"
         endingCash:
           $ref: "#/components/schemas/Numeric"
+    ForecastPoint:
+      type: object
+      description: Projected cash at the end of one month, with that month's flows.
+      properties:
+        date:
+          type: string
+          format: date-time
+        projectedCash:
+          $ref: "#/components/schemas/Numeric"
+        inflow:
+          $ref: "#/components/schemas/Numeric"
+        outflow:
+          $ref: "#/components/schemas/Numeric"
+    ForecastEvent:
+      type: object
+      description: >-
+        One projected cash movement — a single occurrence of a scheduled
+        transaction, with its net effect on cash (inflow positive, outflow
+        negative).
+      properties:
+        date:
+          type: string
+          format: date-time
+        name:
+          type: string
+        amount:
+          $ref: "#/components/schemas/Numeric"
+    CashFlowForecast:
+      type: object
+      description: >-
+        Forward projection of cash over [from, to], simulating the book's
+        scheduled transactions. Single-currency only.
+      properties:
+        bookGuid:
+          type: string
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        startingCash:
+          $ref: "#/components/schemas/Numeric"
+        endingCash:
+          $ref: "#/components/schemas/Numeric"
+        netChange:
+          $ref: "#/components/schemas/Numeric"
+        lowestCash:
+          allOf:
+            - $ref: "#/components/schemas/Numeric"
+          description: The tightest projected cash position in the horizon.
+        lowestDate:
+          type: string
+          format: date-time
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/ForecastPoint"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ForecastEvent"
     Portfolio:
       type: object
       description: Security-holdings report for a book.

@@ -15,6 +15,7 @@ type Server struct {
 	structure    *app.StructureService
 	price        *app.PriceService
 	report       *app.ReportService
+	forecast     *app.ForecastService
 	provision    *app.ProvisionService
 	authz        *app.AuthzService
 	importer     *app.ImportService
@@ -31,8 +32,8 @@ type Server struct {
 }
 
 // NewServer builds a Server from its service dependencies.
-func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService, reconciler *app.ReconcileService, portfolio *app.PortfolioService, trade *app.TradeService, capitalGains *app.CapitalGainsService, schedule *app.ScheduleService, budget *app.BudgetService, customer *app.CustomerService, vendor *app.VendorService, invoice *app.InvoiceService) *Server {
-	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, report: report, provision: provision, authz: authz, importer: importer, exporter: exporter, reconciler: reconciler, portfolio: portfolio, trade: trade, capitalGains: capitalGains, schedule: schedule, budget: budget, customer: customer, vendor: vendor, invoice: invoice}
+func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, forecast *app.ForecastService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService, reconciler *app.ReconcileService, portfolio *app.PortfolioService, trade *app.TradeService, capitalGains *app.CapitalGainsService, schedule *app.ScheduleService, budget *app.BudgetService, customer *app.CustomerService, vendor *app.VendorService, invoice *app.InvoiceService) *Server {
+	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, report: report, forecast: forecast, provision: provision, authz: authz, importer: importer, exporter: exporter, reconciler: reconciler, portfolio: portfolio, trade: trade, capitalGains: capitalGains, schedule: schedule, budget: budget, customer: customer, vendor: vendor, invoice: invoice}
 }
 
 // Routes returns the configured HTTP handler. /healthz is public; every
@@ -49,6 +50,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/books/{id}/reports/balance-sheet", s.requireAuth(s.handleBalanceSheet))
 	mux.HandleFunc("GET /api/v1/books/{id}/reports/income-statement", s.requireAuth(s.handleIncomeStatement))
 	mux.HandleFunc("GET /api/v1/books/{id}/reports/cash-flow", s.requireAuth(s.handleCashFlow))
+	mux.HandleFunc("GET /api/v1/books/{id}/reports/cash-flow-forecast", s.requireAuth(s.handleCashFlowForecast))
 	mux.HandleFunc("GET /api/v1/books/{id}/reports/portfolio", s.requireAuth(s.handlePortfolio))
 	mux.HandleFunc("GET /api/v1/books/{id}/reports/capital-gains", s.requireAuth(s.handleCapitalGains))
 	mux.HandleFunc("GET /api/v1/books/{id}/scheduled-transactions", s.requireAuth(s.handleListScheduledTransactions))

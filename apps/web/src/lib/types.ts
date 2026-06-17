@@ -115,6 +115,36 @@ export interface CashFlowStatement {
   endingCash: Numeric;
 }
 
+// Projected cash at the end of one month, with that month's flows.
+export interface ForecastPoint {
+  date: string;
+  projectedCash: Numeric;
+  inflow: Numeric;
+  outflow: Numeric;
+}
+
+// One projected cash movement — a single scheduled-transaction occurrence, with
+// its net cash effect (inflow positive, outflow negative).
+export interface ForecastEvent {
+  date: string;
+  name: string;
+  amount: Numeric;
+}
+
+// Forward projection of cash, simulating the book's scheduled transactions.
+export interface CashFlowForecast {
+  bookGuid: string;
+  from: string;
+  to: string;
+  startingCash: Numeric;
+  endingCash: Numeric;
+  netChange: Numeric;
+  lowestCash: Numeric;
+  lowestDate: string;
+  points: ForecastPoint[];
+  events: ForecastEvent[];
+}
+
 // One security position in the portfolio report. shares is in the account's
 // commodity; the money fields are in the quote currency. When hasPrice is false
 // the holding has no quote and the market-value fields are absent.
