@@ -74,6 +74,10 @@ type fakeRepo struct {
 	// Provision side.
 	provisionedUserID string // returned by FindOrCreateLDAPUser (default "user-1")
 
+	// Quote side. When non-nil, newTestServer wires a QuoteService backed by this
+	// provider so the online-quote handler can be exercised.
+	quoteProvider app.QuoteProvider
+
 	// Authz side. The zero value grants owner access so most tests don't set it
 	// up; set role to test a specific permission level, or noMembership for 403.
 	noMembership    bool     // UserBookRole reports no membership row
@@ -174,6 +178,15 @@ func (f *fakeRepo) InsertCommodity(_ context.Context, c domain.Commodity) error 
 
 func (f *fakeRepo) ListCommodities(_ context.Context) ([]domain.Commodity, error) {
 	return f.commodities, nil
+}
+
+func (f *fakeRepo) GetCommodity(_ context.Context, guid string) (domain.Commodity, error) {
+	for _, c := range f.commodities {
+		if c.GUID == guid {
+			return c, nil
+		}
+	}
+	return domain.Commodity{}, app.ErrCommodityNotFound
 }
 
 func (f *fakeRepo) InsertPrice(_ context.Context, p domain.Price) error {
@@ -318,11 +331,18 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 	if len(schedSvc) > 0 {
 		svc = schedSvc[0]
 	}
+	price := app.NewPriceService(repo)
+	// Only wire a quote service when the fake has a provider configured, so the
+	// online-quote handler test can inject a stub while other tests leave it nil.
+	var quoteSvc *app.QuoteService
+	if repo.quoteProvider != nil {
+		quoteSvc = app.NewQuoteService(repo.quoteProvider, repo, price)
+	}
 	return NewServer(
 		posting,
 		app.NewLedgerService(repo),
 		app.NewStructureService(repo),
-		app.NewPriceService(repo),
+		price,
 		app.NewReportService(repo),
 		app.NewForecastService(repo),
 		app.NewProvisionService(repo),
@@ -340,6 +360,7 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 		nil,
 		nil,
 		nil,
+		quoteSvc,
 	).Routes()
 }
 

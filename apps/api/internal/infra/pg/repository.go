@@ -265,6 +265,28 @@ func (r *Repository) ListCommodities(ctx context.Context) ([]domain.Commodity, e
 	return commodities, rows.Err()
 }
 
+// GetCommodity returns one commodity by GUID, or app.ErrCommodityNotFound.
+func (r *Repository) GetCommodity(ctx context.Context, guid string) (domain.Commodity, error) {
+	var (
+		c        domain.Commodity
+		fullname *string
+	)
+	err := r.pool.QueryRow(ctx,
+		`SELECT guid, namespace, mnemonic, fullname, fraction
+		 FROM commodities WHERE guid = $1`, guid).
+		Scan(&c.GUID, &c.Namespace, &c.Mnemonic, &fullname, &c.Fraction)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Commodity{}, app.ErrCommodityNotFound
+	}
+	if err != nil {
+		return domain.Commodity{}, fmt.Errorf("get commodity: %w", err)
+	}
+	if fullname != nil {
+		c.Fullname = *fullname
+	}
+	return c, nil
+}
+
 // InsertPrice writes a price quote. The value is stored as an exact
 // numerator/denominator pair (a price is a ratio, so it keeps its own
 // precision rather than a commodity fraction).

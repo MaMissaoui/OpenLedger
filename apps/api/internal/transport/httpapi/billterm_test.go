@@ -93,6 +93,7 @@ func newBillTermTestServer(fr *fakeBillTermRepoH) http.Handler {
 		nil,
 		app.NewBillTermService(fr),
 		nil,
+		nil,
 	).Routes()
 }
 

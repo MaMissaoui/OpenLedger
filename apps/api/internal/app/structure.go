@@ -16,6 +16,10 @@ var ErrBookNotFound = errors.New("book not found")
 // (missing required field, unknown account type, …). Handlers map it to 400.
 var ErrInvalidInput = errors.New("invalid input")
 
+// ErrCommodityNotFound is returned when an operation references a commodity GUID
+// that does not exist. Handlers map it to 404.
+var ErrCommodityNotFound = errors.New("commodity not found")
+
 // StructureRepository persists and reads the chart-of-accounts structure:
 // commodities, books, and accounts.
 type StructureRepository interface {

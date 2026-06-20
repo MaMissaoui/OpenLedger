@@ -171,6 +171,8 @@ func writeStructureError(w http.ResponseWriter, err error) bool {
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, app.ErrBookNotFound):
 		writeError(w, http.StatusNotFound, "book not found")
+	case errors.Is(err, app.ErrCommodityNotFound):
+		writeError(w, http.StatusNotFound, "commodity not found")
 	default:
 		writeError(w, http.StatusInternalServerError, "internal error")
 	}
