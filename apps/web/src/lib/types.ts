@@ -52,6 +52,15 @@ export interface Price {
   value: Numeric;
 }
 
+// Result of importing a GnuCash file: the new book's GUID and the counts of
+// objects created, returned by POST /api/v1/imports/gnucash.
+export interface ImportResult {
+  bookGuid: string;
+  commodities: number;
+  accounts: number;
+  transactions: number;
+}
+
 // One account's natural-sign balance within a report section.
 export interface ReportLine {
   account: Account;

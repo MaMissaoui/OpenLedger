@@ -16,6 +16,8 @@ import { NewAccountDialog } from "./components/NewAccountDialog";
 import { ScheduledTransactionsView } from "./components/ScheduledTransactionsView";
 import BudgetView from "./components/BudgetView";
 import BusinessView from "./components/BusinessView";
+import CommoditiesView from "./components/CommoditiesView";
+import ImportDialog from "./components/ImportDialog";
 
 type View =
   | "dashboard"
@@ -27,7 +29,8 @@ type View =
   | "portfolio"
   | "scheduled"
   | "budget"
-  | "business";
+  | "business"
+  | "commodities";
 
 type StatementTab = "balance-sheet" | "income-statement";
 type BizTab = "ar-aging" | "ap-aging";
@@ -80,9 +83,22 @@ const Icon = {
       <path d="M9 11v2" />
     </svg>
   ),
+  commodities: (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="9" cy="4" rx="6" ry="2.2" />
+      <path d="M3 4v5c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V4" />
+      <path d="M3 9v5c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V9" />
+    </svg>
+  ),
   download: (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M9 2v9M5 8l4 4 4-4" />
+      <path d="M2 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" />
+    </svg>
+  ),
+  upload: (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 12V3M5 7l4-4 4 4" />
       <path d="M2 14v2a1 1 0 001 1h12a1 1 0 001-1v-2" />
     </svg>
   ),
@@ -156,6 +172,7 @@ export function Ledger() {
   const [editTxGuid, setEditTxGuid] = useState<string | null>(null);
   const [showNewAccount, setShowNewAccount] = useState(false);
   const [showTrade, setShowTrade] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [view, setView] = useState<View>("dashboard");
   const [collapsed, setCollapsed] = useState(false);
   // Drill-down targets selected from the Reports Center hub.
@@ -222,6 +239,7 @@ export function Ledger() {
           <NavItem label="Scheduled"  icon={Icon.scheduled} active={view === "scheduled"} collapsed={collapsed} onClick={() => setView("scheduled")} />
           <NavItem label="Budget"     icon={Icon.budget}    active={view === "budget"}    collapsed={collapsed} onClick={() => setView("budget")} />
           <NavItem label="Business"   icon={Icon.business}  active={view === "business"}  collapsed={collapsed} onClick={() => { setBusinessTab(undefined); setView("business"); }} />
+          <NavItem label="Commodities" icon={Icon.commodities} active={view === "commodities"} collapsed={collapsed} onClick={() => setView("commodities")} />
         </div>
 
         {/* Footer */}
@@ -237,6 +255,14 @@ export function Ledger() {
           </button>
 
           <span className="sidenav__book-id mono">book {book.guid.slice(0, 8)}…</span>
+          <button
+            className="sidenav__link"
+            onClick={() => setShowImport(true)}
+            title={collapsed ? "Import GnuCash" : undefined}
+          >
+            <span className="sidenav__link-icon">{Icon.upload}</span>
+            <span className="sidenav__link-text">Import GnuCash</span>
+          </button>
           <a
             className="sidenav__link"
             href={api.exportGnuCashUrl(book.guid)}
@@ -292,6 +318,8 @@ export function Ledger() {
           <BudgetView bookGuid={book.guid} />
         ) : view === "business" ? (
           <BusinessView bookGuid={book.guid} accounts={accounts.data ?? []} initialTab={businessTab} />
+        ) : view === "commodities" ? (
+          <CommoditiesView />
         ) : (
           <div className="workspace">
             <AccountTree
@@ -342,6 +370,7 @@ export function Ledger() {
       {showTrade && (
         <TradeSecurityDialog accounts={postable} onClose={() => setShowTrade(false)} />
       )}
+      {showImport && <ImportDialog onClose={() => setShowImport(false)} />}
     </div>
   );
 }
