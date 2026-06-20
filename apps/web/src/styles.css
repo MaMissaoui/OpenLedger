@@ -298,6 +298,62 @@ a { color: var(--primary); }
   font-size: 0.9rem;
 }
 
+/* ---------- commodities & prices ---------- */
+.commodities {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 1.6fr);
+  gap: 1.5rem;
+  padding: 0 1.5rem 1.5rem;
+  align-items: start;
+}
+.commodities__list tr[onclick],
+.commodities__list tbody tr {
+  user-select: none;
+}
+.commodities__detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+@media (max-width: 860px) {
+  .commodities {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- import dialog ---------- */
+.import-dropzone {
+  border: 1.5px dashed var(--outline-variant);
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--secondary);
+  font-size: 0.9rem;
+}
+.import-result {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+.import-result__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.import-result__num {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+.import-result__label {
+  font-size: 0.75rem;
+  color: var(--secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 /* ---------- app shell ---------- */
 
 .shell {
@@ -541,6 +597,12 @@ a { color: var(--primary); }
   white-space: nowrap;
   transition: color 0.12s;
   padding: 0.2rem 0;
+  /* Reset for when this class is used on a <button> (e.g. Import). */
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .sidenav__link:hover { color: var(--on-primary); }
 

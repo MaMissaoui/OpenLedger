@@ -12,6 +12,7 @@ import type {
   Commodity,
   Customer,
   Entry,
+  ImportResult,
   IncomeStatement,
   Invoice,
   NewBillTerm,
@@ -90,8 +91,8 @@ export const api = {
   createBook: () => post<Book>("/api/v1/books", {}),
   listCommodities: () =>
     request<{ commodities: Commodity[] }>("/api/v1/commodities").then((r) => r.commodities),
-  createCommodity: (mnemonic: string, fraction: number, fullname?: string) =>
-    post<Commodity>("/api/v1/commodities", { mnemonic, fraction, fullname }),
+  createCommodity: (mnemonic: string, fraction: number, fullname?: string, namespace?: string) =>
+    post<Commodity>("/api/v1/commodities", { mnemonic, fraction, fullname, namespace }),
   listAccounts: (bookGuid: string) =>
     request<{ bookGuid: string; accounts: Account[] }>(
       `/api/v1/books/${bookGuid}/accounts`,
@@ -339,4 +340,15 @@ export const api = {
     }),
   deleteTaxTable: (guid: string) =>
     request<void>(`/api/v1/tax-tables/${guid}`, { method: "DELETE" }),
+
+  // Import a GnuCash file (SQLite or XML, optionally gzipped) as a new book.
+  // The file is sent as multipart/form-data under the "file" field; `request`
+  // detects the FormData body and skips the JSON content-type so the browser
+  // sets the multipart boundary. Returns the new book GUID and the counts of
+  // objects imported.
+  importGnuCash: (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<ImportResult>("/api/v1/imports/gnucash", { method: "POST", body });
+  },
 };
