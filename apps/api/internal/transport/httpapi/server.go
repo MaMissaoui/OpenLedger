@@ -92,6 +92,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/prices", s.requireAuth(s.handleCreatePrice))
 	mux.HandleFunc("POST /api/v1/prices/fetch", s.requireAuth(s.handleFetchPrice))
 	mux.HandleFunc("POST /api/v1/imports/gnucash", s.requireAuth(s.handleImportGnuCash))
+	mux.HandleFunc("POST /api/v1/accounts/{id}/import-bank/preview", s.requireAuth(s.handlePreviewBankCSV))
 	mux.HandleFunc("POST /api/v1/accounts/{id}/import-bank", s.requireAuth(s.handleImportBankStatement))
 	mux.HandleFunc("GET /api/v1/books/{id}/export/gnucash", s.requireAuth(s.handleExportGnuCash))
 	// Business: customers

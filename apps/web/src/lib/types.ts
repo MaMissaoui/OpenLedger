@@ -61,11 +61,19 @@ export interface ImportResult {
   transactions: number;
 }
 
-// Result of importing an OFX/QIF bank statement into an account.
+// Result of importing an OFX/QIF/CSV bank statement into an account.
 export interface BankImportResult {
   accountGuid: string;
   imported: number;
   skipped: number;
+}
+
+// First rows of an uploaded CSV, returned by the preview endpoint to drive the
+// column-mapping wizard.
+export interface CsvPreview {
+  rows: string[][];
+  totalRows: number;
+  columns: number;
 }
 
 // One account's natural-sign balance within a report section.
