@@ -1,8 +1,13 @@
-.PHONY: test build run seed dev up down fmt vet lint web-install web-build start stop migrate
+.PHONY: test test-integration build run seed dev up down fmt vet lint web-install web-build start stop migrate
 
 # --- Go API ---
 test:
 	cd apps/api && go test ./...
+
+# Integration tests run against a real Postgres (DATABASE_URL, default local dev
+# stack). Bring the DB up and migrate first: `make dev && make migrate`.
+test-integration:
+	cd apps/api && go test -tags=integration ./...
 
 vet:
 	cd apps/api && go vet ./...

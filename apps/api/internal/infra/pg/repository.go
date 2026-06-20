@@ -2379,30 +2379,115 @@ func (r *Repository) GetInvoice(ctx context.Context, guid string) (domain.Invoic
 	return inv, err
 }
 
+// GetBillTerm returns a payment term by GUID, or domain.ErrBillTermNotFound.
 func (r *Repository) GetBillTerm(ctx context.Context, guid string) (domain.BillTerm, error) {
+	row := r.pool.QueryRow(ctx, `SELECT `+billTermCols+` FROM billterms WHERE guid=$1`, guid)
+	t, err := scanBillTerm(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.BillTerm{}, domain.ErrBillTermNotFound
+	}
+	return t, err
+}
+
+const billTermCols = `guid, book_guid, name, description, type, duedays, discountdays, discount_num, discount_denom, cutoff`
+
+func scanBillTerm(row pgx.Row) (domain.BillTerm, error) {
 	var (
 		t         domain.BillTerm
 		typ       string
 		discNum   int64
 		discDenom int64
 	)
-	err := r.pool.QueryRow(ctx, `
-		SELECT guid, book_guid, name, description, type, duedays, discountdays,
-		       discount_num, discount_denom, cutoff
-		FROM billterms WHERE guid=$1`, guid).Scan(
-		&t.GUID, &t.BookGUID, &t.Name, &t.Description, &typ,
-		&t.DueDays, &t.DiscountDays, &discNum, &discDenom, &t.Cutoff)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.BillTerm{}, domain.ErrBillTermNotFound
-	}
-	if err != nil {
+	if err := row.Scan(&t.GUID, &t.BookGUID, &t.Name, &t.Description, &typ,
+		&t.DueDays, &t.DiscountDays, &discNum, &discDenom, &t.Cutoff); err != nil {
 		return domain.BillTerm{}, err
 	}
 	t.Type = domain.BillTermType(typ)
-	if t.Discount, err = domain.FromNumDenom(discNum, discDenom); err != nil {
+	disc, err := domain.FromNumDenom(discNum, discDenom)
+	if err != nil {
 		return domain.BillTerm{}, err
 	}
+	t.Discount = disc
 	return t, nil
+}
+
+// CreateBillTerm inserts a new payment term.
+func (r *Repository) CreateBillTerm(ctx context.Context, t domain.BillTerm) (domain.BillTerm, error) {
+	discNum, discDenom, err := t.Discount.NumDenom()
+	if err != nil {
+		return domain.BillTerm{}, fmt.Errorf("discount: %w", err)
+	}
+	if _, err := r.pool.Exec(ctx, `
+		INSERT INTO billterms (guid, book_guid, name, description, type, duedays, discountdays, discount_num, discount_denom, cutoff)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		t.GUID, t.BookGUID, t.Name, t.Description, string(t.Type),
+		t.DueDays, t.DiscountDays, discNum, discDenom, t.Cutoff); err != nil {
+		return domain.BillTerm{}, fmt.Errorf("insert bill term: %w", err)
+	}
+	return t, nil
+}
+
+// ListBillTerms returns a book's payment terms, ordered by name.
+func (r *Repository) ListBillTerms(ctx context.Context, bookGUID string) ([]domain.BillTerm, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT `+billTermCols+` FROM billterms WHERE book_guid=$1 ORDER BY name`, bookGUID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var terms []domain.BillTerm
+	for rows.Next() {
+		t, err := scanBillTerm(rows)
+		if err != nil {
+			return nil, err
+		}
+		terms = append(terms, t)
+	}
+	return terms, rows.Err()
+}
+
+// UpdateBillTerm replaces a payment term's fields, or domain.ErrBillTermNotFound.
+func (r *Repository) UpdateBillTerm(ctx context.Context, t domain.BillTerm) (domain.BillTerm, error) {
+	discNum, discDenom, err := t.Discount.NumDenom()
+	if err != nil {
+		return domain.BillTerm{}, fmt.Errorf("discount: %w", err)
+	}
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE billterms SET
+		  name=$2, description=$3, type=$4, duedays=$5, discountdays=$6,
+		  discount_num=$7, discount_denom=$8, cutoff=$9
+		WHERE guid=$1`,
+		t.GUID, t.Name, t.Description, string(t.Type), t.DueDays, t.DiscountDays,
+		discNum, discDenom, t.Cutoff)
+	if err != nil {
+		return domain.BillTerm{}, err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.BillTerm{}, domain.ErrBillTermNotFound
+	}
+	return t, nil
+}
+
+// DeleteBillTerm removes a payment term, or domain.ErrBillTermNotFound.
+func (r *Repository) DeleteBillTerm(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM billterms WHERE guid=$1`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrBillTermNotFound
+	}
+	return nil
+}
+
+// BookGUIDForBillTerm returns the book a payment term belongs to, for authz.
+func (r *Repository) BookGUIDForBillTerm(ctx context.Context, guid string) (string, error) {
+	var bookGUID string
+	err := r.pool.QueryRow(ctx, `SELECT book_guid FROM billterms WHERE guid=$1`, guid).Scan(&bookGUID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrBillTermNotFound
+	}
+	return bookGUID, err
 }
 
 func (r *Repository) UpdateInvoice(ctx context.Context, inv domain.Invoice) error {

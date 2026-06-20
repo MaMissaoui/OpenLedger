@@ -104,6 +104,7 @@ func newBudgetTestServer(fr *fakeBudgetRepoH) http.Handler {
 		nil,
 		nil,
 		nil,
+		nil,
 	).Routes()
 }
 

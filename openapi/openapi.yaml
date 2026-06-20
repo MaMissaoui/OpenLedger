@@ -968,6 +968,108 @@ paths:
         "404":
           description: Budget not found
 
+  /api/v1/books/{id}/bill-terms:
+    get:
+      summary: List payment terms for a book
+      operationId: listBillTerms
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bill term list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillTermList"
+    post:
+      summary: Create a payment term
+      operationId: createBillTerm
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewBillTerm"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillTerm"
+        "400":
+          description: Invalid bill term
+
+  /api/v1/bill-terms/{id}:
+    get:
+      summary: Get a payment term
+      operationId: getBillTerm
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Bill term
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillTerm"
+        "404":
+          description: Bill term not found
+    patch:
+      summary: Update a payment term
+      operationId: updateBillTerm
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewBillTerm"
+      responses:
+        "200":
+          description: Updated bill term
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillTerm"
+        "400":
+          description: Invalid bill term
+        "404":
+          description: Bill term not found
+    delete:
+      summary: Delete a payment term
+      operationId: deleteBillTerm
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Bill term not found
+
   /api/v1/books/{id}/customers:
     get:
       summary: List customers for a book
@@ -2160,6 +2262,55 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Budget"
+
+    NewBillTerm:
+      type: object
+      required: [name, type]
+      description: >
+        Payment terms. type=days is net dueDays after the invoice date;
+        type=proximo is due on dueDays-of-the-month, rolling to the month after
+        when the invoice date is past cutoff.
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [days, proximo]
+        dueDays:
+          type: integer
+          description: days→net days; proximo→due day-of-month (1..31)
+        discountDays:
+          type: integer
+          description: early-payment window, in days after the invoice date
+        discount:
+          allOf:
+            - $ref: "#/components/schemas/Numeric"
+          description: early-payment discount fraction (e.g. 2/100); omit for none
+        cutoff:
+          type: integer
+          description: proximo→invoices dated after this day-of-month roll to the month after
+
+    BillTerm:
+      allOf:
+        - $ref: "#/components/schemas/NewBillTerm"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+
+    BillTermList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        billTerms:
+          type: array
+          items:
+            $ref: "#/components/schemas/BillTerm"
 
     BudgetVarianceLine:
       type: object
