@@ -695,6 +695,56 @@ paths:
           description: The book has already been imported (GUID collision)
         "422":
           description: The file contains one or more unbalanced transactions
+  /api/v1/accounts/{id}/import-bank:
+    post:
+      summary: Import an OFX/QIF bank statement into an account
+      description: >
+        Uploads an OFX or QIF bank statement and posts each line into the given
+        account as a balanced two-split transaction, offsetting to the book's
+        Imbalance-CUR account (recategorise later). The format comes from the
+        `format` field or is sniffed from the file. Lines already present —
+        matched by import ref (OFX FITID, else a content hash) — are skipped, so
+        re-importing an overlapping statement is safe. Requires editor+ on the
+        account's book.
+      operationId: importBankStatement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: GUID of the currency account to import into.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: An OFX or QIF statement file.
+                format:
+                  type: string
+                  enum: [ofx, qif]
+                  description: Optional; sniffed from the file when omitted.
+      responses:
+        "201":
+          description: Statement imported
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankImportResult"
+        "400":
+          description: Missing upload, unsupported/unrecognised format, or a non-currency account
+        "403":
+          description: The user lacks editor access to the account's book
+        "404":
+          description: The account does not exist
+        "422":
+          description: A statement line could not be posted as a balanced transaction
   /api/v1/books/{id}/export/gnucash:
     get:
       summary: Export a book as a GnuCash file
@@ -2264,6 +2314,19 @@ components:
         transactions:
           type: integer
           description: Number of transactions imported.
+    BankImportResult:
+      type: object
+      description: Summary of a completed OFX/QIF statement import.
+      properties:
+        accountGuid:
+          type: string
+          description: GUID of the account the statement was imported into.
+        imported:
+          type: integer
+          description: Number of new transactions posted.
+        skipped:
+          type: integer
+          description: Number of lines skipped as already-imported duplicates.
     ScheduledSplit:
       type: object
       required: [accountGuid, value]

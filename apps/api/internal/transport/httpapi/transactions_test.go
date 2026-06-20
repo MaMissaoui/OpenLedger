@@ -11,6 +11,7 @@ import (
 
 	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/domain"
+	"github.com/openledger/openledger/apps/api/internal/infra/bankimport"
 )
 
 // fakeRepo implements all repository ports in memory so the HTTP layer can be
@@ -77,6 +78,10 @@ type fakeRepo struct {
 	// Quote side. When non-nil, newTestServer wires a QuoteService backed by this
 	// provider so the online-quote handler can be exercised.
 	quoteProvider app.QuoteProvider
+
+	// Bank-import side. ExistingImportRefs returns this set (nil → empty), so a
+	// test can preload refs to exercise duplicate skipping.
+	importRefs map[string]struct{}
 
 	// Authz side. The zero value grants owner access so most tests don't set it
 	// up; set role to test a specific permission level, or noMembership for 403.
@@ -233,6 +238,17 @@ func (f *fakeRepo) AccountCommodity(_ context.Context, accountGUID string) (app.
 	return app.AccountCommodityInfo{}, nil
 }
 
+func (f *fakeRepo) FindOrCreateImbalanceAccount(_ context.Context, _ string, currency domain.Commodity) (string, error) {
+	return "imbalance-" + currency.GUID, nil
+}
+
+func (f *fakeRepo) ExistingImportRefs(_ context.Context, _ string) (map[string]struct{}, error) {
+	if f.importRefs == nil {
+		return map[string]struct{}{}, nil
+	}
+	return f.importRefs, nil
+}
+
 func (f *fakeRepo) CreateLot(_ context.Context, lotGUID, _ string) error {
 	f.createdLots = append(f.createdLots, lotGUID)
 	return nil
@@ -338,6 +354,10 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 	if repo.quoteProvider != nil {
 		quoteSvc = app.NewQuoteService(repo.quoteProvider, repo, price)
 	}
+	bankImport := app.NewBankImportService(posting, repo, map[string]app.StatementReader{
+		"ofx": bankimport.OFX{},
+		"qif": bankimport.QIF{},
+	})
 	return NewServer(
 		posting,
 		app.NewLedgerService(repo),
@@ -361,6 +381,7 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 		nil,
 		nil,
 		quoteSvc,
+		bankImport,
 	).Routes()
 }
 

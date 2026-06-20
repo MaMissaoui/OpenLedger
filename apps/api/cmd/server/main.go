@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/openledger/openledger/apps/api/internal/app"
+	"github.com/openledger/openledger/apps/api/internal/infra/bankimport"
 	"github.com/openledger/openledger/apps/api/internal/infra/gnucash"
 	"github.com/openledger/openledger/apps/api/internal/infra/pg"
 	"github.com/openledger/openledger/apps/api/internal/infra/quote"
@@ -60,8 +61,13 @@ func main() {
 	// overrides the endpoint (e.g. for a mirror or a test stub).
 	quoteProvider := quote.NewFrankfurter(&http.Client{Timeout: 10 * time.Second}, os.Getenv("QUOTE_PROVIDER_URL"))
 	quoteSvc := app.NewQuoteService(quoteProvider, repo, price)
+	// Bank-statement import (OFX/QIF) posts each line into an existing account.
+	bankImport := app.NewBankImportService(posting, repo, map[string]app.StatementReader{
+		"ofx": bankimport.OFX{},
+		"qif": bankimport.QIF{},
+	})
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, forecast, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor, invoice, billterm, taxtable, quoteSvc)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, forecast, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor, invoice, billterm, taxtable, quoteSvc, bankImport)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

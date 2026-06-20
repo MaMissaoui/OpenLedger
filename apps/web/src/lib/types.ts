@@ -61,6 +61,13 @@ export interface ImportResult {
   transactions: number;
 }
 
+// Result of importing an OFX/QIF bank statement into an account.
+export interface BankImportResult {
+  accountGuid: string;
+  imported: number;
+  skipped: number;
+}
+
 // One account's natural-sign balance within a report section.
 export interface ReportLine {
   account: Account;

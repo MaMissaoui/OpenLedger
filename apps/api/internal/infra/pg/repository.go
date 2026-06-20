@@ -1431,6 +1431,76 @@ func (r *Repository) FindOrCreateCapitalGainsAccount(ctx context.Context, anchor
 	return guid, nil
 }
 
+// FindOrCreateImbalanceAccount returns the GUID of the Imbalance-MNEMONIC
+// account (GnuCash's convention) under the book's root, creating it when
+// absent. It is the offsetting account for uncategorised bank-import lines.
+// Keyed by name and commodity, so a multi-currency book gets one per currency.
+func (r *Repository) FindOrCreateImbalanceAccount(ctx context.Context, anchorAccountGUID string, currency domain.Commodity) (string, error) {
+	bookGUID, err := r.BookGUIDForAccount(ctx, anchorAccountGUID)
+	if err != nil {
+		return "", err
+	}
+	name := "Imbalance-" + currency.Mnemonic
+	var guid string
+	err = pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		var root string
+		if err := tx.QueryRow(ctx,
+			`SELECT root_account_guid FROM books WHERE guid = $1`, bookGUID,
+		).Scan(&root); err != nil {
+			return fmt.Errorf("lookup book root: %w", err)
+		}
+		err := tx.QueryRow(ctx,
+			`SELECT guid FROM accounts
+			  WHERE parent_guid = $1 AND name = $2
+			    AND account_type = 'BANK' AND commodity_guid = $3`,
+			root, name, currency.GUID,
+		).Scan(&guid)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("lookup imbalance account: %w", err)
+		}
+		guid = app.NewGUID()
+		return insertAccount(ctx, tx, domain.Account{
+			GUID:          guid,
+			Name:          name,
+			Type:          domain.AccountBank,
+			CommodityGUID: currency.GUID,
+			ParentGUID:    root,
+		})
+	})
+	if err != nil {
+		return "", err
+	}
+	return guid, nil
+}
+
+// ExistingImportRefs returns the set of non-empty transaction num values posted
+// to the account. Bank import stores its per-line ref (OFX FITID or a content
+// hash) in num, so this set drives duplicate detection on re-import.
+func (r *Repository) ExistingImportRefs(ctx context.Context, accountGUID string) (map[string]struct{}, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT DISTINCT t.num
+		   FROM transactions t
+		   JOIN splits s ON s.tx_guid = t.guid
+		  WHERE s.account_guid = $1 AND t.num <> ''`, accountGUID)
+	if err != nil {
+		return nil, fmt.Errorf("list import refs: %w", err)
+	}
+	defer rows.Close()
+
+	refs := make(map[string]struct{})
+	for rows.Next() {
+		var ref string
+		if err := rows.Scan(&ref); err != nil {
+			return nil, fmt.Errorf("scan import ref: %w", err)
+		}
+		refs[ref] = struct{}{}
+	}
+	return refs, rows.Err()
+}
+
 // AccountExists reports whether an account with the given GUID exists.
 func (r *Repository) AccountExists(ctx context.Context, guid string) (bool, error) {
 	var one int

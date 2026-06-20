@@ -2,6 +2,7 @@ import type {
   Account,
   AgingReport,
   BalanceSheet,
+  BankImportResult,
   BillTerm,
   Book,
   Budget,
@@ -154,6 +155,18 @@ export const api = {
   // and record it as a price. Both GUIDs must be CURRENCY commodities.
   fetchPrice: (commodityGuid: string, currencyGuid: string) =>
     post<Price>("/api/v1/prices/fetch", { commodityGuid, currencyGuid }),
+  // Import an OFX/QIF bank statement into a currency account. format is
+  // optional; the server sniffs it from the file when omitted. Each line posts
+  // against the book's Imbalance account; duplicates are skipped.
+  importBankStatement: (accountGuid: string, file: File, format?: string) => {
+    const body = new FormData();
+    body.append("file", file);
+    if (format) body.append("format", format);
+    return request<BankImportResult>(
+      `/api/v1/accounts/${accountGuid}/import-bank`,
+      { method: "POST", body },
+    );
+  },
   getBalanceSheet: (bookGuid: string, asOf?: string) => {
     const q = asOf ? `?asOf=${encodeURIComponent(asOf)}` : "";
     return request<BalanceSheet>(`/api/v1/books/${bookGuid}/reports/balance-sheet${q}`);
