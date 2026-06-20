@@ -1070,6 +1070,108 @@ paths:
         "404":
           description: Bill term not found
 
+  /api/v1/books/{id}/tax-tables:
+    get:
+      summary: List tax tables for a book
+      operationId: listTaxTables
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tax table list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxTableList"
+    post:
+      summary: Create a tax table
+      operationId: createTaxTable
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewTaxTable"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxTable"
+        "400":
+          description: Invalid tax table
+
+  /api/v1/tax-tables/{id}:
+    get:
+      summary: Get a tax table
+      operationId: getTaxTable
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tax table
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxTable"
+        "404":
+          description: Tax table not found
+    patch:
+      summary: Update a tax table
+      operationId: updateTaxTable
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewTaxTable"
+      responses:
+        "200":
+          description: Updated tax table
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaxTable"
+        "400":
+          description: Invalid tax table
+        "404":
+          description: Tax table not found
+    delete:
+      summary: Delete a tax table
+      operationId: deleteTaxTable
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Tax table not found
+
   /api/v1/books/{id}/customers:
     get:
       summary: List customers for a book
@@ -2312,6 +2414,56 @@ components:
           items:
             $ref: "#/components/schemas/BillTerm"
 
+    TaxTableEntry:
+      type: object
+      required: [accountGuid, type, amount]
+      properties:
+        accountGuid:
+          type: string
+          description: the tax account this component posts to
+        type:
+          type: string
+          enum: [percentage, value]
+        amount:
+          allOf:
+            - $ref: "#/components/schemas/Numeric"
+          description: percentage→the rate (e.g. 20 for 20%); value→a flat amount
+
+    NewTaxTable:
+      type: object
+      required: [name, entries]
+      description: >
+        A named set of tax components applied to taxable invoice/bill lines. Tax
+        is exclusive: computed tax is added on top of the line total.
+      properties:
+        name:
+          type: string
+        entries:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/TaxTableEntry"
+
+    TaxTable:
+      allOf:
+        - $ref: "#/components/schemas/NewTaxTable"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+
+    TaxTableList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        taxTables:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaxTable"
+
     BudgetVarianceLine:
       type: object
       properties:
@@ -2561,6 +2713,9 @@ components:
         taxable:
           type: boolean
           default: false
+        taxTableGuid:
+          type: string
+          description: tax table applied when taxable; empty for no tax
 
     Entry:
       allOf:

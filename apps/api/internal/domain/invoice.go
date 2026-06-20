@@ -23,17 +23,18 @@ const (
 
 // InvoiceEntry is one line item on an invoice or bill.
 type InvoiceEntry struct {
-	GUID        string
-	InvoiceGUID string
-	Date        time.Time
-	Description string
-	Action      string
-	Notes       string
-	Quantity    GncNumeric
-	AccountGUID string
-	Price       GncNumeric
-	Taxable     bool
-	CreatedAt   time.Time
+	GUID         string
+	InvoiceGUID  string
+	Date         time.Time
+	Description  string
+	Action       string
+	Notes        string
+	Quantity     GncNumeric
+	AccountGUID  string
+	Price        GncNumeric
+	Taxable      bool
+	TaxTableGUID string // tax table applied when Taxable; empty = no tax
+	CreatedAt    time.Time
 }
 
 func (e InvoiceEntry) LineTotal() GncNumeric {

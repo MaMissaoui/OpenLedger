@@ -27,6 +27,10 @@ type InvoiceRepository interface {
 	// date when it is posted.
 	GetBillTerm(ctx context.Context, guid string) (domain.BillTerm, error)
 
+	// GetTaxTable loads a tax table (with its entries) by GUID; used to compute
+	// invoice tax when it is posted.
+	GetTaxTable(ctx context.Context, guid string) (domain.TaxTable, error)
+
 	ListEntries(ctx context.Context, invoiceGUID string) ([]domain.InvoiceEntry, error)
 	CreateEntry(ctx context.Context, e domain.InvoiceEntry) error
 	GetEntry(ctx context.Context, guid string) (domain.InvoiceEntry, error)
@@ -377,14 +381,38 @@ func (s *InvoiceService) PostInvoice(ctx context.Context, userID, guid string, r
 		return domain.Invoice{}, domain.ErrInvoiceNoEntries
 	}
 
-	total := domain.Zero()
+	// Resolve each taxable entry's tax table and aggregate tax per account. Tax
+	// is exclusive: it is added on top of the line totals.
+	taxTables := make(map[string]*domain.TaxTable)
+	taxLines := make([]domain.TaxableLine, 0, len(entries))
+	net := domain.Zero()
 	for _, e := range entries {
-		total = total.Add(e.LineTotal())
+		lt := e.LineTotal()
+		net = net.Add(lt)
+		line := domain.TaxableLine{Base: lt}
+		if e.Taxable && e.TaxTableGUID != "" {
+			tbl, ok := taxTables[e.TaxTableGUID]
+			if !ok {
+				loaded, err := s.repo.GetTaxTable(ctx, e.TaxTableGUID)
+				if err != nil {
+					return domain.Invoice{}, err
+				}
+				tbl = &loaded
+				taxTables[e.TaxTableGUID] = tbl
+			}
+			line.Table = tbl
+		}
+		taxLines = append(taxLines, line)
+	}
+	taxCharges, _ := domain.AggregateTax(taxLines)
+	total := net
+	for _, c := range taxCharges {
+		total = total.Add(c.Amount)
 	}
 
-	splits := make([]domain.Split, 0, len(entries)+1)
+	splits := make([]domain.Split, 0, len(entries)+len(taxCharges)+1)
 	if inv.Type == domain.InvoiceTypeCustomer {
-		// Debit A/R, credit each income account.
+		// Debit A/R (net + tax); credit each income account (net) and each tax account.
 		splits = append(splits, domain.Split{
 			AccountGUID: req.PostAccGUID,
 			Value:       total,
@@ -398,14 +426,28 @@ func (s *InvoiceService) PostInvoice(ctx context.Context, userID, guid string, r
 				Quantity:    lt.Neg(),
 			})
 		}
+		for _, c := range taxCharges {
+			splits = append(splits, domain.Split{
+				AccountGUID: c.AccountGUID,
+				Value:       c.Amount.Neg(),
+				Quantity:    c.Amount.Neg(),
+			})
+		}
 	} else {
-		// Debit each expense account, credit A/P.
+		// Debit each expense account (net) and each tax account; credit A/P (net + tax).
 		for _, e := range entries {
 			lt := e.LineTotal()
 			splits = append(splits, domain.Split{
 				AccountGUID: e.AccountGUID,
 				Value:       lt,
 				Quantity:    lt,
+			})
+		}
+		for _, c := range taxCharges {
+			splits = append(splits, domain.Split{
+				AccountGUID: c.AccountGUID,
+				Value:       c.Amount,
+				Quantity:    c.Amount,
 			})
 		}
 		splits = append(splits, domain.Split{

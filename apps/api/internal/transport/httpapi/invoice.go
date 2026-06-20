@@ -24,15 +24,16 @@ type invoiceBodyDTO struct {
 }
 
 type entryBodyDTO struct {
-	InvoiceGUID string      `json:"invoiceGuid"`
-	Date        string      `json:"date"`
-	Description string      `json:"description"`
-	Action      string      `json:"action"`
-	Notes       string      `json:"notes"`
-	Quantity    *numericDTO `json:"quantity"`
-	AccountGUID string      `json:"accountGuid"`
-	Price       *numericDTO `json:"price"`
-	Taxable     bool        `json:"taxable"`
+	InvoiceGUID  string      `json:"invoiceGuid"`
+	Date         string      `json:"date"`
+	Description  string      `json:"description"`
+	Action       string      `json:"action"`
+	Notes        string      `json:"notes"`
+	Quantity     *numericDTO `json:"quantity"`
+	AccountGUID  string      `json:"accountGuid"`
+	Price        *numericDTO `json:"price"`
+	Taxable      bool        `json:"taxable"`
+	TaxTableGUID string      `json:"taxTableGuid"`
 }
 
 type postInvoiceDTO struct {
@@ -87,18 +88,19 @@ func invoiceToResponse(inv domain.Invoice) map[string]any {
 
 func entryToResponse(e domain.InvoiceEntry) map[string]any {
 	return map[string]any{
-		"guid":        e.GUID,
-		"invoiceGuid": e.InvoiceGUID,
-		"date":        e.Date.Format("2006-01-02"),
-		"description": e.Description,
-		"action":      e.Action,
-		"notes":       e.Notes,
-		"quantity":    numericAtScale(e.Quantity, 1000),
-		"accountGuid": e.AccountGUID,
-		"price":       numericAtScale(e.Price, 100),
-		"lineTotal":   numericAtScale(e.LineTotal(), 100),
-		"taxable":     e.Taxable,
-		"createdAt":   e.CreatedAt.Format(time.RFC3339),
+		"guid":         e.GUID,
+		"invoiceGuid":  e.InvoiceGUID,
+		"date":         e.Date.Format("2006-01-02"),
+		"description":  e.Description,
+		"action":       e.Action,
+		"notes":        e.Notes,
+		"quantity":     numericAtScale(e.Quantity, 1000),
+		"accountGuid":  e.AccountGUID,
+		"price":        numericAtScale(e.Price, 100),
+		"lineTotal":    numericAtScale(e.LineTotal(), 100),
+		"taxable":      e.Taxable,
+		"taxTableGuid": e.TaxTableGUID,
+		"createdAt":    e.CreatedAt.Format(time.RFC3339),
 	}
 }
 
@@ -309,15 +311,16 @@ func (s *Server) handleAddEntry(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	entry := domain.InvoiceEntry{
-		InvoiceGUID: invoiceGUID,
-		Date:        entryDate,
-		Description: body.Description,
-		Action:      body.Action,
-		Notes:       body.Notes,
-		Quantity:    qty,
-		AccountGUID: body.AccountGUID,
-		Price:       price,
-		Taxable:     body.Taxable,
+		InvoiceGUID:  invoiceGUID,
+		Date:         entryDate,
+		Description:  body.Description,
+		Action:       body.Action,
+		Notes:        body.Notes,
+		Quantity:     qty,
+		AccountGUID:  body.AccountGUID,
+		Price:        price,
+		Taxable:      body.Taxable,
+		TaxTableGUID: body.TaxTableGUID,
 	}
 	created, err := s.invoice.AddEntry(r.Context(), userID, entry)
 	if err != nil {
@@ -358,15 +361,16 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	entry := domain.InvoiceEntry{
-		GUID:        guid,
-		Date:        entryDate,
-		Description: body.Description,
-		Action:      body.Action,
-		Notes:       body.Notes,
-		Quantity:    qty,
-		AccountGUID: body.AccountGUID,
-		Price:       price,
-		Taxable:     body.Taxable,
+		GUID:         guid,
+		Date:         entryDate,
+		Description:  body.Description,
+		Action:       body.Action,
+		Notes:        body.Notes,
+		Quantity:     qty,
+		AccountGUID:  body.AccountGUID,
+		Price:        price,
+		Taxable:      body.Taxable,
+		TaxTableGUID: body.TaxTableGUID,
 	}
 	updated, err := s.invoice.UpdateEntry(r.Context(), userID, entry)
 	if err != nil {

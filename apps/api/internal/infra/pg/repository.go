@@ -2332,7 +2332,7 @@ func (r *Repository) ListInvoices(ctx context.Context, bookGUID, invoiceType str
 	entryRows, err := r.pool.Query(ctx, `
 		SELECT guid, invoice_guid, date, description, action, notes,
 		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
-		       taxable, created_at
+		       taxable, tax_table_guid, created_at
 		FROM entries WHERE invoice_guid = ANY($1)`, guids)
 	if err != nil {
 		return nil, err
@@ -2490,6 +2490,154 @@ func (r *Repository) BookGUIDForBillTerm(ctx context.Context, guid string) (stri
 	return bookGUID, err
 }
 
+// loadTaxTableEntries returns a tax table's entries, ordered by creation.
+func (r *Repository) loadTaxTableEntries(ctx context.Context, taxtableGUID string) ([]domain.TaxTableEntry, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT account_guid, amount_num, amount_denom, type
+		 FROM taxtable_entries WHERE taxtable_guid=$1 ORDER BY created_at`, taxtableGUID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var entries []domain.TaxTableEntry
+	for rows.Next() {
+		var (
+			e              domain.TaxTableEntry
+			amtNum, amtDen int64
+			typ            string
+		)
+		if err := rows.Scan(&e.AccountGUID, &amtNum, &amtDen, &typ); err != nil {
+			return nil, err
+		}
+		if e.Amount, err = domain.FromNumDenom(amtNum, amtDen); err != nil {
+			return nil, err
+		}
+		e.Type = domain.TaxEntryType(typ)
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+// GetTaxTable returns a tax table with its entries, or domain.ErrTaxTableNotFound.
+func (r *Repository) GetTaxTable(ctx context.Context, guid string) (domain.TaxTable, error) {
+	var tt domain.TaxTable
+	err := r.pool.QueryRow(ctx,
+		`SELECT guid, book_guid, name FROM taxtables WHERE guid=$1`, guid).
+		Scan(&tt.GUID, &tt.BookGUID, &tt.Name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.TaxTable{}, domain.ErrTaxTableNotFound
+	}
+	if err != nil {
+		return domain.TaxTable{}, err
+	}
+	if tt.Entries, err = r.loadTaxTableEntries(ctx, guid); err != nil {
+		return domain.TaxTable{}, err
+	}
+	return tt, nil
+}
+
+// ListTaxTables returns a book's tax tables (with entries), ordered by name.
+func (r *Repository) ListTaxTables(ctx context.Context, bookGUID string) ([]domain.TaxTable, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT guid, book_guid, name FROM taxtables WHERE book_guid=$1 ORDER BY name`, bookGUID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tables []domain.TaxTable
+	for rows.Next() {
+		var tt domain.TaxTable
+		if err := rows.Scan(&tt.GUID, &tt.BookGUID, &tt.Name); err != nil {
+			return nil, err
+		}
+		tables = append(tables, tt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range tables {
+		if tables[i].Entries, err = r.loadTaxTableEntries(ctx, tables[i].GUID); err != nil {
+			return nil, err
+		}
+	}
+	return tables, nil
+}
+
+func (r *Repository) insertTaxTableEntries(ctx context.Context, tx pgx.Tx, taxtableGUID string, entries []domain.TaxTableEntry) error {
+	for _, e := range entries {
+		num, den, err := e.Amount.NumDenom()
+		if err != nil {
+			return fmt.Errorf("tax entry amount: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO taxtable_entries (guid, taxtable_guid, account_guid, amount_num, amount_denom, type)
+			VALUES ($1, $2, $3, $4, $5, $6)`,
+			app.NewGUID(), taxtableGUID, e.AccountGUID, num, den, string(e.Type)); err != nil {
+			return fmt.Errorf("insert tax entry: %w", err)
+		}
+	}
+	return nil
+}
+
+// CreateTaxTable inserts a tax table and its entries in one transaction.
+func (r *Repository) CreateTaxTable(ctx context.Context, tt domain.TaxTable) (domain.TaxTable, error) {
+	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO taxtables (guid, book_guid, name) VALUES ($1, $2, $3)`,
+			tt.GUID, tt.BookGUID, tt.Name); err != nil {
+			return fmt.Errorf("insert tax table: %w", err)
+		}
+		return r.insertTaxTableEntries(ctx, tx, tt.GUID, tt.Entries)
+	})
+	if err != nil {
+		return domain.TaxTable{}, err
+	}
+	return tt, nil
+}
+
+// UpdateTaxTable replaces a tax table's name and entries, or domain.ErrTaxTableNotFound.
+func (r *Repository) UpdateTaxTable(ctx context.Context, tt domain.TaxTable) (domain.TaxTable, error) {
+	err := pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		ct, err := tx.Exec(ctx, `UPDATE taxtables SET name=$2 WHERE guid=$1`, tt.GUID, tt.Name)
+		if err != nil {
+			return err
+		}
+		if ct.RowsAffected() == 0 {
+			return domain.ErrTaxTableNotFound
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM taxtable_entries WHERE taxtable_guid=$1`, tt.GUID); err != nil {
+			return err
+		}
+		return r.insertTaxTableEntries(ctx, tx, tt.GUID, tt.Entries)
+	})
+	if err != nil {
+		return domain.TaxTable{}, err
+	}
+	return tt, nil
+}
+
+// DeleteTaxTable removes a tax table and its entries, or domain.ErrTaxTableNotFound.
+func (r *Repository) DeleteTaxTable(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM taxtables WHERE guid=$1`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrTaxTableNotFound
+	}
+	return nil
+}
+
+// BookGUIDForTaxTable returns the book a tax table belongs to, for authz.
+func (r *Repository) BookGUIDForTaxTable(ctx context.Context, guid string) (string, error) {
+	var bookGUID string
+	err := r.pool.QueryRow(ctx, `SELECT book_guid FROM taxtables WHERE guid=$1`, guid).Scan(&bookGUID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrTaxTableNotFound
+	}
+	return bookGUID, err
+}
+
 func (r *Repository) UpdateInvoice(ctx context.Context, inv domain.Invoice) error {
 	var termsGUID *string
 	if inv.TermsGUID != "" {
@@ -2617,7 +2765,7 @@ func (r *Repository) agingRows(ctx context.Context, bookGUID, invType string) ([
 	entryRows, err := r.pool.Query(ctx, `
 		SELECT guid, invoice_guid, date, description, action, notes,
 		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
-		       taxable, created_at
+		       taxable, tax_table_guid, created_at
 		FROM entries WHERE invoice_guid = ANY($1)`, guids)
 	if err != nil {
 		return nil, err
@@ -2664,7 +2812,7 @@ func (r *Repository) ListEntries(ctx context.Context, invoiceGUID string) ([]dom
 	rows, err := r.pool.Query(ctx, `
 		SELECT guid, invoice_guid, date, description, action, notes,
 		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
-		       taxable, created_at
+		       taxable, tax_table_guid, created_at
 		FROM entries WHERE invoice_guid=$1
 		ORDER BY created_at`, invoiceGUID)
 	if err != nil {
@@ -2694,11 +2842,11 @@ func (r *Repository) CreateEntry(ctx context.Context, e domain.InvoiceEntry) err
 	_, err = r.pool.Exec(ctx, `
 		INSERT INTO entries
 		  (guid, invoice_guid, date, description, action, notes,
-		   quantity_num, quantity_denom, account_guid, price_num, price_denom, taxable)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		   quantity_num, quantity_denom, account_guid, price_num, price_denom, taxable, tax_table_guid)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
 		e.GUID, e.InvoiceGUID, e.Date.Format("2006-01-02"),
 		e.Description, e.Action, e.Notes,
-		qNum, qDenom, e.AccountGUID, pNum, pDenom, e.Taxable)
+		qNum, qDenom, e.AccountGUID, pNum, pDenom, e.Taxable, nullable(e.TaxTableGUID))
 	return err
 }
 
@@ -2706,7 +2854,7 @@ func (r *Repository) GetEntry(ctx context.Context, guid string) (domain.InvoiceE
 	row := r.pool.QueryRow(ctx, `
 		SELECT guid, invoice_guid, date, description, action, notes,
 		       quantity_num, quantity_denom, account_guid, price_num, price_denom,
-		       taxable, created_at
+		       taxable, tax_table_guid, created_at
 		FROM entries WHERE guid=$1`, guid)
 	e, err := scanEntry(row)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -2728,11 +2876,11 @@ func (r *Repository) UpdateEntry(ctx context.Context, e domain.InvoiceEntry) err
 		UPDATE entries SET
 		  date=$2, description=$3, action=$4, notes=$5,
 		  quantity_num=$6, quantity_denom=$7, account_guid=$8,
-		  price_num=$9, price_denom=$10, taxable=$11
+		  price_num=$9, price_denom=$10, taxable=$11, tax_table_guid=$12
 		WHERE guid=$1`,
 		e.GUID, e.Date.Format("2006-01-02"),
 		e.Description, e.Action, e.Notes,
-		qNum, qDenom, e.AccountGUID, pNum, pDenom, e.Taxable)
+		qNum, qDenom, e.AccountGUID, pNum, pDenom, e.Taxable, nullable(e.TaxTableGUID))
 	if err != nil {
 		return err
 	}
@@ -2760,13 +2908,17 @@ type entryScanner interface {
 func scanEntry(s entryScanner) (domain.InvoiceEntry, error) {
 	var e domain.InvoiceEntry
 	var qNum, qDenom, pNum, pDenom int64
+	var taxTableGUID *string
 	err := s.Scan(
 		&e.GUID, &e.InvoiceGUID, &e.Date, &e.Description, &e.Action, &e.Notes,
 		&qNum, &qDenom, &e.AccountGUID, &pNum, &pDenom,
-		&e.Taxable, &e.CreatedAt,
+		&e.Taxable, &taxTableGUID, &e.CreatedAt,
 	)
 	if err != nil {
 		return domain.InvoiceEntry{}, err
+	}
+	if taxTableGUID != nil {
+		e.TaxTableGUID = *taxTableGUID
 	}
 	e.Quantity, err = domain.FromNumDenom(qNum, qDenom)
 	if err != nil {
