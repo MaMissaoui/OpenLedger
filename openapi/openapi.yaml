@@ -627,6 +627,38 @@ paths:
                 $ref: "#/components/schemas/Price"
         "400":
           description: Invalid input (missing commodity/currency or zero value)
+  /api/v1/prices/fetch:
+    post:
+      summary: Fetch an online quote and record it as a price
+      description: >
+        Fetches a live exchange rate from the configured quote provider
+        (Frankfurter / ECB reference rates by default) for one unit of the
+        commodity expressed in the currency, and records it as a price.
+        Currently supports currency commodities only; both GUIDs must resolve to
+        CURRENCY commodities and must differ. Prices are shared reference data,
+        so no book authorization applies.
+      operationId: fetchPrice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FetchPrice"
+      responses:
+        "201":
+          description: Quote fetched and recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Price"
+        "400":
+          description: Invalid input (missing GUIDs, same GUID, or non-currency commodity)
+        "404":
+          description: Commodity or currency not found
+        "502":
+          description: The upstream quote provider failed or returned no rate
+        "503":
+          description: Online quotes are not configured on this server
   /api/v1/imports/gnucash:
     post:
       summary: Import a GnuCash file as a new book
@@ -1708,6 +1740,16 @@ components:
           allOf:
             - $ref: "#/components/schemas/Numeric"
           description: Units of currency per one unit of commodity.
+    FetchPrice:
+      type: object
+      required: [commodityGuid, currencyGuid]
+      properties:
+        commodityGuid:
+          type: string
+          description: The currency commodity to quote (must be a CURRENCY commodity).
+        currencyGuid:
+          type: string
+          description: The currency to express the rate in (must differ from commodityGuid).
     Price:
       type: object
       properties:

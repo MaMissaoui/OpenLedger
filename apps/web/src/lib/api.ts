@@ -150,6 +150,10 @@ export const api = {
     source?: string;
     type?: string;
   }) => post<Price>("/api/v1/prices", input),
+  // Fetch a live exchange rate from the server's quote provider (Frankfurter)
+  // and record it as a price. Both GUIDs must be CURRENCY commodities.
+  fetchPrice: (commodityGuid: string, currencyGuid: string) =>
+    post<Price>("/api/v1/prices/fetch", { commodityGuid, currencyGuid }),
   getBalanceSheet: (bookGuid: string, asOf?: string) => {
     const q = asOf ? `?asOf=${encodeURIComponent(asOf)}` : "";
     return request<BalanceSheet>(`/api/v1/books/${bookGuid}/reports/balance-sheet${q}`);

@@ -17,6 +17,7 @@ import (
 	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/infra/gnucash"
 	"github.com/openledger/openledger/apps/api/internal/infra/pg"
+	"github.com/openledger/openledger/apps/api/internal/infra/quote"
 	"github.com/openledger/openledger/apps/api/internal/transport/httpapi"
 )
 
@@ -55,8 +56,12 @@ func main() {
 	invoice := app.NewInvoiceService(repo, posting, authz)
 	billterm := app.NewBillTermService(repo)
 	taxtable := app.NewTaxTableService(repo)
+	// Online price quotes: Frankfurter (ECB FX, no API key). QUOTE_PROVIDER_URL
+	// overrides the endpoint (e.g. for a mirror or a test stub).
+	quoteProvider := quote.NewFrankfurter(&http.Client{Timeout: 10 * time.Second}, os.Getenv("QUOTE_PROVIDER_URL"))
+	quoteSvc := app.NewQuoteService(quoteProvider, repo, price)
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, forecast, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor, invoice, billterm, taxtable)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, forecast, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor, invoice, billterm, taxtable, quoteSvc)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

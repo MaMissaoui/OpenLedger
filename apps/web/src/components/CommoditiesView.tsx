@@ -199,6 +199,72 @@ function NewPriceDialog({
   );
 }
 
+// ── Fetch online quote dialog ─────────────────────────────────────────────────
+
+function FetchQuoteDialog({
+  commodity,
+  currencies,
+  onSaved,
+  onClose,
+}: {
+  commodity: Commodity;
+  currencies: Commodity[];
+  onSaved: () => void;
+  onClose: () => void;
+}) {
+  // Can't quote a currency against itself.
+  const others = currencies.filter((c) => c.guid !== commodity.guid);
+  const [currencyGuid, setCurrencyGuid] = useState(others[0]?.guid ?? "");
+  const [fetching, setFetching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFetch() {
+    setError(null);
+    if (!currencyGuid) { setError("Pick a quote currency."); return; }
+    setFetching(true);
+    try {
+      await api.fetchPrice(commodity.guid, currencyGuid);
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Fetch failed");
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  return (
+    <div className="dialog-overlay" onClick={onClose}>
+      <div className="dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="dialog__header">
+          <h2>Fetch Online Quote — {commodity.mnemonic}</h2>
+          <button className="dialog__close" onClick={onClose} aria-label="Close">×</button>
+        </div>
+        <div className="dialog__body">
+          {error && <p className="error" style={{ margin: 0 }}>{error}</p>}
+          <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+            Pulls today's reference rate from the server's quote provider and saves it as a price.
+          </p>
+          <label className="field">
+            <span className="field__label">Quote currency (1 {commodity.mnemonic} =)</span>
+            <select value={currencyGuid} onChange={(e) => setCurrencyGuid(e.target.value)}>
+              <option value="">— currency —</option>
+              {others.map((c) => (
+                <option key={c.guid} value={c.guid}>{c.mnemonic}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="dialog__footer">
+          <button className="btn btn--ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn--primary" onClick={handleFetch} disabled={fetching || !currencyGuid}>
+            {fetching ? "Fetching…" : "Fetch"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Prices panel ──────────────────────────────────────────────────────────────
 
 function PricesPanel({
@@ -259,6 +325,7 @@ export default function CommoditiesView() {
   const [selectedGuid, setSelectedGuid] = useState<string | null>(null);
   const [showNewCommodity, setShowNewCommodity] = useState(false);
   const [showNewPrice, setShowNewPrice] = useState(false);
+  const [showFetch, setShowFetch] = useState(false);
   // Bumped to force the prices panel to reload after adding a quote.
   const [pricesReload, setPricesReload] = useState(0);
 
@@ -338,14 +405,26 @@ export default function CommoditiesView() {
                     {selected.namespace}
                   </span>
                 </h2>
-                <button
-                  className="btn btn--primary btn--sm"
-                  onClick={() => setShowNewPrice(true)}
-                  disabled={currencies.length === 0}
-                  title={currencies.length === 0 ? "Add a currency first" : undefined}
-                >
-                  + Add Price
-                </button>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  {selected.namespace === "CURRENCY" && (
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => setShowFetch(true)}
+                      disabled={currencies.length < 2}
+                      title={currencies.length < 2 ? "Add another currency to quote against" : "Fetch today's rate online"}
+                    >
+                      Fetch online
+                    </button>
+                  )}
+                  <button
+                    className="btn btn--primary btn--sm"
+                    onClick={() => setShowNewPrice(true)}
+                    disabled={currencies.length === 0}
+                    title={currencies.length === 0 ? "Add a currency first" : undefined}
+                  >
+                    + Add Price
+                  </button>
+                </div>
               </div>
               <PricesPanel commodity={selected} currencyMap={currencyMap} reloadKey={pricesReload} />
             </>
@@ -370,6 +449,17 @@ export default function CommoditiesView() {
           onClose={() => setShowNewPrice(false)}
           onSaved={() => {
             setShowNewPrice(false);
+            setPricesReload((n) => n + 1);
+          }}
+        />
+      )}
+      {showFetch && selected && (
+        <FetchQuoteDialog
+          commodity={selected}
+          currencies={currencies}
+          onClose={() => setShowFetch(false)}
+          onSaved={() => {
+            setShowFetch(false);
             setPricesReload((n) => n + 1);
           }}
         />

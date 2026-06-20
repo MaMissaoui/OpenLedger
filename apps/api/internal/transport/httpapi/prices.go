@@ -2,9 +2,11 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
+	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
 
@@ -61,6 +63,37 @@ func (s *Server) handleListPrices(w http.ResponseWriter, r *http.Request) {
 		out = append(out, priceDTO(p))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"prices": out})
+}
+
+type fetchPriceDTO struct {
+	CommodityGUID string `json:"commodityGuid"`
+	CurrencyGUID  string `json:"currencyGuid"`
+}
+
+// handleFetchPrice fetches a live exchange rate from the configured quote
+// provider (one unit of commodity in currency) and records it as a price.
+// Prices are shared reference data, so there is no book authorization. Upstream
+// provider failures map to 502; an unknown commodity to 404.
+func (s *Server) handleFetchPrice(w http.ResponseWriter, r *http.Request) {
+	if s.quote == nil {
+		writeError(w, http.StatusServiceUnavailable, "online price quotes are not configured")
+		return
+	}
+	var dto fetchPriceDTO
+	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	price, err := s.quote.FetchAndStore(r.Context(), dto.CommodityGUID, dto.CurrencyGUID)
+	if errors.Is(err, app.ErrQuoteUnavailable) {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	if writeStructureError(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusCreated, priceDTO(price))
 }
 
 func priceDTO(p domain.Price) map[string]any {
