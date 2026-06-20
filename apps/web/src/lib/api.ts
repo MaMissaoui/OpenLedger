@@ -4,6 +4,7 @@ import type {
   BalanceSheet,
   BankImportResult,
   BillTerm,
+  CsvPreview,
   Book,
   Budget,
   BudgetReport,
@@ -155,15 +156,27 @@ export const api = {
   // and record it as a price. Both GUIDs must be CURRENCY commodities.
   fetchPrice: (commodityGuid: string, currencyGuid: string) =>
     post<Price>("/api/v1/prices/fetch", { commodityGuid, currencyGuid }),
-  // Import an OFX/QIF bank statement into a currency account. format is
-  // optional; the server sniffs it from the file when omitted. Each line posts
-  // against the book's Imbalance account; duplicates are skipped.
-  importBankStatement: (accountGuid: string, file: File, format?: string) => {
+  // Import an OFX/QIF/CSV bank statement into a currency account. format is
+  // optional for OFX/QIF (sniffed) but "csv" with a mapping JSON is required for
+  // CSV. Each line posts against the book's Imbalance account; duplicates are
+  // skipped.
+  importBankStatement: (accountGuid: string, file: File, format?: string, mapping?: string) => {
     const body = new FormData();
     body.append("file", file);
     if (format) body.append("format", format);
+    if (mapping) body.append("mapping", mapping);
     return request<BankImportResult>(
       `/api/v1/accounts/${accountGuid}/import-bank`,
+      { method: "POST", body },
+    );
+  },
+  // Parse an uploaded CSV and return its first rows so the import wizard can
+  // build a column mapping. Nothing is persisted.
+  previewBankCsv: (accountGuid: string, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<CsvPreview>(
+      `/api/v1/accounts/${accountGuid}/import-bank/preview`,
       { method: "POST", body },
     );
   },

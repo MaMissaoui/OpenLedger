@@ -354,6 +354,42 @@ a { color: var(--primary); }
   letter-spacing: 0.04em;
 }
 
+/* ---------- CSV import wizard ---------- */
+.csv-map {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.csv-map__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.csv-map__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+.csv-map__desc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+}
+.csv-map__chip {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+.csv-map__preview {
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 0.5rem;
+  overflow-x: auto;
+}
+
 /* ---------- app shell ---------- */
 
 .shell {

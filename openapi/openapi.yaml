@@ -697,15 +697,17 @@ paths:
           description: The file contains one or more unbalanced transactions
   /api/v1/accounts/{id}/import-bank:
     post:
-      summary: Import an OFX/QIF bank statement into an account
+      summary: Import an OFX/QIF/CSV bank statement into an account
       description: >
-        Uploads an OFX or QIF bank statement and posts each line into the given
-        account as a balanced two-split transaction, offsetting to the book's
-        Imbalance-CUR account (recategorise later). The format comes from the
-        `format` field or is sniffed from the file. Lines already present —
-        matched by import ref (OFX FITID, else a content hash) — are skipped, so
-        re-importing an overlapping statement is safe. Requires editor+ on the
-        account's book.
+        Uploads a bank statement and posts each line into the given account as a
+        balanced two-split transaction, offsetting to the book's Imbalance-CUR
+        account (recategorise later). The format comes from the `format` field or
+        is sniffed (OFX/QIF). CSV additionally requires a `mapping` JSON field
+        (see CsvMapping) describing which columns hold the date, amount (single
+        signed column, or debit/credit columns), and description — build it from
+        the preview endpoint. Lines already present — matched by import ref (OFX
+        FITID, else a content hash) — are skipped, so re-importing an overlapping
+        statement is safe. Requires editor+ on the account's book.
       operationId: importBankStatement
       parameters:
         - name: id
@@ -725,11 +727,15 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: An OFX or QIF statement file.
+                  description: An OFX, QIF, or CSV statement file.
                 format:
                   type: string
-                  enum: [ofx, qif]
-                  description: Optional; sniffed from the file when omitted.
+                  enum: [ofx, qif, csv]
+                  description: Optional for OFX/QIF (sniffed); required (csv) for CSV.
+                mapping:
+                  type: string
+                  description: >
+                    Required when format is csv: a JSON-encoded CsvMapping.
       responses:
         "201":
           description: Statement imported
@@ -738,13 +744,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/BankImportResult"
         "400":
-          description: Missing upload, unsupported/unrecognised format, or a non-currency account
+          description: Missing upload, unsupported format, bad CSV mapping, or a non-currency account
         "403":
           description: The user lacks editor access to the account's book
         "404":
           description: The account does not exist
         "422":
           description: A statement line could not be posted as a balanced transaction
+  /api/v1/accounts/{id}/import-bank/preview:
+    post:
+      summary: Preview an uploaded CSV for column mapping
+      description: >
+        Parses an uploaded CSV (robust quoted-field handling) and returns its
+        first rows so the import wizard can build a column mapping. Nothing is
+        persisted. Requires editor+ on the account's book.
+      operationId: previewBankCsv
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: GUID of the account the statement will be imported into.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: A CSV statement file.
+      responses:
+        "200":
+          description: Parsed preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CsvPreview"
+        "400":
+          description: Missing upload or the file could not be parsed as CSV
+        "403":
+          description: The user lacks editor access to the account's book
   /api/v1/books/{id}/export/gnucash:
     get:
       summary: Export a book as a GnuCash file
@@ -2327,6 +2371,58 @@ components:
         skipped:
           type: integer
           description: Number of lines skipped as already-imported duplicates.
+    CsvPreview:
+      type: object
+      description: First rows of an uploaded CSV, used to drive the mapping wizard.
+      properties:
+        rows:
+          type: array
+          description: Up to 11 rows, each an array of cell strings (verbatim).
+          items:
+            type: array
+            items:
+              type: string
+        totalRows:
+          type: integer
+          description: Total number of rows in the file.
+        columns:
+          type: integer
+          description: Column count of the widest row.
+    CsvMapping:
+      type: object
+      description: >
+        Column mapping for a CSV import (posted as a JSON string in the import's
+        `mapping` field). Columns are zero-based. Provide either amountCol, or
+        debitCol and/or creditCol.
+      properties:
+        hasHeader:
+          type: boolean
+          description: Whether the first row is a header to skip.
+        dateCol:
+          type: integer
+        dateFormat:
+          type: string
+          description: A Go time layout (e.g. "2006-01-02"); blank tries common layouts.
+        descCols:
+          type: array
+          items:
+            type: integer
+          description: Columns joined to form the description.
+        amountCol:
+          type: integer
+          nullable: true
+          description: Single signed-amount column; omit when using debit/credit.
+        debitCol:
+          type: integer
+          nullable: true
+          description: Money-out column (positive values).
+        creditCol:
+          type: integer
+          nullable: true
+          description: Money-in column (positive values).
+        invert:
+          type: boolean
+          description: Negate the resulting amount (banks that list outflows as positive).
     ScheduledSplit:
       type: object
       required: [accountGuid, value]

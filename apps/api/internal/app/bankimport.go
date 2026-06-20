@@ -68,16 +68,23 @@ func NewBankImportService(posting *PostingService, repo BankImportRepository, re
 	return &BankImportService{posting: posting, repo: repo, readers: readers}
 }
 
-// Import parses r as the named format and posts its transactions into
-// accountGUID, offsetting each to the book's Imbalance account. Duplicates (by
-// import ref) are skipped. It returns counts of imported and skipped lines, or
-// ErrImportParse / ErrInvalidInput / ErrAccountNotFound.
+// Import parses r as the named format (a key in the readers map, e.g. "ofx" or
+// "qif") and imports it via ImportFrom. Returns ErrInvalidInput for an unknown
+// format. For formats that need per-request configuration (CSV column mapping)
+// the caller builds the reader and calls ImportFrom directly.
 func (s *BankImportService) Import(ctx context.Context, accountGUID, format string, r io.Reader, actor AuditActor) (BankImportResult, error) {
 	reader, ok := s.readers[strings.ToLower(strings.TrimSpace(format))]
 	if !ok {
 		return BankImportResult{}, fmt.Errorf("%w: unsupported statement format %q", ErrInvalidInput, format)
 	}
+	return s.ImportFrom(ctx, accountGUID, reader, r, actor)
+}
 
+// ImportFrom reads transactions from reader/r and posts them into accountGUID,
+// offsetting each to the book's Imbalance account. Duplicates (by import ref)
+// are skipped. It returns counts of imported and skipped lines, or
+// ErrImportParse / ErrInvalidInput / ErrAccountNotFound.
+func (s *BankImportService) ImportFrom(ctx context.Context, accountGUID string, reader StatementReader, r io.Reader, actor AuditActor) (BankImportResult, error) {
 	info, err := s.repo.AccountCommodity(ctx, accountGUID)
 	if err != nil {
 		return BankImportResult{}, err
