@@ -1,7 +1,13 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
 import type { Account, Numeric } from "../lib/types";
 import { formatMoney } from "../lib/money";
+import ImportStatementDialog from "./ImportStatementDialog";
+
+// Account types that hold a currency balance and so accept OFX/QIF statement
+// imports. Income/expense and security accounts are excluded.
+const STATEMENT_TYPES = new Set(["BANK", "CASH", "CREDIT", "ASSET", "LIABILITY"]);
 
 interface Props {
   account: Account;
@@ -33,6 +39,7 @@ function formatDate(iso: string): string {
 
 export function RegisterView({ account, onNewTransaction, onEditTransaction }: Props) {
   const qc = useQueryClient();
+  const [showImport, setShowImport] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["register", account.guid],
     queryFn: () => api.getRegister(account.guid),
@@ -84,6 +91,11 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
             </div>
           )}
           <div className="register__actions">
+            {STATEMENT_TYPES.has(account.type) && (
+              <button className="btn btn--ghost" onClick={() => setShowImport(true)}>
+                Import statement
+              </button>
+            )}
             <button className="btn btn--primary" onClick={onNewTransaction}>
               + New transaction
             </button>
@@ -159,6 +171,10 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
             ))}
           </tbody>
         </table>
+      )}
+
+      {showImport && (
+        <ImportStatementDialog account={account} onClose={() => setShowImport(false)} />
       )}
     </section>
   );

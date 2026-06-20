@@ -94,6 +94,7 @@ func newTaxTableTestServer(fr *fakeTaxTableRepoH) http.Handler {
 		nil,
 		app.NewTaxTableService(fr),
 		nil,
+		nil,
 	).Routes()
 }
 
