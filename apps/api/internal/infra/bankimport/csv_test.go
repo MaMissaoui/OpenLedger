@@ -96,6 +96,28 @@ func TestCSVAutoDateAndBlankRows(t *testing.T) {
 	}
 }
 
+func TestCSVSkipsZeroAmountRows(t *testing.T) {
+	// A summary/balance row with a 0.00 amount (and a blank debit+credit pair)
+	// should be dropped rather than posted as a zero-value transaction.
+	const data = `2024-06-19,-50.00
+2024-06-20,0.00
+2024-06-21,10.00
+`
+	r := CSV{Mapping: CSVMapping{DateCol: 0, AmountCol: 1, DebitCol: -1, CreditCol: -1}}
+	txns, err := r.Read(strings.NewReader(data))
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if len(txns) != 2 {
+		t.Fatalf("got %d txns, want 2 (zero-amount row skipped)", len(txns))
+	}
+	for _, tx := range txns {
+		if tx.Amount.IsZero() {
+			t.Error("a zero-amount transaction was imported")
+		}
+	}
+}
+
 func TestCSVEmptyIsError(t *testing.T) {
 	r := CSV{Mapping: CSVMapping{DateCol: 0, AmountCol: 1, DebitCol: -1, CreditCol: -1}}
 	if _, err := r.Read(strings.NewReader("\n\n")); err == nil {

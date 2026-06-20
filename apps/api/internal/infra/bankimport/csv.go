@@ -34,8 +34,8 @@ type CSV struct {
 }
 
 // Read parses CSV from r per the mapping. Quoted fields and embedded commas are
-// handled by encoding/csv. Blank rows are skipped; an error is returned if no
-// data rows remain or a mapped cell cannot be parsed.
+// handled by encoding/csv. Blank rows and zero-amount rows are skipped; an error
+// is returned if no data rows remain or a mapped cell cannot be parsed.
 func (c CSV) Read(r io.Reader) ([]app.StatementTxn, error) {
 	cr := csv.NewReader(r)
 	cr.FieldsPerRecord = -1 // tolerate ragged rows
@@ -59,6 +59,11 @@ func (c CSV) Read(r io.Reader) ([]app.StatementTxn, error) {
 		amount, err := c.parseAmount(row)
 		if err != nil {
 			return nil, fmt.Errorf("row %d: %w", i+1, err)
+		}
+		// Skip zero-amount lines — typically summary/balance rows or a blank
+		// debit+credit pair, not real transactions.
+		if amount.IsZero() {
+			continue
 		}
 		desc := make([]string, 0, len(c.Mapping.DescCols))
 		for _, col := range c.Mapping.DescCols {
