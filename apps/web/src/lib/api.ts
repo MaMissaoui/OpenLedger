@@ -2,6 +2,7 @@ import type {
   Account,
   AgingReport,
   BalanceSheet,
+  BillTerm,
   Book,
   Budget,
   BudgetReport,
@@ -13,13 +14,16 @@ import type {
   Entry,
   IncomeStatement,
   Invoice,
+  NewBillTerm,
   NewBudget,
   NewCustomer,
   NewEntry,
   NewInvoice,
   NewScheduledTransaction,
+  NewTaxTable,
   NewVendor,
   Numeric,
+  TaxTable,
   Portfolio,
   PostedSchedule,
   Price,
@@ -303,4 +307,36 @@ export const api = {
     }),
   deleteEntry: (guid: string) =>
     request<void>(`/api/v1/entries/${guid}`, { method: "DELETE" }),
+
+  listBillTerms: (bookGuid: string) =>
+    request<{ bookGuid: string; billTerms: BillTerm[] }>(
+      `/api/v1/books/${bookGuid}/bill-terms`,
+    ).then((r) => r.billTerms),
+  createBillTerm: (bookGuid: string, input: NewBillTerm) =>
+    post<BillTerm>(`/api/v1/books/${bookGuid}/bill-terms`, input),
+  getBillTerm: (guid: string) => request<BillTerm>(`/api/v1/bill-terms/${guid}`),
+  updateBillTerm: (guid: string, input: NewBillTerm) =>
+    request<BillTerm>(`/api/v1/bill-terms/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteBillTerm: (guid: string) =>
+    request<void>(`/api/v1/bill-terms/${guid}`, { method: "DELETE" }),
+
+  listTaxTables: (bookGuid: string) =>
+    request<{ bookGuid: string; taxTables: TaxTable[] }>(
+      `/api/v1/books/${bookGuid}/tax-tables`,
+    ).then((r) => r.taxTables),
+  createTaxTable: (bookGuid: string, input: NewTaxTable) =>
+    post<TaxTable>(`/api/v1/books/${bookGuid}/tax-tables`, input),
+  getTaxTable: (guid: string) => request<TaxTable>(`/api/v1/tax-tables/${guid}`),
+  updateTaxTable: (guid: string, input: NewTaxTable) =>
+    request<TaxTable>(`/api/v1/tax-tables/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteTaxTable: (guid: string) =>
+    request<void>(`/api/v1/tax-tables/${guid}`, { method: "DELETE" }),
 };

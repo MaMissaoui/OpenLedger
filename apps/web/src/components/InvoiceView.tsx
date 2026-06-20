@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import type { Account, AgingReport, Entry, Invoice, NewEntry, NewInvoice, Numeric } from "../lib/types";
+import type { Account, AgingReport, BillTerm, Entry, Invoice, NewEntry, NewInvoice, Numeric, TaxTable } from "../lib/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -55,17 +55,19 @@ interface EntryFormProps {
   invoiceGuid: string;
   invType: "invoice" | "bill";
   accounts: Account[];
+  taxTables: TaxTable[];
   existing?: Entry;
   onSaved: () => void;
   onCancel: () => void;
 }
 
-function EntryForm({ invoiceGuid, invType, accounts, existing, onSaved, onCancel }: EntryFormProps) {
+function EntryForm({ invoiceGuid, invType, accounts, taxTables, existing, onSaved, onCancel }: EntryFormProps) {
   const [description, setDescription] = useState(existing?.description ?? "");
   const [accountGuid, setAccountGuid] = useState(existing?.accountGuid ?? "");
   const [qty, setQty] = useState(existing ? String(numericToFloat(existing.quantity ?? { num: 1, denom: 1 })) : "1");
   const [price, setPrice] = useState(existing ? String(numericToFloat(existing.price)) : "");
   const [date, setDate] = useState(existing?.date ?? today());
+  const [taxTableGuid, setTaxTableGuid] = useState(existing?.taxTableGuid ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,6 +85,8 @@ function EntryForm({ invoiceGuid, invType, accounts, existing, onSaved, onCancel
       quantity: parseAmount(qty, 1000),
       accountGuid,
       price: parseAmount(price, 100),
+      taxable: taxTableGuid !== "",
+      taxTableGuid: taxTableGuid || undefined,
     };
     setSaving(true);
     try {
@@ -144,6 +148,18 @@ function EntryForm({ invoiceGuid, invType, accounts, existing, onSaved, onCancel
       </td>
       <td style={{ color: "var(--ink-soft)", fontSize: "0.85rem", textAlign: "right" }}>
         {price ? formatMoney(parseAmount(price, 100)) : "—"}
+      </td>
+      <td>
+        <select
+          value={taxTableGuid}
+          onChange={(e) => setTaxTableGuid(e.target.value)}
+          style={{ fontSize: "0.85rem", maxWidth: "8rem" }}
+        >
+          <option value="">No tax</option>
+          {taxTables.map((tt) => (
+            <option key={tt.guid} value={tt.guid}>{tt.name}</option>
+          ))}
+        </select>
       </td>
       <td style={{ whiteSpace: "nowrap" }}>
         {error && <span className="error" style={{ fontSize: "0.78rem", display: "block" }}>{error}</span>}
@@ -416,6 +432,12 @@ function InvoiceDetail({
   const [showPost, setShowPost] = useState(false);
   const [showPay, setShowPay] = useState(false);
   const [loadingEntries, setLoadingEntries] = useState(false);
+  const [taxTables, setTaxTables] = useState<TaxTable[]>([]);
+
+  useEffect(() => {
+    api.listTaxTables(invoice.bookGuid).then(setTaxTables).catch(() => null);
+  }, [invoice.bookGuid]);
+  const taxTableName = (guid?: string) => taxTables.find((t) => t.guid === guid)?.name;
 
   async function reloadEntries() {
     setLoadingEntries(true);
@@ -484,6 +506,7 @@ function InvoiceDetail({
             <th style={{ textAlign: "right" }}>Qty</th>
             <th style={{ textAlign: "right" }}>Price</th>
             <th style={{ textAlign: "right" }}>Total</th>
+            <th>Tax</th>
             <th />
           </tr>
         </thead>
@@ -495,6 +518,7 @@ function InvoiceDetail({
                 invoiceGuid={invoice.guid}
                 invType={invoice.type as "invoice" | "bill"}
                 accounts={accounts}
+                taxTables={taxTables}
                 existing={e}
                 onSaved={() => { setEditingEntry(null); reloadEntries(); }}
                 onCancel={() => setEditingEntry(null)}
@@ -509,6 +533,7 @@ function InvoiceDetail({
                 <td style={{ textAlign: "right", fontSize: "0.85rem" }}>{numericToFloat(e.quantity ?? { num: 1, denom: 1 }).toFixed(3)}</td>
                 <td style={{ textAlign: "right", fontSize: "0.85rem" }}>{formatMoney(e.price)}</td>
                 <td style={{ textAlign: "right", fontWeight: 500 }}>{formatMoney(e.lineTotal)}</td>
+                <td style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>{taxTableName(e.taxTableGuid) ?? "—"}</td>
                 <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                   {!isPosted && (
                     <>
@@ -525,6 +550,7 @@ function InvoiceDetail({
               invoiceGuid={invoice.guid}
               invType={invoice.type as "invoice" | "bill"}
               accounts={accounts}
+              taxTables={taxTables}
               onSaved={() => { setAddingEntry(false); reloadEntries(); }}
               onCancel={() => setAddingEntry(false)}
             />
@@ -532,9 +558,9 @@ function InvoiceDetail({
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan={5} style={{ textAlign: "right", fontWeight: 600, paddingTop: "0.5rem" }}>Total</td>
+            <td colSpan={5} style={{ textAlign: "right", fontWeight: 600, paddingTop: "0.5rem" }}>Total (pre-tax)</td>
             <td style={{ textAlign: "right", fontWeight: 700, paddingTop: "0.5rem" }}>{total.toFixed(2)}</td>
-            <td />
+            <td colSpan={2} />
           </tr>
         </tfoot>
       </table>
@@ -589,22 +615,25 @@ function InvoiceFormDialog({
   const [dateOpened, setDateOpened] = useState(existing?.dateOpened ?? today());
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [currencyGuid, setCurrencyGuid] = useState(existing?.currencyGuid ?? "");
+  const [termsGuid, setTermsGuid] = useState(existing?.termsGuid ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Load currencies for selector
   const [currencies, setCurrencies] = useState<Array<{ guid: string; mnemonic: string }>>([]);
+  const [terms, setTerms] = useState<BillTerm[]>([]);
   useEffect(() => {
     api.listCommodities()
       .then((list) => setCurrencies(list.filter((c) => c.namespace === "CURRENCY")))
       .catch(() => null);
-  }, []);
+    api.listBillTerms(bookGuid).then(setTerms).catch(() => null);
+  }, [bookGuid]);
 
   async function handleSave() {
     setError(null);
     if (!ownerGuid) { setError(`${invType === "invoice" ? "Customer" : "Vendor"} is required.`); return; }
     if (!currencyGuid) { setError("Currency is required."); return; }
-    const input: NewInvoice = { id, type: invType, ownerGuid, dateOpened, notes, active: true, currencyGuid };
+    const input: NewInvoice = { id, type: invType, ownerGuid, dateOpened, notes, active: true, currencyGuid, termsGuid: termsGuid || undefined };
     setSaving(true);
     try {
       let result: Invoice;
@@ -653,13 +682,22 @@ function InvoiceFormDialog({
             </label>
           </div>
 
-          <label className="field">
-            <span>Currency *</span>
-            <select value={currencyGuid} onChange={(e) => setCurrencyGuid(e.target.value)}>
-              <option value="">— select currency —</option>
-              {currencies.map((c) => <option key={c.guid} value={c.guid}>{c.mnemonic}</option>)}
-            </select>
-          </label>
+          <div className="dialog__row">
+            <label className="field" style={{ flex: 1 }}>
+              <span>Currency *</span>
+              <select value={currencyGuid} onChange={(e) => setCurrencyGuid(e.target.value)}>
+                <option value="">— select currency —</option>
+                {currencies.map((c) => <option key={c.guid} value={c.guid}>{c.mnemonic}</option>)}
+              </select>
+            </label>
+            <label className="field" style={{ flex: 1 }}>
+              <span>Payment terms</span>
+              <select value={termsGuid} onChange={(e) => setTermsGuid(e.target.value)}>
+                <option value="">— none —</option>
+                {terms.map((t) => <option key={t.guid} value={t.guid}>{t.name}</option>)}
+              </select>
+            </label>
+          </div>
 
           <label className="field">
             <span>Notes</span>

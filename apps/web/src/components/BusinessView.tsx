@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { Account, Commodity, Customer, NewCustomer, NewVendor, Vendor } from "../lib/types";
 import InvoiceView, { AgingReportView } from "./InvoiceView";
+import BillTermsView from "./BillTermsView";
+import TaxTablesView from "./TaxTablesView";
 
 // ── Commodity select — loads its own list when rendered ───────────────────────
 
@@ -348,7 +350,7 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
 
 // ── Top-level BusinessView ────────────────────────────────────────────────────
 
-type BizTab = "customers" | "vendors" | "invoices" | "bills" | "ar-aging" | "ap-aging";
+type BizTab = "customers" | "vendors" | "invoices" | "bills" | "ar-aging" | "ap-aging" | "terms" | "tax";
 
 const TAB_LABELS: Record<BizTab, string> = {
   customers: "Customers",
@@ -357,6 +359,8 @@ const TAB_LABELS: Record<BizTab, string> = {
   bills: "Bills",
   "ar-aging": "A/R Aging",
   "ap-aging": "A/P Aging",
+  terms: "Bill Terms",
+  tax: "Tax Tables",
 };
 
 export default function BusinessView({
@@ -401,7 +405,7 @@ export default function BusinessView({
         </div>
         <div className="register__actions">
           <div className="biz-tabs">
-            {(["customers", "vendors", "invoices", "bills", "ar-aging", "ap-aging"] as BizTab[]).map((t) => (
+            {(["customers", "vendors", "invoices", "bills", "ar-aging", "ap-aging", "terms", "tax"] as BizTab[]).map((t) => (
               <button
                 key={t}
                 className={`biz-tab${tab === t ? " biz-tab--active" : ""}`}
@@ -409,7 +413,7 @@ export default function BusinessView({
               >{TAB_LABELS[t]}</button>
             ))}
           </div>
-          {(tab === "customers" || tab === "vendors" || tab === "invoices" || tab === "bills") && (
+          {(tab === "customers" || tab === "vendors" || tab === "invoices" || tab === "bills" || tab === "terms" || tab === "tax") && (
             <button className="btn btn--primary btn--sm" onClick={handleNew}>
               + New {newLabel}
             </button>
@@ -468,6 +472,12 @@ export default function BusinessView({
       )}
       {tab === "ap-aging" && (
         <AgingReportView bookGuid={bookGuid} invType="bill" owners={vendors} />
+      )}
+      {tab === "terms" && (
+        <BillTermsView bookGuid={bookGuid} triggerNew={newTrigger} />
+      )}
+      {tab === "tax" && (
+        <TaxTablesView bookGuid={bookGuid} accounts={accounts} triggerNew={newTrigger} />
       )}
     </section>
   );

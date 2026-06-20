@@ -371,6 +371,7 @@ export interface NewEntry {
   accountGuid: string;
   price: Numeric;
   taxable?: boolean;
+  taxTableGuid?: string;
 }
 
 export interface Entry extends NewEntry {
@@ -441,6 +442,41 @@ export interface RegisterPage {
   limit: number;
   offset: number;
   entries: RegisterEntry[];
+}
+
+// ── Bill / payment terms ──────────────────────────────────────────────────────
+
+export interface NewBillTerm {
+  name: string;
+  description?: string;
+  type: "days" | "proximo";
+  dueDays?: number;
+  discountDays?: number;
+  discount?: Numeric;
+  cutoff?: number;
+}
+
+export interface BillTerm extends NewBillTerm {
+  guid: string;
+  bookGuid: string;
+}
+
+// ── Tax tables ────────────────────────────────────────────────────────────────
+
+export interface TaxTableEntry {
+  accountGuid: string;
+  type: "percentage" | "value";
+  amount: Numeric;
+}
+
+export interface NewTaxTable {
+  name: string;
+  entries: TaxTableEntry[];
+}
+
+export interface TaxTable extends NewTaxTable {
+  guid: string;
+  bookGuid: string;
 }
 
 // Account types the UI offers when creating an account, grouped for the picker.
