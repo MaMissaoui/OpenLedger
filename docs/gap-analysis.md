@@ -46,19 +46,20 @@ calls for a "pluggable price-fetch service" to replace GnuCash's Finance::Quote.
 Gap: a quote-provider interface + one provider + optional scheduled refresh.
 **Effort: M**
 
-## D. Web UI gaps (backend ahead of frontend)
+## D. Web UI gaps (backend ahead of frontend) — DONE
 
-- **Prices/commodities management view** — `createPrice`/`listPrices` exist in
-  `api.ts` but no component renders them; prices are only read inside
-  Portfolio/Invoice. **S**
-- **Import UI** — an *export* URL helper exists in `api.ts` but there's **no
-  import call and no upload surface**; GnuCash import is API-only. **S–M**
+- ~~**Prices/commodities management view**~~ — **Done.** A "Commodities" nav
+  view (`CommoditiesView.tsx`) lists commodities, creates them (currency or
+  security), and shows/adds per-commodity price history.
+- ~~**Import UI**~~ — **Done.** An "Import GnuCash" sidebar button
+  (`ImportDialog.tsx`) uploads a SQLite/XML file to `POST /imports/gnucash`
+  via the new `api.importGnuCash` and reports the imported object counts.
 
 ## Recommended sequencing
 
 1. **Bill terms** (A) — small, unblocks correct invoice due dates, referenced everywhere already.
 2. **Tax tables** (A) — completes invoicing correctness.
-3. **Prices/commodities UI + import UI** (D) — cheap, high visibility, no schema work.
+3. ~~**Prices/commodities UI + import UI** (D)~~ — **Done.**
 4. **Online price quotes** (C) — self-contained.
 5. **OFX/QIF import** (B) — then CSV last (heaviest).
 6. **Employees & jobs** (A) — lowest value for a personal/small-business focus; defer unless chasing full GnuCash parity.
