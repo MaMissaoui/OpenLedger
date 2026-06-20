@@ -23,6 +23,10 @@ type InvoiceRepository interface {
 	// APAgingRows returns posted unpaid bills (type='bill') for a book.
 	APAgingRows(ctx context.Context, bookGUID string) ([]AgingRow, error)
 
+	// GetBillTerm loads a payment term by GUID; used to derive an invoice's due
+	// date when it is posted.
+	GetBillTerm(ctx context.Context, guid string) (domain.BillTerm, error)
+
 	ListEntries(ctx context.Context, invoiceGUID string) ([]domain.InvoiceEntry, error)
 	CreateEntry(ctx context.Context, e domain.InvoiceEntry) error
 	GetEntry(ctx context.Context, guid string) (domain.InvoiceEntry, error)
@@ -416,6 +420,18 @@ func (s *InvoiceService) PostInvoice(ctx context.Context, userID, guid string, r
 		postDate = s.now().UTC().Truncate(24 * time.Hour)
 	}
 
+	// Derive the due date from the invoice's payment term unless the caller gave
+	// one explicitly (an explicit DueDate always wins).
+	var term *domain.BillTerm
+	if inv.TermsGUID != "" {
+		bt, err := s.repo.GetBillTerm(ctx, inv.TermsGUID)
+		if err != nil {
+			return domain.Invoice{}, err
+		}
+		term = &bt
+	}
+	dueDate := domain.ResolveDueDate(req.DueDate, term, postDate)
+
 	label := "Invoice"
 	if inv.Type == domain.InvoiceTypeBill {
 		label = "Bill"
@@ -437,12 +453,12 @@ func (s *InvoiceService) PostInvoice(ctx context.Context, userID, guid string, r
 		return domain.Invoice{}, err
 	}
 
-	if err := s.repo.MarkInvoicePosted(ctx, guid, posted.GUID, req.PostAccGUID, &postDate, req.DueDate); err != nil {
+	if err := s.repo.MarkInvoicePosted(ctx, guid, posted.GUID, req.PostAccGUID, &postDate, dueDate); err != nil {
 		return domain.Invoice{}, err
 	}
 
 	inv.DatePosted = &postDate
-	inv.DateDue = req.DueDate
+	inv.DateDue = dueDate
 	inv.PostTxnGUID = posted.GUID
 	inv.PostAccGUID = req.PostAccGUID
 	inv.Entries = entries

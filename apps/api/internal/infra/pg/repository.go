@@ -2379,6 +2379,32 @@ func (r *Repository) GetInvoice(ctx context.Context, guid string) (domain.Invoic
 	return inv, err
 }
 
+func (r *Repository) GetBillTerm(ctx context.Context, guid string) (domain.BillTerm, error) {
+	var (
+		t         domain.BillTerm
+		typ       string
+		discNum   int64
+		discDenom int64
+	)
+	err := r.pool.QueryRow(ctx, `
+		SELECT guid, book_guid, name, description, type, duedays, discountdays,
+		       discount_num, discount_denom, cutoff
+		FROM billterms WHERE guid=$1`, guid).Scan(
+		&t.GUID, &t.BookGUID, &t.Name, &t.Description, &typ,
+		&t.DueDays, &t.DiscountDays, &discNum, &discDenom, &t.Cutoff)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.BillTerm{}, domain.ErrBillTermNotFound
+	}
+	if err != nil {
+		return domain.BillTerm{}, err
+	}
+	t.Type = domain.BillTermType(typ)
+	if t.Discount, err = domain.FromNumDenom(discNum, discDenom); err != nil {
+		return domain.BillTerm{}, err
+	}
+	return t, nil
+}
+
 func (r *Repository) UpdateInvoice(ctx context.Context, inv domain.Invoice) error {
 	var termsGUID *string
 	if inv.TermsGUID != "" {
