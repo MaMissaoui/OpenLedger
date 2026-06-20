@@ -39,12 +39,13 @@ Import only accepts GnuCash SQLite/XML. The deferred formats are absent:
 | **QIF** import | M |
 | **CSV** import (column-mapping wizard — UI heavy) | L |
 
-## C. Online price quotes
+## C. Online price quotes — DONE
 
-`PriceService` stores only **manually-entered** quotes — no fetch. ARCHITECTURE
-calls for a "pluggable price-fetch service" to replace GnuCash's Finance::Quote.
-Gap: a quote-provider interface + one provider + optional scheduled refresh.
-**Effort: M**
+~~`PriceService` stores only **manually-entered** quotes — no fetch.~~ **Done.**
+A pluggable `app.QuoteProvider` + a Frankfurter (ECB FX) provider back
+`POST /api/v1/prices/fetch`, recording fetched rates as exact-rational prices
+via the normal price write path; a "Fetch online" button in the Commodities view
+drives it. Optional scheduled auto-refresh is still deferred. **Effort: M**
 
 ## D. Web UI gaps (backend ahead of frontend) — DONE
 
@@ -60,6 +61,6 @@ Gap: a quote-provider interface + one provider + optional scheduled refresh.
 1. ~~**Bill terms** (A)~~ — **Done.** Unblocked correct invoice due dates.
 2. ~~**Tax tables** (A)~~ — **Done.** Completed invoicing correctness.
 3. ~~**Prices/commodities UI + import UI** (D)~~ — **Done.**
-4. **Online price quotes** (C) — self-contained. **← next**
-5. **OFX/QIF import** (B) — then CSV last (heaviest).
+4. ~~**Online price quotes** (C)~~ — **Done.** Frankfurter FX provider behind `POST /prices/fetch`.
+5. **OFX/QIF import** (B) — then CSV last (heaviest). **← next**
 6. **Employees & jobs** (A) — lowest value for a personal/small-business focus; defer unless chasing full GnuCash parity.
