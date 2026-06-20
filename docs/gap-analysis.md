@@ -24,8 +24,8 @@ The `customers`/`vendors`/`invoices` tables already carry `terms_guid` and
 
 | Gap | Evidence | Effort |
 |---|---|---|
-| **Bill/payment terms** (`billterms`) | `terms_guid` columns exist everywhere; no `billterms` table, domain, or endpoint — due dates set manually | **M** |
-| **Tax tables** (`taxtables` + `taxtable_entries`) | `entries.taxable BOOLEAN` exists but no tax-rate table or tax calc on totals | **M–L** |
+| ~~**Bill/payment terms** (`billterms`)~~ — **Done.** `billterms` table, domain, CRUD endpoints + web UI; invoice due dates derive from terms | **M** |
+| ~~**Tax tables** (`taxtables` + `taxtable_entries`)~~ — **Done.** Tax-rate table + entries, tax applied when posting invoices, web UI | **M–L** |
 | **Employees** + expense vouchers | No `employees` table/handler | **M** |
 | **Jobs** (group invoices/bills under a job) | No `jobs` table/handler | **S–M** |
 
@@ -57,8 +57,8 @@ Gap: a quote-provider interface + one provider + optional scheduled refresh.
 
 ## Recommended sequencing
 
-1. **Bill terms** (A) — small, unblocks correct invoice due dates, referenced everywhere already.
-2. **Tax tables** (A) — completes invoicing correctness.
+1. ~~**Bill terms** (A)~~ — **Done.** Unblocked correct invoice due dates.
+2. ~~**Tax tables** (A)~~ — **Done.** Completed invoicing correctness.
 3. ~~**Prices/commodities UI + import UI** (D)~~ — **Done.**
 4. **Online price quotes** (C) — self-contained.
 5. **OFX/QIF import** (B) — then CSV last (heaviest).
