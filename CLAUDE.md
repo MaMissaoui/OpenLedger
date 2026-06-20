@@ -42,3 +42,17 @@ Run from the repo root via the Makefile (the targets `cd` into the right app):
 
 - The HTTP layer uses the **stdlib `net/http` 1.22 mux** (`http.NewServeMux` with method patterns), **not chi**.
 - **`sqlc` is configured (`sqlc.yaml`) but not yet generated.** The pg repository (`internal/infra/pg/repository.go`) is hand-written pgx; there is no generated `internal/infra/db` package yet.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in this repo's **GitHub Issues** (via the `gh` CLI). External PRs are **not** a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Canonical label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), used verbatim. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
