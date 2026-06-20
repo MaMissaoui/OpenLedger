@@ -45,3 +45,21 @@ coverage/
 # Root-level only — design assets live under docs/ and stay tracked.
 /*.png
 .playwright-mcp/
+
+# Skill-manager artifacts: an .agents/ store with symlinks under
+# .claude/skills/ + a lockfile. Not versioned here. No trailing slashes —
+# the .claude/skills/* entries are symlinks, not real dirs. The tracked
+# add-endpoint skill and .claude/settings.json stay tracked.
+/.agents/
+/skills-lock.json
+/.claude/skills/codebase-design
+/.claude/skills/grill-me
+/.claude/skills/grill-with-docs
+/.claude/skills/improve-codebase-architecture
+/.claude/skills/scaffold-exercises
+/.claude/skills/setup-matt-pocock-skills
+/.claude/skills/tdd
+/.claude/skills/to-issues
+/.claude/skills/to-prd
+/.claude/skills/triage
+/.claude/skills/writing-great-skills
