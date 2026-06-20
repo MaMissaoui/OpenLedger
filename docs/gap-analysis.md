@@ -60,6 +60,6 @@ Gap: a quote-provider interface + one provider + optional scheduled refresh.
 1. ~~**Bill terms** (A)~~ — **Done.** Unblocked correct invoice due dates.
 2. ~~**Tax tables** (A)~~ — **Done.** Completed invoicing correctness.
 3. ~~**Prices/commodities UI + import UI** (D)~~ — **Done.**
-4. **Online price quotes** (C) — self-contained.
+4. **Online price quotes** (C) — self-contained. **← next**
 5. **OFX/QIF import** (B) — then CSV last (heaviest).
 6. **Employees & jobs** (A) — lowest value for a personal/small-business focus; defer unless chasing full GnuCash parity.
