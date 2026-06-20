@@ -31,12 +31,13 @@ The `customers`/`vendors`/`invoices` tables already carry `terms_guid` and
 
 ## B. Deferred bank-import formats
 
-Import only accepts GnuCash SQLite/XML. The deferred formats are absent:
+OFX and QIF now import into an existing account (`POST /accounts/{id}/import-bank`,
+offset to Imbalance-CUR, deduped by import ref). CSV remains:
 
 | Gap | Effort |
 |---|---|
-| **OFX** import | M |
-| **QIF** import | M |
+| ~~**OFX** import~~ — **Done.** Tolerant SGML/XML parser; FITID-based dedup | M |
+| ~~**QIF** import~~ — **Done.** Content-hash dedup (no per-line id in QIF) | M |
 | **CSV** import (column-mapping wizard — UI heavy) | L |
 
 ## C. Online price quotes — DONE
@@ -62,5 +63,5 @@ drives it. Optional scheduled auto-refresh is still deferred. **Effort: M**
 2. ~~**Tax tables** (A)~~ — **Done.** Completed invoicing correctness.
 3. ~~**Prices/commodities UI + import UI** (D)~~ — **Done.**
 4. ~~**Online price quotes** (C)~~ — **Done.** Frankfurter FX provider behind `POST /prices/fetch`.
-5. **OFX/QIF import** (B) — then CSV last (heaviest). **← next**
+5. ~~**OFX/QIF import** (B)~~ — **Done.** Posts into an account, offset to Imbalance. **CSV still deferred (heaviest, UI-led). ← next**
 6. **Employees & jobs** (A) — lowest value for a personal/small-business focus; defer unless chasing full GnuCash parity.
