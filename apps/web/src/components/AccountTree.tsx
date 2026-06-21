@@ -1,13 +1,14 @@
+import { useTranslation } from "react-i18next";
 import type { Account, Numeric } from "../lib/types";
 import { TOP_LEVEL_ORDER } from "../lib/types";
 import { formatMoney, sumBalances } from "../lib/money";
 
-const BUCKET_LABEL: Record<string, string> = {
-  ASSET:     "Assets",
-  LIABILITY: "Liabilities",
-  EQUITY:    "Equity",
-  INCOME:    "Income",
-  EXPENSE:   "Expenses",
+const BUCKET_KEY: Record<string, string> = {
+  ASSET:     "reports.balanceSheet.assets",
+  LIABILITY: "reports.balanceSheet.liabilities",
+  EQUITY:    "reports.balanceSheet.equity",
+  INCOME:    "reports.incomeStatement.income",
+  EXPENSE:   "reports.incomeStatement.expenses",
 };
 
 function bucket(type: string): string {
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function AccountTree({ accounts, rootGuid, selectedGuid, onSelect, onAddAccount }: Props) {
+  const { t } = useTranslation();
   const postable = accounts.filter((a) => !a.placeholder && a.type !== "ROOT");
 
   const sectionTotal = (b: string): Numeric | null => {
@@ -39,9 +41,9 @@ export function AccountTree({ accounts, rootGuid, selectedGuid, onSelect, onAddA
   return (
     <nav className="sidebar">
       <div className="sidebar__head">
-        <h2>Accounts</h2>
+        <h2>{t("accounts.title")}</h2>
         <button className="btn btn--ghost btn--sm" onClick={onAddAccount}>
-          + Account
+          {t("accounts.addAccount")}
         </button>
       </div>
 
@@ -54,7 +56,7 @@ export function AccountTree({ accounts, rootGuid, selectedGuid, onSelect, onAddA
         return (
           <div className="acct-group" key={b}>
             <div className="acct-group__label">
-              <span>{BUCKET_LABEL[b]}</span>
+              <span>{t(BUCKET_KEY[b] ?? b)}</span>
               {total && <span className="acct-group__total">{formatMoney(total)}</span>}
             </div>
             {inBucket.map((a) => (

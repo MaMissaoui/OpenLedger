@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api, ApiError } from "../lib/api";
 import type { Account, Transaction } from "../lib/types";
 import { formatMoney, negate, parseAmount } from "../lib/money";
@@ -38,6 +39,7 @@ export function TransactionDialog({ accounts, defaultToGuid, editGuid, onClose }
 }
 
 function EditLoader({ accounts, editGuid, onClose }: { accounts: Account[]; editGuid: string; onClose: () => void }) {
+  const { t } = useTranslation();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["transaction", editGuid],
     queryFn: () => api.getTransaction(editGuid),
@@ -45,25 +47,23 @@ function EditLoader({ accounts, editGuid, onClose }: { accounts: Account[]; edit
 
   if (isLoading) {
     return (
-      <Shell onClose={onClose} title="Edit transaction">
+      <Shell onClose={onClose} title={t("transaction.editTitle")}>
         <div className="empty"><span className="spinner" /></div>
       </Shell>
     );
   }
   if (isError || !data) {
     return (
-      <Shell onClose={onClose} title="Edit transaction">
-        <div className="error-note">Could not load this transaction.</div>
+      <Shell onClose={onClose} title={t("transaction.editTitle")}>
+        <div className="error-note">{t("transaction.loadError")}</div>
         <DialogClose onClose={onClose} />
       </Shell>
     );
   }
   if (data.splits.length !== 2) {
     return (
-      <Shell onClose={onClose} title="Edit transaction">
-        <p className="sub">
-          This transaction has {data.splits.length} splits and can't be edited here. Delete it from the register.
-        </p>
+      <Shell onClose={onClose} title={t("transaction.editTitle")}>
+        <p className="sub">{t("transaction.splitsNote", { count: data.splits.length })}</p>
         <DialogClose onClose={onClose} />
       </Shell>
     );
@@ -81,6 +81,7 @@ function initialFromTransaction(tx: Transaction): Initial {
 function TransactionForm({
   accounts, initial, editGuid, onClose,
 }: { accounts: Account[]; initial: Initial; editGuid?: string; onClose: () => void }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [description, setDescription] = useState(initial.description);
   const [amount, setAmount]           = useState(initial.amount);
@@ -114,7 +115,7 @@ function TransactionForm({
       onClose();
     },
     onError: (err) =>
-      setError(err instanceof ApiError ? err.message : "Could not save transaction"),
+      setError(err instanceof ApiError ? err.message : t("transaction.saveFailed")),
   });
 
   function submit(e: FormEvent) {
@@ -124,23 +125,23 @@ function TransactionForm({
   }
 
   return (
-    <Shell onClose={onClose} title={editGuid ? "Edit transaction" : "New transaction"}>
-      <p className="sub">A balanced transfer between two accounts.</p>
+    <Shell onClose={onClose} title={editGuid ? t("transaction.editTitle") : t("transaction.newTitle")}>
+      <p className="sub">{t("transaction.subtitle")}</p>
 
       <form className="dialog__grid" onSubmit={submit}>
         <div className="field">
-          <label htmlFor="tx-desc">Description</label>
+          <label htmlFor="tx-desc">{t("common.description")}</label>
           <input
             id="tx-desc"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="e.g. Weekly groceries"
+            placeholder={t("transaction.descriptionPlaceholder")}
           />
         </div>
 
         <div className="dialog__row">
           <div className="field">
-            <label htmlFor="tx-from">From (money out)</label>
+            <label htmlFor="tx-from">{t("transaction.from")}</label>
             <select id="tx-from" value={fromGuid} onChange={(e) => setFromGuid(e.target.value)}>
               {accounts.map((a) => (
                 <option key={a.guid} value={a.guid}>{a.name}</option>
@@ -148,7 +149,7 @@ function TransactionForm({
             </select>
           </div>
           <div className="field">
-            <label htmlFor="tx-to">To (money in)</label>
+            <label htmlFor="tx-to">{t("transaction.to")}</label>
             <select id="tx-to" value={toGuid} onChange={(e) => setToGuid(e.target.value)}>
               {accounts.map((a) => (
                 <option key={a.guid} value={a.guid}>{a.name}</option>
@@ -158,25 +159,25 @@ function TransactionForm({
         </div>
 
         <div className="field">
-          <label htmlFor="tx-amount">Amount</label>
+          <label htmlFor="tx-amount">{t("common.amount")}</label>
           <input
             id="tx-amount"
             className="mono"
             inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
+            placeholder={t("transaction.amountPlaceholder")}
           />
         </div>
 
         <div>
           <span className={`balance-pill ${valid ? "balance-pill--ok" : "balance-pill--off"}`}>
             {valid ? (
-              <>✓ Balanced · {formatMoney({ num: 0, denom: parsed!.denom })}</>
+              <>{t("transaction.balanced")} · {formatMoney({ num: 0, denom: parsed!.denom })}</>
             ) : toGuid === fromGuid && toGuid !== "" ? (
-              "From and To must differ"
+              t("transaction.mustDiffer")
             ) : (
-              "Enter an amount"
+              t("transaction.enterAmount")
             )}
           </span>
         </div>
@@ -185,10 +186,10 @@ function TransactionForm({
 
         <div className="dialog__actions">
           <button type="button" className="btn btn--ghost" onClick={onClose}>
-            Cancel
+            {t("transaction.cancel")}
           </button>
           <button type="submit" className="btn btn--primary" disabled={!valid || save.isPending}>
-            {save.isPending ? <span className="spinner" /> : editGuid ? "Save changes" : "Post transaction"}
+            {save.isPending ? <span className="spinner" /> : editGuid ? t("transaction.saveChanges") : t("transaction.postTransaction")}
           </button>
         </div>
       </form>
@@ -208,9 +209,10 @@ function Shell({ title, children, onClose }: { title: string; children: React.Re
 }
 
 function DialogClose({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="dialog__actions">
-      <button type="button" className="btn btn--ghost" onClick={onClose}>Close</button>
+      <button type="button" className="btn btn--ghost" onClick={onClose}>{t("common.close")}</button>
     </div>
   );
 }

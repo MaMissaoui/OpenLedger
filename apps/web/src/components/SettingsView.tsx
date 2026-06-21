@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { api } from "../lib/api";
 import type { Member, Role } from "../lib/types";
@@ -6,18 +7,16 @@ import { ROLES } from "../lib/types";
 
 type Tab = "members" | "system";
 
-// SettingsView is the admin/system home. It opens on member management (book
-// RBAC) and reserves a "System" tab for locale/default-currency setup that the
-// i18n and system-setup work will fill in.
 export default function SettingsView({ bookGuid }: { bookGuid: string }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>("members");
 
   return (
     <section className="register report">
       <header className="register__header">
         <div className="register__title">
-          <div className="eyebrow">Administration</div>
-          <h1>Settings</h1>
+          <div className="eyebrow">{t("settings.eyebrow")}</div>
+          <h1>{t("settings.title")}</h1>
         </div>
       </header>
 
@@ -26,28 +25,27 @@ export default function SettingsView({ bookGuid }: { bookGuid: string }) {
           className={`btn btn--sm ${tab === "members" ? "btn--primary" : "btn--ghost"}`}
           onClick={() => setTab("members")}
         >
-          Members
+          {t("settings.tabs.members")}
         </button>
         <button
           className={`btn btn--sm ${tab === "system" ? "btn--primary" : "btn--ghost"}`}
           onClick={() => setTab("system")}
         >
-          System
+          {t("settings.tabs.system")}
         </button>
       </div>
 
       {tab === "members" ? (
         <MembersPanel bookGuid={bookGuid} />
       ) : (
-        <div className="empty" style={{ padding: "1.5rem" }}>
-          System setup (default currency, locale, date &amp; number formats) is coming soon.
-        </div>
+        <SystemPanel />
       )}
     </section>
   );
 }
 
 function MembersPanel({ bookGuid }: { bookGuid: string }) {
+  const { t } = useTranslation();
   const [members, setMembers] = useState<Member[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
@@ -59,7 +57,7 @@ function MembersPanel({ bookGuid }: { bookGuid: string }) {
     try {
       setMembers(await api.listMembers(bookGuid));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not load members");
+      setError(e instanceof Error ? e.message : t("settings.members.errorLoad"));
       setMembers([]);
     }
   }
@@ -71,7 +69,7 @@ function MembersPanel({ bookGuid }: { bookGuid: string }) {
 
   async function handleAdd() {
     if (!email.trim()) {
-      setError("An email is required.");
+      setError(t("settings.members.emailRequired"));
       return;
     }
     setBusy(true);
@@ -82,7 +80,7 @@ function MembersPanel({ bookGuid }: { bookGuid: string }) {
       setRole("viewer");
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not add member");
+      setError(e instanceof Error ? e.message : t("settings.members.errorAdd"));
     } finally {
       setBusy(false);
     }
@@ -94,7 +92,7 @@ function MembersPanel({ bookGuid }: { bookGuid: string }) {
       await api.updateMember(bookGuid, m.userId, next);
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not change role");
+      setError(e instanceof Error ? e.message : t("settings.members.errorRole"));
     }
   }
 
@@ -104,7 +102,7 @@ function MembersPanel({ bookGuid }: { bookGuid: string }) {
       await api.removeMember(bookGuid, m.userId);
       await reload();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not remove member");
+      setError(e instanceof Error ? e.message : t("settings.members.errorRemove"));
     }
   }
 
@@ -117,16 +115,16 @@ function MembersPanel({ bookGuid }: { bookGuid: string }) {
         style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", marginBottom: "1rem", flexWrap: "wrap" }}
       >
         <label className="field" style={{ flex: "1 1 16rem" }}>
-          <span className="field__label">Add member by email</span>
+          <span className="field__label">{t("settings.members.addLabel")}</span>
           <input
             type="email"
-            placeholder="person@example.com"
+            placeholder={t("settings.members.addPlaceholder")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </label>
         <label className="field">
-          <span className="field__label">Role</span>
+          <span className="field__label">{t("settings.members.roleLabel")}</span>
           <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
             {ROLES.map((r) => (
               <option key={r} value={r}>{r}</option>
@@ -134,18 +132,23 @@ function MembersPanel({ bookGuid }: { bookGuid: string }) {
           </select>
         </label>
         <button className="btn btn--primary btn--sm" onClick={handleAdd} disabled={busy}>
-          {busy ? "Adding…" : "Add"}
+          {busy ? t("settings.members.adding") : t("settings.members.add")}
         </button>
       </div>
 
       {members === null ? (
         <div className="empty"><span className="spinner" /></div>
       ) : members.length === 0 ? (
-        <div className="empty">No members yet.</div>
+        <div className="empty">{t("settings.members.noMembers")}</div>
       ) : (
         <table className="ledger-table">
           <thead>
-            <tr><th>Email</th><th>User</th><th>Role</th><th></th></tr>
+            <tr>
+              <th>{t("settings.members.emailCol")}</th>
+              <th>{t("settings.members.userCol")}</th>
+              <th>{t("settings.members.roleCol")}</th>
+              <th></th>
+            </tr>
           </thead>
           <tbody>
             {members.map((m) => (
@@ -161,7 +164,7 @@ function MembersPanel({ bookGuid }: { bookGuid: string }) {
                 </td>
                 <td style={{ textAlign: "right" }}>
                   <button className="btn btn--ghost btn--sm" onClick={() => handleRemove(m)}>
-                    Remove
+                    {t("settings.members.remove")}
                   </button>
                 </td>
               </tr>
@@ -171,7 +174,38 @@ function MembersPanel({ bookGuid }: { bookGuid: string }) {
       )}
 
       <p style={{ color: "var(--ink-soft)", fontSize: "0.8rem", marginTop: "1rem" }}>
-        Members must have signed in at least once before they can be added. A book always keeps at least one owner.
+        {t("settings.members.signInNote")}
+      </p>
+    </div>
+  );
+}
+
+const LANGUAGE_OPTIONS = [
+  { code: "en", key: "settings.system.languageEn" },
+  { code: "fr", key: "settings.system.languageFr" },
+  { code: "de", key: "settings.system.languageDe" },
+] as const;
+
+function SystemPanel() {
+  const { t, i18n } = useTranslation();
+
+  function handleLanguageChange(lng: string) {
+    void i18n.changeLanguage(lng);
+  }
+
+  return (
+    <div style={{ padding: "0 1.5rem 1.5rem" }}>
+      <div className="field" style={{ maxWidth: "20rem" }}>
+        <label className="field__label">{t("settings.system.languageLabel")}</label>
+        <select value={i18n.resolvedLanguage ?? i18n.language} onChange={(e) => handleLanguageChange(e.target.value)}>
+          {LANGUAGE_OPTIONS.map(({ code, key }) => (
+            <option key={code} value={code}>{t(key)}</option>
+          ))}
+        </select>
+      </div>
+
+      <p style={{ color: "var(--ink-soft)", fontSize: "0.875rem", marginTop: "1.5rem" }}>
+        {t("settings.system.comingSoon")}
       </p>
     </div>
   );
