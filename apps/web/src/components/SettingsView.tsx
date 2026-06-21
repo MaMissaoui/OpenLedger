@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { api } from "../lib/api";
-import type { Member, Role } from "../lib/types";
+import type { BookPreferences, Commodity, Member, Role } from "../lib/types";
 import { ROLES } from "../lib/types";
 
 type Tab = "members" | "system";
@@ -38,7 +38,7 @@ export default function SettingsView({ bookGuid }: { bookGuid: string }) {
       {tab === "members" ? (
         <MembersPanel bookGuid={bookGuid} />
       ) : (
-        <SystemPanel />
+        <SystemPanel bookGuid={bookGuid} />
       )}
     </section>
   );
@@ -186,27 +186,63 @@ const LANGUAGE_OPTIONS = [
   { code: "de", key: "settings.system.languageDe" },
 ] as const;
 
-function SystemPanel() {
+function SystemPanel({ bookGuid }: { bookGuid: string }) {
   const { t, i18n } = useTranslation();
+  const [commodities, setCommodities] = useState<Commodity[]>([]);
+  const [prefs, setPrefs] = useState<BookPreferences | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function handleLanguageChange(lng: string) {
-    void i18n.changeLanguage(lng);
+  useEffect(() => {
+    void api.listCommodities().then(setCommodities);
+    void api.getBookPreferences(bookGuid).then(setPrefs);
+  }, [bookGuid]);
+
+  async function handleCurrencyChange(guid: string) {
+    const next: BookPreferences = { defaultCommodityGuid: guid || null };
+    setPrefs(next);
+    setSaveStatus("idle");
+    try {
+      await api.updateBookPreferences(bookGuid, next);
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+    }
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => setSaveStatus("idle"), 2500);
   }
 
   return (
-    <div style={{ padding: "0 1.5rem 1.5rem" }}>
-      <div className="field" style={{ maxWidth: "20rem" }}>
+    <div style={{ padding: "0 1.5rem 1.5rem", display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: "28rem" }}>
+      {/* Language */}
+      <div className="field">
         <label className="field__label">{t("settings.system.languageLabel")}</label>
-        <select value={i18n.resolvedLanguage ?? i18n.language} onChange={(e) => handleLanguageChange(e.target.value)}>
+        <select value={i18n.resolvedLanguage ?? i18n.language} onChange={(e) => void i18n.changeLanguage(e.target.value)}>
           {LANGUAGE_OPTIONS.map(({ code, key }) => (
             <option key={code} value={code}>{t(key)}</option>
           ))}
         </select>
       </div>
 
-      <p style={{ color: "var(--ink-soft)", fontSize: "0.875rem", marginTop: "1.5rem" }}>
-        {t("settings.system.comingSoon")}
-      </p>
+      {/* Default currency */}
+      <div className="field">
+        <label className="field__label">{t("settings.system.defaultCurrencyLabel")}</label>
+        <select
+          value={prefs?.defaultCommodityGuid ?? ""}
+          onChange={(e) => void handleCurrencyChange(e.target.value)}
+          disabled={prefs === null}
+        >
+          <option value="">{t("settings.system.noCurrency")}</option>
+          {commodities.map((c) => (
+            <option key={c.guid} value={c.guid}>
+              {c.mnemonic} — {c.fullname}
+            </option>
+          ))}
+        </select>
+        <span style={{ fontSize: "0.8rem", color: saveStatus === "error" ? "var(--red)" : saveStatus === "saved" ? "var(--green)" : "var(--ink-soft)", marginTop: "0.25rem", display: "block" }}>
+          {saveStatus === "saved" ? t("settings.system.saved") : saveStatus === "error" ? t("settings.system.saveError") : t("settings.system.defaultCurrencyHint")}
+        </span>
+      </div>
     </div>
   );
 }

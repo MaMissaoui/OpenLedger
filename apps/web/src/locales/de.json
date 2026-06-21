@@ -236,11 +236,15 @@
       "errorRemove": "Mitglied konnte nicht entfernt werden"
     },
     "system": {
-      "comingSoon": "Systemeinstellungen (Standardwährung, Gebietsschema, Datums- und Zahlenformate) folgen demnächst.",
       "languageLabel": "Anzeigesprache",
       "languageEn": "English",
       "languageFr": "Français",
-      "languageDe": "Deutsch"
+      "languageDe": "Deutsch",
+      "defaultCurrencyLabel": "Standardwährung",
+      "defaultCurrencyHint": "Wird beim Erstellen neuer Konten und Transaktionen vorausgefüllt.",
+      "noCurrency": "— Keine Auswahl —",
+      "saved": "Gespeichert",
+      "saveError": "Einstellungen konnten nicht gespeichert werden"
     }
   }
 }

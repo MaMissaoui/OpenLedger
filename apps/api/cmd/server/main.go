@@ -45,6 +45,7 @@ func main() {
 	provision := app.NewProvisionService(repo)
 	authz := app.NewAuthzService(repo)
 	membership := app.NewMembershipService(repo, authz)
+	preferences := app.NewPreferencesService(repo, authz)
 	importer := app.NewImportService(gnucash.NewReader(), repo)
 	exporter := app.NewExportService(repo, gnucash.NewWriter())
 	reconciler := app.NewReconcileService(repo)
@@ -82,6 +83,7 @@ func main() {
 		Provision:    provision,
 		Authz:        authz,
 		Membership:   membership,
+		Preferences:  preferences,
 		Importer:     importer,
 		Exporter:     exporter,
 		Reconciler:   reconciler,

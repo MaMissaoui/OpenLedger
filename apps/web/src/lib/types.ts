@@ -39,6 +39,7 @@ export interface Commodity {
   guid: string;
   namespace: string;
   mnemonic: string;
+  fullname: string;
   fraction: number;
 }
 
@@ -564,6 +565,10 @@ export interface Member {
 export interface NewMember {
   email: string;
   role: Role;
+}
+
+export interface BookPreferences {
+  defaultCommodityGuid: string | null;
 }
 
 // Account types the UI offers when creating an account, grouped for the picker.

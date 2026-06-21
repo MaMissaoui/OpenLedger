@@ -3290,3 +3290,42 @@ func scanEntry(s entryScanner) (domain.InvoiceEntry, error) {
 	}
 	return e, nil
 }
+
+// GetBookPreferences returns the stored preferences for a book. If no row
+// exists yet it returns a zero-value BookPreferences, not an error.
+func (r *Repository) GetBookPreferences(ctx context.Context, bookGUID string) (app.BookPreferences, error) {
+	var p app.BookPreferences
+	var guid *string
+	err := r.pool.QueryRow(ctx,
+		`SELECT default_commodity_guid FROM book_preferences WHERE book_guid = $1`, bookGUID,
+	).Scan(&guid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return p, nil
+	}
+	if err != nil {
+		return p, fmt.Errorf("get book preferences: %w", err)
+	}
+	if guid != nil {
+		p.DefaultCommodityGUID = *guid
+	}
+	return p, nil
+}
+
+// UpsertBookPreferences writes (or overwrites) the preferences for a book.
+func (r *Repository) UpsertBookPreferences(ctx context.Context, bookGUID string, prefs app.BookPreferences) error {
+	var guid *string
+	if prefs.DefaultCommodityGUID != "" {
+		guid = &prefs.DefaultCommodityGUID
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO book_preferences (book_guid, default_commodity_guid, updated_at)
+		VALUES ($1, $2, now())
+		ON CONFLICT (book_guid) DO UPDATE
+		  SET default_commodity_guid = EXCLUDED.default_commodity_guid,
+		      updated_at             = EXCLUDED.updated_at`,
+		bookGUID, guid)
+	if err != nil {
+		return fmt.Errorf("upsert book preferences: %w", err)
+	}
+	return nil
+}
