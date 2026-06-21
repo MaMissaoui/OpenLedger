@@ -56,9 +56,9 @@ func (s *Server) handleImportGnuCash(w http.ResponseWriter, r *http.Request) {
 	var result app.ImportResult
 	switch format {
 	case formatSQLite:
-		result, err = s.importer.ImportSQLite(r.Context(), tmp.Name(), userID)
+		result, err = s.Importer.ImportSQLite(r.Context(), tmp.Name(), userID)
 	case formatXML:
-		result, err = s.importer.ImportXML(r.Context(), tmp.Name(), userID)
+		result, err = s.Importer.ImportXML(r.Context(), tmp.Name(), userID)
 	}
 	switch {
 	case errors.Is(err, app.ErrImportParse):

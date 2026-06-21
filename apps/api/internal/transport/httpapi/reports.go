@@ -17,7 +17,7 @@ func (s *Server) handleBalanceSheet(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	bs, err := s.report.BalanceSheet(r.Context(), bookGUID, asOf)
+	bs, err := s.Report.BalanceSheet(r.Context(), bookGUID, asOf)
 	if writeStructureError(w, err) {
 		return
 	}
@@ -47,7 +47,7 @@ func (s *Server) handleIncomeStatement(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	is, err := s.report.IncomeStatement(r.Context(), bookGUID, from, to)
+	is, err := s.Report.IncomeStatement(r.Context(), bookGUID, from, to)
 	if writeStructureError(w, err) {
 		return
 	}
@@ -74,7 +74,7 @@ func (s *Server) handleCapitalGains(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	cg, err := s.capitalGains.CapitalGains(r.Context(), bookGUID, from, to)
+	cg, err := s.CapitalGains.CapitalGains(r.Context(), bookGUID, from, to)
 	if writeStructureError(w, err) {
 		return
 	}
@@ -109,7 +109,7 @@ func (s *Server) handleCashFlow(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	cf, err := s.report.CashFlowStatement(r.Context(), bookGUID, from, to)
+	cf, err := s.Report.CashFlowStatement(r.Context(), bookGUID, from, to)
 	if writeStructureError(w, err) {
 		return
 	}
@@ -142,7 +142,7 @@ func (s *Server) handleCashFlowForecast(w http.ResponseWriter, r *http.Request) 
 	if months > 60 {
 		months = 60
 	}
-	fc, err := s.forecast.Forecast(r.Context(), bookGUID, from, months)
+	fc, err := s.Forecast.Forecast(r.Context(), bookGUID, from, months)
 	if writeStructureError(w, err) {
 		return
 	}

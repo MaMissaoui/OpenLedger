@@ -113,7 +113,7 @@ func (s *Server) handleListInvoices(w http.ResponseWriter, r *http.Request) {
 	if invType == "" {
 		invType = "invoice"
 	}
-	list, err := s.invoice.ListInvoices(r.Context(), userID, bookGUID, domain.InvoiceType(invType))
+	list, err := s.Invoice.ListInvoices(r.Context(), userID, bookGUID, domain.InvoiceType(invType))
 	if err != nil {
 		writeAuthzError(w, err)
 		return
@@ -150,7 +150,7 @@ func (s *Server) handleCreateInvoice(w http.ResponseWriter, r *http.Request) {
 		CurrencyGUID: body.CurrencyGUID,
 		TermsGUID:    body.TermsGUID,
 	}
-	created, err := s.invoice.CreateInvoice(r.Context(), userID, inv)
+	created, err := s.Invoice.CreateInvoice(r.Context(), userID, inv)
 	if err != nil {
 		writeAuthzError(w, err)
 		return
@@ -160,7 +160,7 @@ func (s *Server) handleCreateInvoice(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetInvoice(w http.ResponseWriter, r *http.Request) {
 	userID := actorFromContext(r.Context()).UserID
-	inv, err := s.invoice.GetInvoice(r.Context(), userID, r.PathValue("id"))
+	inv, err := s.Invoice.GetInvoice(r.Context(), userID, r.PathValue("id"))
 	if err != nil {
 		writeAuthzError(w, err)
 		return
@@ -192,7 +192,7 @@ func (s *Server) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 		CurrencyGUID: body.CurrencyGUID,
 		TermsGUID:    body.TermsGUID,
 	}
-	updated, err := s.invoice.UpdateInvoice(r.Context(), userID, inv)
+	updated, err := s.Invoice.UpdateInvoice(r.Context(), userID, inv)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvoiceNotFound) {
 			writeError(w, http.StatusNotFound, "invoice not found")
@@ -210,7 +210,7 @@ func (s *Server) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteInvoice(w http.ResponseWriter, r *http.Request) {
 	userID := actorFromContext(r.Context()).UserID
-	if err := s.invoice.DeleteInvoice(r.Context(), userID, r.PathValue("id")); err != nil {
+	if err := s.Invoice.DeleteInvoice(r.Context(), userID, r.PathValue("id")); err != nil {
 		if errors.Is(err, domain.ErrInvoiceNotFound) {
 			writeError(w, http.StatusNotFound, "invoice not found")
 			return
@@ -250,7 +250,7 @@ func (s *Server) handlePostInvoice(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	req := app.PostRequest{PostDate: postDate, DueDate: dueDate, PostAccGUID: body.PostAccGUID}
-	inv, err := s.invoice.PostInvoice(r.Context(), userID, guid, req)
+	inv, err := s.Invoice.PostInvoice(r.Context(), userID, guid, req)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvoiceNotFound) {
 			writeError(w, http.StatusNotFound, "invoice not found")
@@ -276,7 +276,7 @@ func (s *Server) handleListEntries(w http.ResponseWriter, r *http.Request) {
 	userID := actorFromContext(r.Context()).UserID
 	invoiceGUID := r.PathValue("id")
 	// GetInvoice validates auth and loads entries.
-	inv, err := s.invoice.GetInvoice(r.Context(), userID, invoiceGUID)
+	inv, err := s.Invoice.GetInvoice(r.Context(), userID, invoiceGUID)
 	if err != nil {
 		writeAuthzError(w, err)
 		return
@@ -322,7 +322,7 @@ func (s *Server) handleAddEntry(w http.ResponseWriter, r *http.Request) {
 		Taxable:      body.Taxable,
 		TaxTableGUID: body.TaxTableGUID,
 	}
-	created, err := s.invoice.AddEntry(r.Context(), userID, entry)
+	created, err := s.Invoice.AddEntry(r.Context(), userID, entry)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvoiceNotFound) {
 			writeError(w, http.StatusNotFound, "invoice not found")
@@ -372,7 +372,7 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 		Taxable:      body.Taxable,
 		TaxTableGUID: body.TaxTableGUID,
 	}
-	updated, err := s.invoice.UpdateEntry(r.Context(), userID, entry)
+	updated, err := s.Invoice.UpdateEntry(r.Context(), userID, entry)
 	if err != nil {
 		if errors.Is(err, domain.ErrEntryNotFound) {
 			writeError(w, http.StatusNotFound, "entry not found")
@@ -390,7 +390,7 @@ func (s *Server) handleUpdateEntry(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteEntry(w http.ResponseWriter, r *http.Request) {
 	userID := actorFromContext(r.Context()).UserID
-	if err := s.invoice.DeleteEntry(r.Context(), userID, r.PathValue("id")); err != nil {
+	if err := s.Invoice.DeleteEntry(r.Context(), userID, r.PathValue("id")); err != nil {
 		if errors.Is(err, domain.ErrEntryNotFound) {
 			writeError(w, http.StatusNotFound, "entry not found")
 			return
@@ -429,7 +429,7 @@ func (s *Server) handlePayInvoice(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	req := app.PayRequest{PaymentDate: payDate, PaymentAccGUID: body.PaymentAccGUID}
-	inv, err := s.invoice.PayInvoice(r.Context(), userID, guid, req)
+	inv, err := s.Invoice.PayInvoice(r.Context(), userID, guid, req)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvoiceNotFound) {
 			writeError(w, http.StatusNotFound, "invoice not found")
@@ -462,7 +462,7 @@ func (s *Server) handleAPAgingReport(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAgingReport(w http.ResponseWriter, r *http.Request, invType domain.InvoiceType) {
 	userID := actorFromContext(r.Context()).UserID
 	bookGUID := r.PathValue("id")
-	report, err := s.invoice.AgingReport(r.Context(), userID, bookGUID, invType)
+	report, err := s.Invoice.AgingReport(r.Context(), userID, bookGUID, invType)
 	if err != nil {
 		writeAuthzError(w, err)
 		return

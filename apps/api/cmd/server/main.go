@@ -69,7 +69,33 @@ func main() {
 		"qif": bankimport.QIF{},
 	})
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, forecast, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor, invoice, billterm, taxtable, quoteSvc, bankImport, employee, job)
+	server := &httpapi.Server{Services: httpapi.Services{
+		Posting:      posting,
+		Ledger:       ledger,
+		Structure:    structure,
+		Price:        price,
+		Quote:        quoteSvc,
+		BankImport:   bankImport,
+		Report:       report,
+		Forecast:     forecast,
+		Provision:    provision,
+		Authz:        authz,
+		Importer:     importer,
+		Exporter:     exporter,
+		Reconciler:   reconciler,
+		Portfolio:    portfolio,
+		Trade:        trade,
+		CapitalGains: capitalGains,
+		Schedule:     schedule,
+		Budget:       budget,
+		Customer:     customer,
+		Vendor:       vendor,
+		Employee:     employee,
+		Job:          job,
+		Invoice:      invoice,
+		BillTerm:     billterm,
+		TaxTable:     taxtable,
+	}}
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

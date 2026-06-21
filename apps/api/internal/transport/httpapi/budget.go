@@ -80,7 +80,7 @@ func (s *Server) handleListBudgets(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeBook(w, r, bookGUID, app.AccessRead) {
 		return
 	}
-	budgets, err := s.budget.List(r.Context(), bookGUID)
+	budgets, err := s.Budget.List(r.Context(), bookGUID)
 	if writeStructureError(w, err) {
 		return
 	}
@@ -106,7 +106,7 @@ func (s *Server) handleCreateBudget(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid budget: "+err.Error())
 		return
 	}
-	created, err := s.budget.Create(r.Context(), b)
+	created, err := s.Budget.Create(r.Context(), b)
 	switch {
 	case errors.Is(err, app.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, "invalid budget")
@@ -120,7 +120,7 @@ func (s *Server) handleCreateBudget(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetBudget(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	b, err := s.budget.Get(r.Context(), guid)
+	b, err := s.Budget.Get(r.Context(), guid)
 	if errors.Is(err, domain.ErrBudgetNotFound) {
 		writeError(w, http.StatusNotFound, "budget not found")
 		return
@@ -129,7 +129,7 @@ func (s *Server) handleGetBudget(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "could not load budget")
 		return
 	}
-	bookGUID, err := s.budget.BookGUIDForBudget(r.Context(), guid)
+	bookGUID, err := s.Budget.BookGUIDForBudget(r.Context(), guid)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not authorize")
 		return
@@ -142,7 +142,7 @@ func (s *Server) handleGetBudget(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleUpdateBudget(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	bookGUID, err := s.budget.BookGUIDForBudget(r.Context(), guid)
+	bookGUID, err := s.Budget.BookGUIDForBudget(r.Context(), guid)
 	if errors.Is(err, domain.ErrBudgetNotFound) {
 		writeError(w, http.StatusNotFound, "budget not found")
 		return
@@ -164,7 +164,7 @@ func (s *Server) handleUpdateBudget(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid budget: "+err.Error())
 		return
 	}
-	updated, err := s.budget.Update(r.Context(), b)
+	updated, err := s.Budget.Update(r.Context(), b)
 	switch {
 	case errors.Is(err, domain.ErrBudgetNotFound):
 		writeError(w, http.StatusNotFound, "budget not found")
@@ -181,7 +181,7 @@ func (s *Server) handleUpdateBudget(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteBudget(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	bookGUID, err := s.budget.BookGUIDForBudget(r.Context(), guid)
+	bookGUID, err := s.Budget.BookGUIDForBudget(r.Context(), guid)
 	if errors.Is(err, domain.ErrBudgetNotFound) {
 		writeError(w, http.StatusNotFound, "budget not found")
 		return
@@ -193,7 +193,7 @@ func (s *Server) handleDeleteBudget(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeBook(w, r, bookGUID, app.AccessWrite) {
 		return
 	}
-	if err := s.budget.Delete(r.Context(), guid); errors.Is(err, domain.ErrBudgetNotFound) {
+	if err := s.Budget.Delete(r.Context(), guid); errors.Is(err, domain.ErrBudgetNotFound) {
 		writeError(w, http.StatusNotFound, "budget not found")
 		return
 	} else if err != nil {
@@ -205,7 +205,7 @@ func (s *Server) handleDeleteBudget(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleBudgetReport(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	bookGUID, err := s.budget.BookGUIDForBudget(r.Context(), guid)
+	bookGUID, err := s.Budget.BookGUIDForBudget(r.Context(), guid)
 	if errors.Is(err, domain.ErrBudgetNotFound) {
 		writeError(w, http.StatusNotFound, "budget not found")
 		return
@@ -221,7 +221,7 @@ func (s *Server) handleBudgetReport(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	report, err := s.budget.Report(r.Context(), guid, asOf)
+	report, err := s.Budget.Report(r.Context(), guid, asOf)
 	if errors.Is(err, domain.ErrBudgetNotFound) {
 		writeError(w, http.StatusNotFound, "budget not found")
 		return

@@ -35,7 +35,7 @@ func (s *Server) handleReconcileSplit(w http.ResponseWriter, r *http.Request) {
 	}
 	state := domain.ReconcileState([]rune(req.State)[0])
 
-	switch err := s.reconciler.SetReconcile(r.Context(), splitGUID, state); {
+	switch err := s.Reconciler.SetReconcile(r.Context(), splitGUID, state); {
 	case errors.Is(err, app.ErrInvalidReconcileState):
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

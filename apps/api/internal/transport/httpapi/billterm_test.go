@@ -70,34 +70,11 @@ func (f *fakeBillTermRepoH) BookGUIDForBillTerm(_ context.Context, guid string) 
 }
 
 func newBillTermTestServer(fr *fakeBillTermRepoH) http.Handler {
-	posting := app.NewPostingService(fr.fakeRepo)
-	return NewServer(
-		posting,
-		app.NewLedgerService(fr.fakeRepo),
-		app.NewStructureService(fr.fakeRepo),
-		app.NewPriceService(fr.fakeRepo),
-		app.NewReportService(fr.fakeRepo),
-		app.NewForecastService(fr.fakeRepo),
-		app.NewProvisionService(fr.fakeRepo),
-		app.NewAuthzService(fr.fakeRepo),
-		app.NewImportService(fr.fakeRepo, fr.fakeRepo),
-		app.NewExportService(fr.fakeRepo, &fakeWriter{}),
-		app.NewReconcileService(fr.fakeRepo),
-		app.NewPortfolioService(fr.fakeRepo),
-		app.NewTradeService(fr.fakeRepo, posting),
-		app.NewCapitalGainsService(fr.fakeRepo),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		app.NewBillTermService(fr),
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	).Routes()
+	return (&Server{Services: Services{
+		Provision: app.NewProvisionService(fr.fakeRepo),
+		Authz:     app.NewAuthzService(fr.fakeRepo),
+		BillTerm:  app.NewBillTermService(fr),
+	}}).Routes()
 }
 
 func billTermReq(h http.Handler, method, path string, body any) *httptest.ResponseRecorder {

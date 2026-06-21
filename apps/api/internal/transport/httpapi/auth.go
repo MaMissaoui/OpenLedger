@@ -37,7 +37,7 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "not authenticated")
 			return
 		}
-		userID, err := s.provision.ProvisionUser(r.Context(), ldapUID, email)
+		userID, err := s.Provision.ProvisionUser(r.Context(), ldapUID, email)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "could not provision user")
 			return
@@ -66,26 +66,26 @@ func actorFromContext(ctx context.Context) app.AuditActor {
 // request must stop.
 func (s *Server) authorizeBook(w http.ResponseWriter, r *http.Request, bookGUID string, need app.Access) bool {
 	actor := actorFromContext(r.Context())
-	return !writeAuthzError(w, s.authz.AuthorizeBook(r.Context(), actor.UserID, bookGUID, need))
+	return !writeAuthzError(w, s.Authz.AuthorizeBook(r.Context(), actor.UserID, bookGUID, need))
 }
 
 // authorizeAccount enforces the user's role on the book the account belongs to.
 func (s *Server) authorizeAccount(w http.ResponseWriter, r *http.Request, accountGUID string, need app.Access) bool {
 	actor := actorFromContext(r.Context())
-	return !writeAuthzError(w, s.authz.AuthorizeAccount(r.Context(), actor.UserID, accountGUID, need))
+	return !writeAuthzError(w, s.Authz.AuthorizeAccount(r.Context(), actor.UserID, accountGUID, need))
 }
 
 // authorizeAccounts enforces the user's role on the book(s) the given accounts belong to.
 func (s *Server) authorizeAccounts(w http.ResponseWriter, r *http.Request, accountGUIDs []string, need app.Access) bool {
 	actor := actorFromContext(r.Context())
-	return !writeAuthzError(w, s.authz.AuthorizeAccounts(r.Context(), actor.UserID, accountGUIDs, need))
+	return !writeAuthzError(w, s.Authz.AuthorizeAccounts(r.Context(), actor.UserID, accountGUIDs, need))
 }
 
 // authorizeSplit enforces the user's role on the book the split's account
 // belongs to.
 func (s *Server) authorizeSplit(w http.ResponseWriter, r *http.Request, splitGUID string, need app.Access) bool {
 	actor := actorFromContext(r.Context())
-	return !writeAuthzError(w, s.authz.AuthorizeSplit(r.Context(), actor.UserID, splitGUID, need))
+	return !writeAuthzError(w, s.Authz.AuthorizeSplit(r.Context(), actor.UserID, splitGUID, need))
 }
 
 // writeAuthzError maps an authorization error to an HTTP response, returning

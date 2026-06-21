@@ -80,7 +80,7 @@ func (s *Server) handleListTaxTables(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeBook(w, r, bookGUID, app.AccessRead) {
 		return
 	}
-	tables, err := s.taxtable.List(r.Context(), bookGUID)
+	tables, err := s.TaxTable.List(r.Context(), bookGUID)
 	if writeTaxTableError(w, err) {
 		return
 	}
@@ -106,7 +106,7 @@ func (s *Server) handleCreateTaxTable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid tax table: "+err.Error())
 		return
 	}
-	created, err := s.taxtable.Create(r.Context(), tt)
+	created, err := s.TaxTable.Create(r.Context(), tt)
 	if writeTaxTableError(w, err) {
 		return
 	}
@@ -115,7 +115,7 @@ func (s *Server) handleCreateTaxTable(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetTaxTable(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	tt, err := s.taxtable.Get(r.Context(), guid)
+	tt, err := s.TaxTable.Get(r.Context(), guid)
 	if writeTaxTableError(w, err) {
 		return
 	}
@@ -127,7 +127,7 @@ func (s *Server) handleGetTaxTable(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleUpdateTaxTable(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	bookGUID, err := s.taxtable.BookGUIDForTaxTable(r.Context(), guid)
+	bookGUID, err := s.TaxTable.BookGUIDForTaxTable(r.Context(), guid)
 	if writeTaxTableError(w, err) {
 		return
 	}
@@ -144,7 +144,7 @@ func (s *Server) handleUpdateTaxTable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid tax table: "+err.Error())
 		return
 	}
-	updated, err := s.taxtable.Update(r.Context(), tt)
+	updated, err := s.TaxTable.Update(r.Context(), tt)
 	if writeTaxTableError(w, err) {
 		return
 	}
@@ -153,14 +153,14 @@ func (s *Server) handleUpdateTaxTable(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteTaxTable(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	bookGUID, err := s.taxtable.BookGUIDForTaxTable(r.Context(), guid)
+	bookGUID, err := s.TaxTable.BookGUIDForTaxTable(r.Context(), guid)
 	if writeTaxTableError(w, err) {
 		return
 	}
 	if !s.authorizeBook(w, r, bookGUID, app.AccessWrite) {
 		return
 	}
-	if err := s.taxtable.Delete(r.Context(), guid); writeTaxTableError(w, err) {
+	if err := s.TaxTable.Delete(r.Context(), guid); writeTaxTableError(w, err) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -15,7 +15,7 @@ func (s *Server) handlePortfolio(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeBook(w, r, bookGUID, app.AccessRead) {
 		return
 	}
-	p, err := s.portfolio.Portfolio(r.Context(), bookGUID)
+	p, err := s.Portfolio.Portfolio(r.Context(), bookGUID)
 	if writeStructureError(w, err) {
 		return
 	}

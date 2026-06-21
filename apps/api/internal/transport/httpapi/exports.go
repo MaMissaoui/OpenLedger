@@ -44,9 +44,9 @@ func (s *Server) handleExportGnuCash(w http.ResponseWriter, r *http.Request) {
 	var exportErr error
 	switch format {
 	case "xml":
-		exportErr = s.exporter.ExportXML(r.Context(), bookGUID, path)
+		exportErr = s.Exporter.ExportXML(r.Context(), bookGUID, path)
 	default:
-		exportErr = s.exporter.ExportSQLite(r.Context(), bookGUID, path)
+		exportErr = s.Exporter.ExportSQLite(r.Context(), bookGUID, path)
 	}
 	switch {
 	case errors.Is(exportErr, app.ErrBookNotFound):

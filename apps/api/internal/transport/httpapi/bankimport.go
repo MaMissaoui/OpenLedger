@@ -26,7 +26,7 @@ func (s *Server) handleImportBankStatement(w http.ResponseWriter, r *http.Reques
 	if !s.authorizeAccount(w, r, accountGUID, app.AccessWrite) {
 		return
 	}
-	if s.bankImport == nil {
+	if s.BankImport == nil {
 		writeError(w, http.StatusServiceUnavailable, "bank-statement import is not configured")
 		return
 	}
@@ -60,10 +60,10 @@ func (s *Server) handleImportBankStatement(w http.ResponseWriter, r *http.Reques
 		if !ok {
 			return
 		}
-		result, err = s.bankImport.ImportFrom(r.Context(), accountGUID,
+		result, err = s.BankImport.ImportFrom(r.Context(), accountGUID,
 			bankimport.CSV{Mapping: mapping}, bytes.NewReader(data), actor)
 	} else {
-		result, err = s.bankImport.Import(r.Context(), accountGUID, format, bytes.NewReader(data), actor)
+		result, err = s.BankImport.Import(r.Context(), accountGUID, format, bytes.NewReader(data), actor)
 	}
 	switch {
 	case errors.Is(err, app.ErrImportParse):
