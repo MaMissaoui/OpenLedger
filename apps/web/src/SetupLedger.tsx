@@ -51,7 +51,7 @@ export function SetupLedger() {
       const currencyGuid = useExisting && existingGuid
         ? existingGuid
         : await resolveOrCreateCurrency(presetMnemonic, allCommodities);
-      return api.createBook(name.trim() || "My Company", currencyGuid || undefined);
+      return api.createBook(name.trim() || "My Ledger", currencyGuid || undefined);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["books"] });
@@ -70,11 +70,11 @@ export function SetupLedger() {
 
         <div className="setup__form">
           <label className="setup__label">
-            {t("setup.companyName", "Company name")}
+            {t("setup.ledgerName")}
             <input
               className="setup__input"
               type="text"
-              placeholder={t("setup.companyNamePlaceholder", "e.g. My Business")}
+              placeholder={t("setup.ledgerNamePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -127,7 +127,7 @@ export function SetupLedger() {
             onClick={() => create.mutate()}
             disabled={create.isPending || (useExisting && !existingGuid)}
           >
-            {create.isPending ? <span className="spinner" /> : t("setup.createCompany", "Create Company")}
+            {create.isPending ? <span className="spinner" /> : t("setup.createLedger")}
           </button>
         </div>
 
@@ -141,9 +141,9 @@ export function SetupLedger() {
   );
 }
 
-// NewCompanyDialog is a compact modal for adding additional books when the user
+// NewLedgerDialog is a compact modal for adding additional ledgers when the user
 // already has at least one.
-export function NewCompanyDialog({
+export function NewLedgerDialog({
   onClose,
   onCreated,
 }: {
@@ -166,7 +166,7 @@ export function NewCompanyDialog({
       const currencyGuid = useExisting && existingGuid
         ? existingGuid
         : await resolveOrCreateCurrency(presetMnemonic, allCommodities);
-      return api.createBook(name.trim() || "New Company", currencyGuid || undefined);
+      return api.createBook(name.trim() || "New Ledger", currencyGuid || undefined);
     },
     onSuccess: (book) => {
       qc.invalidateQueries({ queryKey: ["books"] });
@@ -181,16 +181,16 @@ export function NewCompanyDialog({
     <div className="dialog-backdrop" onClick={onClose}>
       <div className="dialog" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <div className="dialog__header">
-          <h3 className="dialog__title">{t("setup.newCompany", "New Company")}</h3>
+          <h3 className="dialog__title">{t("setup.newLedger")}</h3>
           <button className="dialog__close" onClick={onClose}>✕</button>
         </div>
         <div className="dialog__body">
           <label className="field">
-            <span className="field__label">{t("setup.companyName", "Company name")}</span>
+            <span className="field__label">{t("setup.ledgerName")}</span>
             <input
               className="field__input"
               type="text"
-              placeholder={t("setup.companyNamePlaceholder", "e.g. My Business")}
+              placeholder={t("setup.ledgerNamePlaceholder")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
@@ -248,7 +248,7 @@ export function NewCompanyDialog({
             onClick={() => create.mutate()}
             disabled={create.isPending || (useExisting && !existingGuid)}
           >
-            {create.isPending ? <span className="spinner" /> : t("setup.createCompany", "Create Company")}
+            {create.isPending ? <span className="spinner" /> : t("setup.createLedger")}
           </button>
         </div>
         {create.error && (

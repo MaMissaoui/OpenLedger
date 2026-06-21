@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "./lib/api";
-import { SetupLedger, NewCompanyDialog } from "./SetupLedger";
+import { SetupLedger, NewLedgerDialog } from "./SetupLedger";
 import { DashboardView } from "./components/DashboardView";
 import { AccountTree } from "./components/AccountTree";
 import { RegisterView } from "./components/RegisterView";
@@ -172,7 +172,7 @@ export function Ledger() {
 
   // Track which book the user has open by GUID; auto-select the first one.
   const [activeBookGuid, setActiveBookGuid] = useState<string | null>(null);
-  const [showNewCompany, setShowNewCompany] = useState(false);
+  const [showNewLedger, setShowNewLedger] = useState(false);
 
   const bookList = books.data ?? [];
   const book = bookList.find((b) => b.guid === activeBookGuid) ?? bookList[0] ?? null;
@@ -300,7 +300,7 @@ export function Ledger() {
             <span className="sidenav__cta-label">{t("nav.newTransaction")}</span>
           </button>
 
-          {/* Book / company switcher */}
+          {/* Ledger switcher */}
           {bookList.length > 1 ? (
             <select
               className="sidenav__book-select"
@@ -309,7 +309,7 @@ export function Ledger() {
                 setActiveBookGuid(e.target.value);
                 setView("dashboard");
               }}
-              title={t("nav.switchCompany", "Switch company")}
+              title={t("nav.switchLedger")}
             >
               {bookList.map((b) => (
                 <option key={b.guid} value={b.guid}>
@@ -319,16 +319,16 @@ export function Ledger() {
             </select>
           ) : (
             <span className="sidenav__book-name" title={book.guid}>
-              {book.name || `book ${book.guid.slice(0, 8)}…`}
+              {book.name || `ledger ${book.guid.slice(0, 8)}…`}
             </span>
           )}
           <button
             className="sidenav__link"
-            onClick={() => setShowNewCompany(true)}
-            title={collapsed ? t("nav.newCompany", "New Company") : undefined}
+            onClick={() => setShowNewLedger(true)}
+            title={collapsed ? t("nav.newLedger") : undefined}
           >
             <span className="sidenav__link-icon">{Icon.plus}</span>
-            <span className="sidenav__link-text">{t("nav.newCompany", "New Company")}</span>
+            <span className="sidenav__link-text">{t("nav.newLedger")}</span>
           </button>
           <button
             className="sidenav__link"
@@ -475,13 +475,13 @@ export function Ledger() {
         <TradeSecurityDialog accounts={postable} onClose={() => setShowTrade(false)} />
       )}
       {showImport && <ImportDialog onClose={() => setShowImport(false)} />}
-      {showNewCompany && (
-        <NewCompanyDialog
-          onClose={() => setShowNewCompany(false)}
+      {showNewLedger && (
+        <NewLedgerDialog
+          onClose={() => setShowNewLedger(false)}
           onCreated={(guid) => {
             setActiveBookGuid(guid);
             setView("dashboard");
-            setShowNewCompany(false);
+            setShowNewLedger(false);
           }}
         />
       )}

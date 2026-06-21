@@ -16,7 +16,9 @@
     "signOut": "Abmelden",
     "expandSidebar": "Seitenleiste einblenden",
     "collapseSidebar": "Seitenleiste ausblenden",
-    "brandTag": "Unternehmensfinanzen"
+    "brandTag": "Unternehmensfinanzen",
+    "newLedger": "Neues Hauptbuch",
+    "switchLedger": "Hauptbuch wechseln"
   },
   "common": {
     "add": "Hinzufügen",
@@ -51,10 +53,15 @@
     "account": "Konto"
   },
   "setup": {
-    "title": "Ihr erstes Buch eröffnen",
-    "description": "Wir richten ein Demo-Hauptbuch für Sie ein: eine US-Dollar-Währung, einen Basis-Kontenplan (Girokonto, Gehalt, Lebensmittel, Eigenkapital) und einen Eröffnungssaldo von 1.000 $ — alles als ausgeglichene doppelte Buchführung.",
-    "createDemo": "Demo-Hauptbuch erstellen",
-    "setupFailed": "Einrichtung fehlgeschlagen"
+    "title": "Ihr erstes Hauptbuch eröffnen",
+    "description": "Geben Sie einen Namen und eine Hauswährung ein, um Ihr Hauptbuch zu erstellen.",
+    "setupFailed": "Einrichtung fehlgeschlagen",
+    "ledgerName": "Name des Hauptbuchs",
+    "ledgerNamePlaceholder": "z. B. Privatfinanzen",
+    "currency": "Hauswährung",
+    "useExistingCurrency": "Vorhandene Währung verwenden",
+    "createLedger": "Hauptbuch erstellen",
+    "newLedger": "Neues Hauptbuch"
   },
   "dashboard": {
     "eyebrow": "Finanzübersicht",
@@ -86,7 +93,7 @@
     "codeOptional": "Kontonummer (optional)",
     "codePlaceholder": "5020",
     "parent": "Übergeordnetes Konto",
-    "topLevel": "Oberste Ebene (Buchstamm)",
+    "topLevel": "Oberste Ebene (Hauptbuch-Stamm)",
     "placeholderAccount": "Sammelkonto (keine Buchungen)",
     "accountDescription": "Beschreibung",
     "addBegin": "Fügen Sie ein Konto hinzu, um zu beginnen.",
@@ -229,7 +236,7 @@
       "roleCol": "Rolle",
       "remove": "Entfernen",
       "noMembers": "Noch keine Mitglieder.",
-      "signInNote": "Mitglieder müssen sich mindestens einmal angemeldet haben, bevor sie hinzugefügt werden können. Ein Buch muss immer mindestens einen Eigentümer haben.",
+      "signInNote": "Mitglieder müssen sich mindestens einmal angemeldet haben, bevor sie hinzugefügt werden können. Ein Hauptbuch muss immer mindestens einen Eigentümer haben.",
       "errorLoad": "Mitglieder konnten nicht geladen werden",
       "errorAdd": "Mitglied konnte nicht hinzugefügt werden",
       "errorRole": "Rolle konnte nicht geändert werden",

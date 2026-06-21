@@ -16,7 +16,9 @@
     "signOut": "Sign out",
     "expandSidebar": "Expand sidebar",
     "collapseSidebar": "Collapse sidebar",
-    "brandTag": "Enterprise Finance"
+    "brandTag": "Enterprise Finance",
+    "newLedger": "New Ledger",
+    "switchLedger": "Switch ledger"
   },
   "common": {
     "add": "Add",
@@ -51,10 +53,15 @@
     "account": "Account"
   },
   "setup": {
-    "title": "Open your first book",
-    "description": "We'll set up a demo ledger for you: a US Dollar currency, a starter chart of accounts (Checking, Salary, Groceries, Equity), and a $1,000 opening balance — all posted as balanced double-entry transactions.",
-    "createDemo": "Create demo ledger",
-    "setupFailed": "Setup failed"
+    "title": "Open your first ledger",
+    "description": "Enter a name and home currency to create your ledger.",
+    "setupFailed": "Setup failed",
+    "ledgerName": "Ledger name",
+    "ledgerNamePlaceholder": "e.g. Personal Finances",
+    "currency": "Home currency",
+    "useExistingCurrency": "Use an existing currency",
+    "createLedger": "Create Ledger",
+    "newLedger": "New Ledger"
   },
   "dashboard": {
     "eyebrow": "Financial Overview",
@@ -86,7 +93,7 @@
     "codeOptional": "Code (optional)",
     "codePlaceholder": "5020",
     "parent": "Parent",
-    "topLevel": "Top level (book root)",
+    "topLevel": "Top level (ledger root)",
     "placeholderAccount": "Placeholder (no transactions)",
     "accountDescription": "Description",
     "addBegin": "Add an account to begin.",
@@ -229,7 +236,7 @@
       "roleCol": "Role",
       "remove": "Remove",
       "noMembers": "No members yet.",
-      "signInNote": "Members must have signed in at least once before they can be added. A book always keeps at least one owner.",
+      "signInNote": "Members must have signed in at least once before they can be added. A ledger always keeps at least one owner.",
       "errorLoad": "Could not load members",
       "errorAdd": "Could not add member",
       "errorRole": "Could not change role",

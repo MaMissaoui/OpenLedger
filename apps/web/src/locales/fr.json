@@ -16,7 +16,9 @@
     "signOut": "Se déconnecter",
     "expandSidebar": "Développer le menu",
     "collapseSidebar": "Réduire le menu",
-    "brandTag": "Finance d'entreprise"
+    "brandTag": "Finance d'entreprise",
+    "newLedger": "Nouveau grand livre",
+    "switchLedger": "Changer de grand livre"
   },
   "common": {
     "add": "Ajouter",
@@ -51,10 +53,15 @@
     "account": "Compte"
   },
   "setup": {
-    "title": "Ouvrir votre premier livre",
-    "description": "Nous allons configurer un grand livre de démonstration : une devise en dollars américains, un plan comptable de démarrage (Compte courant, Salaire, Courses, Capitaux propres) et un solde d'ouverture de 1 000 $ — tous enregistrés comme transactions en partie double équilibrées.",
-    "createDemo": "Créer le grand livre de démonstration",
-    "setupFailed": "Échec de la configuration"
+    "title": "Ouvrir votre premier grand livre",
+    "description": "Saisissez un nom et une devise principale pour créer votre grand livre.",
+    "setupFailed": "Échec de la configuration",
+    "ledgerName": "Nom du grand livre",
+    "ledgerNamePlaceholder": "ex. Finances personnelles",
+    "currency": "Devise principale",
+    "useExistingCurrency": "Utiliser une devise existante",
+    "createLedger": "Créer le grand livre",
+    "newLedger": "Nouveau grand livre"
   },
   "dashboard": {
     "eyebrow": "Aperçu financier",
@@ -86,7 +93,7 @@
     "codeOptional": "Code (optionnel)",
     "codePlaceholder": "5020",
     "parent": "Compte parent",
-    "topLevel": "Niveau supérieur (racine du livre)",
+    "topLevel": "Niveau supérieur (racine du grand livre)",
     "placeholderAccount": "Compte agrégat (sans transactions)",
     "accountDescription": "Description",
     "addBegin": "Ajoutez un compte pour commencer.",
@@ -229,7 +236,7 @@
       "roleCol": "Rôle",
       "remove": "Supprimer",
       "noMembers": "Aucun membre pour l'instant.",
-      "signInNote": "Les membres doivent s'être connectés au moins une fois avant de pouvoir être ajoutés. Un livre doit toujours conserver au moins un propriétaire.",
+      "signInNote": "Les membres doivent s'être connectés au moins une fois avant de pouvoir être ajoutés. Un grand livre doit toujours conserver au moins un propriétaire.",
       "errorLoad": "Impossible de charger les membres",
       "errorAdd": "Impossible d'ajouter le membre",
       "errorRole": "Impossible de modifier le rôle",
