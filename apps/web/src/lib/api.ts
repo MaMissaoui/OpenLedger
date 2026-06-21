@@ -344,7 +344,7 @@ export const api = {
   deleteJob: (guid: string) =>
     request<void>(`/api/v1/jobs/${guid}`, { method: "DELETE" }),
 
-  listInvoices: (bookGuid: string, type: "invoice" | "bill" = "invoice") =>
+  listInvoices: (bookGuid: string, type: "invoice" | "bill" | "expense_voucher" = "invoice") =>
     request<{ bookGuid: string; type: string; invoices: Invoice[] }>(
       `/api/v1/books/${bookGuid}/invoices?type=${type}`,
     ).then((r) => r.invoices),

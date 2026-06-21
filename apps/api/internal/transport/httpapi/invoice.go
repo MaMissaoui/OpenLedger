@@ -14,7 +14,7 @@ import (
 
 type invoiceBodyDTO struct {
 	ID           string `json:"id"`
-	Type         string `json:"type"` // "invoice" or "bill"
+	Type         string `json:"type"` // "invoice", "bill", or "expense_voucher"
 	OwnerGUID    string `json:"ownerGuid"`
 	JobGUID      string `json:"jobGuid"`
 	DateOpened   string `json:"dateOpened"`

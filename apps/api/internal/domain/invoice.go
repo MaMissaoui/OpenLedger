@@ -19,6 +19,7 @@ type InvoiceType string
 const (
 	InvoiceTypeCustomer InvoiceType = "invoice"
 	InvoiceTypeBill     InvoiceType = "bill"
+	InvoiceTypeVoucher  InvoiceType = "expense_voucher" // employee expense reimbursement
 )
 
 // InvoiceEntry is one line item on an invoice or bill.

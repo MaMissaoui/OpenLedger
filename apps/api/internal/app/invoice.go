@@ -247,7 +247,7 @@ func (s *InvoiceService) PayInvoice(ctx context.Context, userID, guid string, re
 			{AccountGUID: inv.PostAccGUID, Value: total.Neg(), Quantity: total.Neg()},
 		}
 	} else {
-		// Cash paid: debit A/P (-), credit cash (-)
+		// Bill / expense_voucher: debit A/P (or employee payable), credit cash.
 		splits = []domain.Split{
 			{AccountGUID: inv.PostAccGUID, Value: total, Quantity: total},
 			{AccountGUID: req.PaymentAccGUID, Value: total.Neg(), Quantity: total.Neg()},
@@ -258,14 +258,15 @@ func (s *InvoiceService) PayInvoice(ctx context.Context, userID, guid string, re
 	if payDate.IsZero() {
 		payDate = s.now().UTC().Truncate(24 * time.Hour)
 	}
+	invLabel := "Bill"
+	if inv.Type == domain.InvoiceTypeCustomer {
+		invLabel = "Invoice"
+	} else if inv.Type == domain.InvoiceTypeVoucher {
+		invLabel = "Expense Voucher"
+	}
 	label := "Payment"
 	if inv.ID != "" {
-		label = fmt.Sprintf("Payment: %s %s", func() string {
-			if inv.Type == domain.InvoiceTypeCustomer {
-				return "Invoice"
-			}
-			return "Bill"
-		}(), inv.ID)
+		label = fmt.Sprintf("Payment: %s %s", invLabel, inv.ID)
 	}
 
 	tx := domain.Transaction{
@@ -434,7 +435,8 @@ func (s *InvoiceService) PostInvoice(ctx context.Context, userID, guid string, r
 			})
 		}
 	} else {
-		// Debit each expense account (net) and each tax account; credit A/P (net + tax).
+		// Bill and expense_voucher: debit each expense account (net) and each tax account;
+		// credit A/P (or employee payable) for the full amount.
 		for _, e := range entries {
 			lt := e.LineTotal()
 			splits = append(splits, domain.Split{
@@ -475,8 +477,11 @@ func (s *InvoiceService) PostInvoice(ctx context.Context, userID, guid string, r
 	dueDate := domain.ResolveDueDate(req.DueDate, term, postDate)
 
 	label := "Invoice"
-	if inv.Type == domain.InvoiceTypeBill {
+	switch inv.Type {
+	case domain.InvoiceTypeBill:
 		label = "Bill"
+	case domain.InvoiceTypeVoucher:
+		label = "Expense Voucher"
 	}
 	description := label
 	if inv.ID != "" {

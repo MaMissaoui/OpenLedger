@@ -61,7 +61,7 @@ function AccountSelect({
 
 interface EntryFormProps {
   invoiceGuid: string;
-  invType: "invoice" | "bill";
+  invType: "invoice" | "bill" | "expense_voucher";
   accounts: Account[];
   taxTables: TaxTable[];
   existing?: Entry;
@@ -79,6 +79,7 @@ function EntryForm({ invoiceGuid, invType, accounts, taxTables, existing, onSave
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Invoices credit income accounts; bills and vouchers debit expense accounts.
   const accountFilter = invType === "invoice"
     ? (a: Account) => a.type === "INCOME" && !a.placeholder
     : (a: Account) => a.type === "EXPENSE" && !a.placeholder;
@@ -206,7 +207,7 @@ function PostDialog({
   async function handlePost() {
     setError(null);
     if (!postAccGuid) {
-      setError(invoice.type === "invoice" ? "Select an A/R account." : "Select an A/P account.");
+      setError(invoice.type === "invoice" ? "Select an A/R account." : "Select an A/P (payable) account.");
       return;
     }
     setSaving(true);
@@ -224,7 +225,7 @@ function PostDialog({
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" style={{ width: "min(420px, 96vw)" }} onClick={(e) => e.stopPropagation()}>
         <div className="dialog__header">
-          <h2>Post {invoice.type === "invoice" ? "Invoice" : "Bill"}</h2>
+          <h2>Post {invoice.type === "invoice" ? "Invoice" : invoice.type === "bill" ? "Bill" : "Expense Voucher"}</h2>
           <button className="dialog__close" onClick={onClose}>×</button>
         </div>
         <div className="dialog__body">
@@ -484,7 +485,7 @@ function InvoiceDetail({
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
         <button className="btn btn--ghost btn--sm" onClick={onBack}>← Back</button>
         <h2 style={{ margin: 0, fontSize: "1.1rem" }}>
-          {invoice.type === "invoice" ? "Invoice" : "Bill"} {invoice.id || invoice.guid.slice(0, 8)}
+          {invoice.type === "invoice" ? "Invoice" : invoice.type === "bill" ? "Bill" : "Voucher"} {invoice.id || invoice.guid.slice(0, 8)}
         </h2>
         {isPaid ? (
           <span style={{ background: "rgba(26,127,55,0.18)", color: "var(--forest-dark)", borderRadius: "999px", padding: "0.15rem 0.55rem", fontSize: "0.75rem", fontWeight: 600 }}>
@@ -543,7 +544,7 @@ function InvoiceDetail({
               <EntryForm
                 key={e.guid}
                 invoiceGuid={invoice.guid}
-                invType={invoice.type as "invoice" | "bill"}
+                invType={invoice.type as "invoice" | "bill" | "expense_voucher"}
                 accounts={accounts}
                 taxTables={taxTables}
                 existing={e}
@@ -575,7 +576,7 @@ function InvoiceDetail({
           {addingEntry && (
             <EntryForm
               invoiceGuid={invoice.guid}
-              invType={invoice.type as "invoice" | "bill"}
+              invType={invoice.type as "invoice" | "bill" | "expense_voucher"}
               accounts={accounts}
               taxTables={taxTables}
               onSaved={() => { setAddingEntry(false); reloadEntries(); }}
@@ -632,7 +633,7 @@ function InvoiceFormDialog({
   onSaved,
 }: {
   bookGuid: string;
-  invType: "invoice" | "bill";
+  invType: "invoice" | "bill" | "expense_voucher";
   owners: Array<{ guid: string; name: string; id?: string }>;
   jobs: Job[];
   existing?: Invoice;
@@ -661,7 +662,8 @@ function InvoiceFormDialog({
 
   async function handleSave() {
     setError(null);
-    if (!ownerGuid) { setError(`${invType === "invoice" ? "Customer" : "Vendor"} is required.`); return; }
+    const ownerNoun = invType === "invoice" ? "Customer" : invType === "bill" ? "Vendor" : "Employee";
+    if (!ownerGuid) { setError(`${ownerNoun} is required.`); return; }
     if (!currencyGuid) { setError("Currency is required."); return; }
     const input: NewInvoice = { id, type: invType, ownerGuid, jobGuid: jobGuid || undefined, dateOpened, notes, active: true, currencyGuid, termsGuid: termsGuid || undefined };
     setSaving(true);
@@ -680,14 +682,14 @@ function InvoiceFormDialog({
     }
   }
 
-  const entityLabel = invType === "invoice" ? "Customer" : "Vendor";
-  const numPrefix = invType === "invoice" ? "INV" : "BILL";
+  const entityLabel = invType === "invoice" ? "Customer" : invType === "bill" ? "Vendor" : "Employee";
+  const numPrefix = invType === "invoice" ? "INV" : invType === "bill" ? "BILL" : "EXP";
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" style={{ width: "min(460px, 96vw)" }} onClick={(e) => e.stopPropagation()}>
         <div className="dialog__header">
-          <h2>{existing ? "Edit" : "New"} {invType === "invoice" ? "Invoice" : "Bill"}</h2>
+          <h2>{existing ? "Edit" : "New"} {invType === "invoice" ? "Invoice" : invType === "bill" ? "Bill" : "Expense Voucher"}</h2>
           <button className="dialog__close" onClick={onClose}>×</button>
         </div>
         <div className="dialog__body">
@@ -702,6 +704,7 @@ function InvoiceFormDialog({
           </label>
 
           {(() => {
+            if (invType === "expense_voucher") return null;
             const ownerJobs = jobs.filter((j) => j.ownerGuid === ownerGuid && j.active);
             if (!ownerGuid || ownerJobs.length === 0) return null;
             return (
@@ -770,7 +773,7 @@ export default function InvoiceView({
   accounts,
 }: {
   bookGuid: string;
-  invType: "invoice" | "bill";
+  invType: "invoice" | "bill" | "expense_voucher";
   triggerNew: number;
   accounts: Account[];
 }) {
@@ -782,13 +785,19 @@ export default function InvoiceView({
   const [editing, setEditing] = useState<Invoice | undefined>(undefined);
   const [query, setQuery] = useState("");
 
-  // Owners: customers for invoices, vendors for bills
+  // Owners: customers for invoices, vendors for bills, employees for vouchers
   const [owners, setOwners] = useState<Array<{ guid: string; name: string; id?: string }>>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   useEffect(() => {
-    const fn = invType === "invoice" ? api.listCustomers : api.listVendors;
+    const fn = invType === "invoice"
+      ? api.listCustomers
+      : invType === "bill"
+        ? api.listVendors
+        : api.listEmployees;
     fn(bookGuid).then((list) => setOwners(list)).catch(() => null);
-    api.listJobs(bookGuid).then(setJobs).catch(() => null);
+    if (invType !== "expense_voucher") {
+      api.listJobs(bookGuid).then(setJobs).catch(() => null);
+    }
   }, [bookGuid, invType]);
 
   function load() {
@@ -816,7 +825,8 @@ export default function InvoiceView({
   }, [triggerNew]);
 
   async function handleDelete(inv: Invoice) {
-    if (!confirm(`Delete ${invType === "invoice" ? "invoice" : "bill"} "${inv.id || inv.guid.slice(0, 8)}"?`)) return;
+    const docLabel = invType === "invoice" ? "invoice" : invType === "bill" ? "bill" : "voucher";
+    if (!confirm(`Delete ${docLabel} "${inv.id || inv.guid.slice(0, 8)}"?`)) return;
     try {
       await api.deleteInvoice(inv.guid);
       setInvoices((prev) => prev?.filter((i) => i.guid !== inv.guid) ?? null);
@@ -863,25 +873,24 @@ export default function InvoiceView({
 
       {loading && <div className="empty"><span className="spinner" /></div>}
 
-      {!loading && invoices?.length === 0 && (
-        <div className="empty">
-          <span style={{ fontSize: "2.2rem", opacity: 0.25, lineHeight: 1 }}>
-            {invType === "invoice" ? "🧾" : "📄"}
-          </span>
-          <span style={{ fontWeight: 500, color: "var(--ink)" }}>
-            No {invType === "invoice" ? "invoices" : "bills"} yet.
-          </span>
-          <span style={{ fontSize: "0.85rem" }}>
-            Click <strong>+ New {invType === "invoice" ? "Invoice" : "Bill"}</strong> to create one.
-          </span>
-        </div>
-      )}
+      {!loading && invoices?.length === 0 && (() => {
+        const noun = invType === "invoice" ? "Invoice" : invType === "bill" ? "Bill" : "Voucher";
+        return (
+          <div className="empty">
+            <span style={{ fontSize: "2.2rem", opacity: 0.25, lineHeight: 1 }}>
+              {invType === "invoice" ? "🧾" : invType === "bill" ? "📄" : "🗂️"}
+            </span>
+            <span style={{ fontWeight: 500, color: "var(--ink)" }}>No {noun.toLowerCase()}s yet.</span>
+            <span style={{ fontSize: "0.85rem" }}>Click <strong>+ New {noun}</strong> to create one.</span>
+          </div>
+        );
+      })()}
 
       {invoices && invoices.length > 0 && (
         <div style={{ padding: "0.5rem 1.5rem 0", display: "flex", gap: "0.5rem" }}>
           <input
             type="search"
-            placeholder={`Filter by number or ${invType === "invoice" ? "customer" : "vendor"}…`}
+            placeholder={`Filter by number or ${invType === "invoice" ? "customer" : invType === "bill" ? "vendor" : "employee"}…`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ maxWidth: "20rem" }}
@@ -894,8 +903,8 @@ export default function InvoiceView({
           <thead>
             <tr>
               <th>Number</th>
-              <th>{invType === "invoice" ? "Customer" : "Vendor"}</th>
-              <th>Job</th>
+              <th>{invType === "invoice" ? "Customer" : invType === "bill" ? "Vendor" : "Employee"}</th>
+              {invType !== "expense_voucher" && <th>Job</th>}
               <th>Date</th>
               <th>Due</th>
               <th style={{ textAlign: "right" }}>Total</th>
@@ -912,9 +921,11 @@ export default function InvoiceView({
                 <td style={{ fontWeight: 500 }}>
                   {ownerDisplay[inv.ownerGuid] ?? <span style={{ color: "var(--ink-soft)" }}>—</span>}
                 </td>
-                <td style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>
-                  {inv.jobGuid ? jobMap[inv.jobGuid] ?? "—" : "—"}
-                </td>
+                {invType !== "expense_voucher" && (
+                  <td style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>
+                    {inv.jobGuid ? jobMap[inv.jobGuid] ?? "—" : "—"}
+                  </td>
+                )}
                 <td className="mono" style={{ fontSize: "0.85rem" }}>{inv.dateOpened}</td>
                 <td className="mono" style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
                   {inv.dateDue ?? "—"}
