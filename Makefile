@@ -1,4 +1,4 @@
-.PHONY: test test-integration build run seed dev up down fmt vet lint web-install web-build start stop migrate
+.PHONY: test test-integration build run seed seed-skr04 dev up down fmt vet lint web-install web-build start stop migrate
 
 # --- Go API ---
 test:
@@ -26,6 +26,9 @@ run:
 
 seed:
 	cd apps/api && go run ./cmd/seed
+
+seed-skr04:
+	cd apps/api && go run ./cmd/seed-skr04
 
 # --- Web ---
 web-install:
