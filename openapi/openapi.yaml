@@ -1407,6 +1407,110 @@ paths:
         "404":
           description: Customer not found
 
+  /api/v1/books/{id}/members:
+    get:
+      summary: List a book's members and their roles
+      operationId: listMembers
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Member list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberList"
+        "403":
+          description: Forbidden
+    post:
+      summary: Add a member to a book by email (requires admin)
+      operationId: addMember
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewMember"
+      responses:
+        "201":
+          description: Added member
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          description: Validation error
+        "403":
+          description: Forbidden
+        "404":
+          description: No user with that email has signed in yet
+
+  /api/v1/books/{id}/members/{userId}:
+    patch:
+      summary: Change a member's role (requires admin)
+      operationId: updateMember
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberRole"
+      responses:
+        "204":
+          description: Role updated
+        "400":
+          description: Validation error
+        "403":
+          description: Forbidden
+        "404":
+          description: Not a member of this book
+        "409":
+          description: Would leave the book without an owner
+    delete:
+      summary: Remove a member from a book (requires admin)
+      operationId: removeMember
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Member removed
+        "403":
+          description: Forbidden
+        "404":
+          description: Not a member of this book
+        "409":
+          description: Would leave the book without an owner
+
   /api/v1/books/{id}/vendors:
     get:
       summary: List vendors for a book
@@ -3022,6 +3126,48 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Vendor"
+
+    MemberRole:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [viewer, editor, admin, owner]
+
+    NewMember:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+          description: Email of an already-provisioned user
+        role:
+          type: string
+          enum: [viewer, editor, admin, owner]
+
+    Member:
+      type: object
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+        ldapUser:
+          type: string
+        role:
+          type: string
+          enum: [viewer, editor, admin, owner]
+
+    MemberList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/Member"
 
     NewEmployee:
       type: object

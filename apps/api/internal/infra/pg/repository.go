@@ -1117,6 +1117,82 @@ func (r *Repository) UserBookRole(ctx context.Context, userID, bookGUID string) 
 	return app.Role(role), true, nil
 }
 
+// ListBookMembers returns every member of a book with their role, ordered by
+// email for a stable members screen.
+func (r *Repository) ListBookMembers(ctx context.Context, bookGUID string) ([]app.Member, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT u.id, u.email, COALESCE(u.ldap_uid, ''), m.role
+		   FROM memberships m
+		   JOIN users u ON u.id = m.user_id
+		  WHERE m.book_guid = $1
+		  ORDER BY lower(u.email)`, bookGUID)
+	if err != nil {
+		return nil, fmt.Errorf("list book members: %w", err)
+	}
+	defer rows.Close()
+
+	var members []app.Member
+	for rows.Next() {
+		var m app.Member
+		var role string
+		if err := rows.Scan(&m.UserID, &m.Email, &m.LDAPUser, &role); err != nil {
+			return nil, fmt.Errorf("scan member: %w", err)
+		}
+		m.Role = app.Role(role)
+		members = append(members, m)
+	}
+	return members, rows.Err()
+}
+
+// FindUserByEmail returns the user with the given email (case-insensitive),
+// or app.ErrUserNotFound if none has been provisioned.
+func (r *Repository) FindUserByEmail(ctx context.Context, email string) (app.Member, error) {
+	var m app.Member
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, email, COALESCE(ldap_uid, '') FROM users WHERE lower(email) = lower($1)`, email,
+	).Scan(&m.UserID, &m.Email, &m.LDAPUser)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return app.Member{}, app.ErrUserNotFound
+	}
+	if err != nil {
+		return app.Member{}, fmt.Errorf("find user by email: %w", err)
+	}
+	return m, nil
+}
+
+// CountBookOwners returns how many owner memberships a book has.
+func (r *Repository) CountBookOwners(ctx context.Context, bookGUID string) (int, error) {
+	var n int
+	if err := r.pool.QueryRow(ctx,
+		`SELECT count(*) FROM memberships WHERE book_guid = $1 AND role = 'owner'`, bookGUID,
+	).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count book owners: %w", err)
+	}
+	return n, nil
+}
+
+// UpsertMembership creates or updates a user's role on a book.
+func (r *Repository) UpsertMembership(ctx context.Context, userID, bookGUID string, role app.Role) error {
+	if _, err := r.pool.Exec(ctx,
+		`INSERT INTO memberships (user_id, book_guid, role) VALUES ($1, $2, $3)
+		 ON CONFLICT (user_id, book_guid) DO UPDATE SET role = EXCLUDED.role`,
+		userID, bookGUID, string(role),
+	); err != nil {
+		return fmt.Errorf("upsert membership: %w", err)
+	}
+	return nil
+}
+
+// DeleteMembership removes a user's membership on a book.
+func (r *Repository) DeleteMembership(ctx context.Context, userID, bookGUID string) error {
+	if _, err := r.pool.Exec(ctx,
+		`DELETE FROM memberships WHERE user_id = $1 AND book_guid = $2`, userID, bookGUID,
+	); err != nil {
+		return fmt.Errorf("delete membership: %w", err)
+	}
+	return nil
+}
+
 // BookGUIDForAccount returns the book an account belongs to by walking up the
 // parent_guid chain to the root account, which a book references via
 // root_account_guid. Returns app.ErrAccountNotFound if the account does not

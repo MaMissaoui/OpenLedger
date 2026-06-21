@@ -24,6 +24,7 @@ type Services struct {
 	Forecast     *app.ForecastService
 	Provision    *app.ProvisionService
 	Authz        *app.AuthzService
+	Membership   *app.MembershipService
 	Importer     *app.ImportService
 	Exporter     *app.ExportService
 	Reconciler   *app.ReconcileService
@@ -103,6 +104,11 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/accounts/{id}/import-bank/preview", s.requireAuth(s.handlePreviewBankCSV))
 	mux.HandleFunc("POST /api/v1/accounts/{id}/import-bank", s.requireAuth(s.handleImportBankStatement))
 	mux.HandleFunc("GET /api/v1/books/{id}/export/gnucash", s.requireAuth(s.handleExportGnuCash))
+	// Settings: book members (admin-managed RBAC)
+	mux.HandleFunc("GET /api/v1/books/{id}/members", s.requireAuth(s.handleListMembers))
+	mux.HandleFunc("POST /api/v1/books/{id}/members", s.requireAuth(s.handleAddMember))
+	mux.HandleFunc("PATCH /api/v1/books/{id}/members/{userId}", s.requireAuth(s.handleUpdateMember))
+	mux.HandleFunc("DELETE /api/v1/books/{id}/members/{userId}", s.requireAuth(s.handleRemoveMember))
 	// Business: customers
 	mux.HandleFunc("GET /api/v1/books/{id}/customers", s.requireAuth(s.handleListCustomers))
 	mux.HandleFunc("POST /api/v1/books/{id}/customers", s.requireAuth(s.handleCreateCustomer))
