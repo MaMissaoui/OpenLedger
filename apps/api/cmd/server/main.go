@@ -54,6 +54,8 @@ func main() {
 	budget := app.NewBudgetService(repo)
 	customer := app.NewCustomerService(repo, authz)
 	vendor := app.NewVendorService(repo, authz)
+	employee := app.NewEmployeeService(repo, authz)
+	job := app.NewJobService(repo, authz)
 	invoice := app.NewInvoiceService(repo, posting, authz)
 	billterm := app.NewBillTermService(repo)
 	taxtable := app.NewTaxTableService(repo)
@@ -67,7 +69,7 @@ func main() {
 		"qif": bankimport.QIF{},
 	})
 
-	server := httpapi.NewServer(posting, ledger, structure, price, report, forecast, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor, invoice, billterm, taxtable, quoteSvc, bankImport)
+	server := httpapi.NewServer(posting, ledger, structure, price, report, forecast, provision, authz, importer, exporter, reconciler, portfolio, trade, capitalGains, schedule, budget, customer, vendor, invoice, billterm, taxtable, quoteSvc, bankImport, employee, job)
 
 	addr := ":" + envOr("PORT", "8080")
 	srv := &http.Server{

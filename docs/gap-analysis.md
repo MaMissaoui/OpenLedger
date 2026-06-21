@@ -26,19 +26,19 @@ The `customers`/`vendors`/`invoices` tables already carry `terms_guid` and
 |---|---|---|
 | ~~**Bill/payment terms** (`billterms`)~~ — **Done.** `billterms` table, domain, CRUD endpoints + web UI; invoice due dates derive from terms | **M** |
 | ~~**Tax tables** (`taxtables` + `taxtable_entries`)~~ — **Done.** Tax-rate table + entries, tax applied when posting invoices, web UI | **M–L** |
-| **Employees** + expense vouchers | No `employees` table/handler | **M** |
-| **Jobs** (group invoices/bills under a job) | No `jobs` table/handler | **S–M** |
+| ~~**Employees**~~ — **Done.** `employees` table, domain, CRUD endpoints + web UI (entity only; expense vouchers still deferred) | **M** |
+| ~~**Jobs** (group invoices/bills under a job)~~ — **Done.** `jobs` table, domain, CRUD endpoints + web UI (customer/vendor owner) | **S–M** |
 
-## B. Deferred bank-import formats
+## B. Deferred bank-import formats — DONE
 
-OFX and QIF now import into an existing account (`POST /accounts/{id}/import-bank`,
-offset to Imbalance-CUR, deduped by import ref). CSV remains:
+OFX, QIF and CSV all import into an existing account (`POST /accounts/{id}/import-bank`,
+offset to Imbalance-CUR, deduped by import ref).
 
 | Gap | Effort |
 |---|---|
 | ~~**OFX** import~~ — **Done.** Tolerant SGML/XML parser; FITID-based dedup | M |
 | ~~**QIF** import~~ — **Done.** Content-hash dedup (no per-line id in QIF) | M |
-| **CSV** import (column-mapping wizard — UI heavy) | L |
+| ~~**CSV** import~~ — **Done.** Column-mapping wizard (server preview + mapping UI), `$€£¥`/parens/sign parsing | L |
 
 ## C. Online price quotes — DONE
 
@@ -63,5 +63,7 @@ drives it. Optional scheduled auto-refresh is still deferred. **Effort: M**
 2. ~~**Tax tables** (A)~~ — **Done.** Completed invoicing correctness.
 3. ~~**Prices/commodities UI + import UI** (D)~~ — **Done.**
 4. ~~**Online price quotes** (C)~~ — **Done.** Frankfurter FX provider behind `POST /prices/fetch`.
-5. ~~**OFX/QIF import** (B)~~ — **Done.** Posts into an account, offset to Imbalance. **CSV still deferred (heaviest, UI-led). ← next**
-6. **Employees & jobs** (A) — lowest value for a personal/small-business focus; defer unless chasing full GnuCash parity.
+5. ~~**OFX/QIF/CSV import** (B)~~ — **Done.** All three post into an account, offset to Imbalance; CSV via a column-mapping wizard.
+6. ~~**Employees & jobs** (A)~~ — **Done.** Entity CRUD (table + domain + endpoints + web) for both; expense vouchers and job-attachment-to-invoice still deferred.
+
+**Backlog complete** — every item in sections A–D is shipped or explicitly deferred (employee expense vouchers, scheduled price auto-refresh, job→invoice linking). Re-audit before picking up new roadmap work.

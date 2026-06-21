@@ -13,15 +13,19 @@ import type {
   CashFlowStatement,
   Commodity,
   Customer,
+  Employee,
   Entry,
   ImportResult,
   IncomeStatement,
   Invoice,
+  Job,
   NewBillTerm,
   NewBudget,
   NewCustomer,
+  NewEmployee,
   NewEntry,
   NewInvoice,
+  NewJob,
   NewScheduledTransaction,
   NewTaxTable,
   NewVendor,
@@ -299,6 +303,42 @@ export const api = {
     }),
   deleteVendor: (guid: string) =>
     request<void>(`/api/v1/vendors/${guid}`, { method: "DELETE" }),
+
+  listEmployees: (bookGuid: string, activeOnly = false) => {
+    const q = activeOnly ? "?active=true" : "";
+    return request<{ bookGuid: string; employees: Employee[] }>(
+      `/api/v1/books/${bookGuid}/employees${q}`,
+    ).then((r) => r.employees);
+  },
+  createEmployee: (bookGuid: string, input: NewEmployee) =>
+    post<Employee>(`/api/v1/books/${bookGuid}/employees`, input),
+  getEmployee: (guid: string) => request<Employee>(`/api/v1/employees/${guid}`),
+  updateEmployee: (guid: string, input: NewEmployee) =>
+    request<Employee>(`/api/v1/employees/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteEmployee: (guid: string) =>
+    request<void>(`/api/v1/employees/${guid}`, { method: "DELETE" }),
+
+  listJobs: (bookGuid: string, activeOnly = false) => {
+    const q = activeOnly ? "?active=true" : "";
+    return request<{ bookGuid: string; jobs: Job[] }>(
+      `/api/v1/books/${bookGuid}/jobs${q}`,
+    ).then((r) => r.jobs);
+  },
+  createJob: (bookGuid: string, input: NewJob) =>
+    post<Job>(`/api/v1/books/${bookGuid}/jobs`, input),
+  getJob: (guid: string) => request<Job>(`/api/v1/jobs/${guid}`),
+  updateJob: (guid: string, input: NewJob) =>
+    request<Job>(`/api/v1/jobs/${guid}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }),
+  deleteJob: (guid: string) =>
+    request<void>(`/api/v1/jobs/${guid}`, { method: "DELETE" }),
 
   listInvoices: (bookGuid: string, type: "invoice" | "bill" = "invoice") =>
     request<{ bookGuid: string; type: string; invoices: Invoice[] }>(
