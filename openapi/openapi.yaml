@@ -1516,6 +1516,224 @@ paths:
         "404":
           description: Vendor not found
 
+  /api/v1/books/{id}/employees:
+    get:
+      summary: List employees for a book
+      operationId: listEmployees
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        "200":
+          description: Employee list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeList"
+        "403":
+          description: Forbidden
+    post:
+      summary: Create an employee in a book
+      operationId: createEmployee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewEmployee"
+      responses:
+        "201":
+          description: Created employee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+        "400":
+          description: Validation error
+        "403":
+          description: Forbidden
+
+  /api/v1/employees/{id}:
+    get:
+      summary: Get an employee by GUID
+      operationId: getEmployee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Employee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+        "404":
+          description: Employee not found
+    patch:
+      summary: Update an employee
+      operationId: updateEmployee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewEmployee"
+      responses:
+        "200":
+          description: Updated employee
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Employee"
+        "404":
+          description: Employee not found
+    delete:
+      summary: Delete an employee
+      operationId: deleteEmployee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Employee not found
+
+  /api/v1/books/{id}/jobs:
+    get:
+      summary: List jobs for a book
+      operationId: listJobs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: active
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+      responses:
+        "200":
+          description: Job list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobList"
+        "403":
+          description: Forbidden
+    post:
+      summary: Create a job in a book
+      operationId: createJob
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewJob"
+      responses:
+        "201":
+          description: Created job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "400":
+          description: Validation error
+        "403":
+          description: Forbidden
+
+  /api/v1/jobs/{id}:
+    get:
+      summary: Get a job by GUID
+      operationId: getJob
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Job not found
+    patch:
+      summary: Update a job (owner is fixed at creation)
+      operationId: updateJob
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewJob"
+      responses:
+        "200":
+          description: Updated job
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Job not found
+    delete:
+      summary: Delete a job
+      operationId: deleteJob
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Job not found
+
   /api/v1/books/{id}/invoices:
     get:
       summary: List invoices or bills for a book
@@ -2804,6 +3022,95 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Vendor"
+
+    NewEmployee:
+      type: object
+      required: [name, currencyGuid]
+      properties:
+        name:
+          type: string
+        username:
+          type: string
+        id:
+          type: string
+          description: Display number (e.g. EMP-0001)
+        notes:
+          type: string
+        active:
+          type: boolean
+        currencyGuid:
+          type: string
+        addr:
+          $ref: "#/components/schemas/Address"
+        rate:
+          $ref: "#/components/schemas/GncNumeric"
+          description: Default hourly billing rate in the employee's currency
+
+    Employee:
+      allOf:
+        - $ref: "#/components/schemas/NewEmployee"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+
+    EmployeeList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        employees:
+          type: array
+          items:
+            $ref: "#/components/schemas/Employee"
+
+    NewJob:
+      type: object
+      required: [name, ownerType, ownerGuid]
+      properties:
+        name:
+          type: string
+        id:
+          type: string
+          description: Display number (e.g. JOB-0001)
+        reference:
+          type: string
+        active:
+          type: boolean
+        ownerType:
+          type: string
+          enum: [customer, vendor]
+          description: Whether ownerGuid points at a customer or a vendor. Fixed at creation.
+        ownerGuid:
+          type: string
+
+    Job:
+      allOf:
+        - $ref: "#/components/schemas/NewJob"
+        - type: object
+          properties:
+            guid:
+              type: string
+            bookGuid:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+
+    JobList:
+      type: object
+      properties:
+        bookGuid:
+          type: string
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Job"
 
     NewInvoice:
       type: object

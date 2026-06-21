@@ -2385,6 +2385,198 @@ func scanVendor(s vendorScanner) (domain.Vendor, error) {
 	return v, err
 }
 
+// ── Employees ────────────────────────────────────────────────────────────────
+
+const employeeCols = `guid, book_guid, name, username, id, notes, active, currency_guid,
+		addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		rate_num, rate_denom, created_at`
+
+func (r *Repository) ListEmployees(ctx context.Context, bookGUID string, activeOnly bool) ([]domain.Employee, error) {
+	q := `SELECT ` + employeeCols + ` FROM employees WHERE book_guid = $1`
+	args := []any{bookGUID}
+	if activeOnly {
+		q += " AND active = TRUE"
+	}
+	q += " ORDER BY name"
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list employees: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Employee
+	for rows.Next() {
+		e, err := scanEmployee(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) GetEmployee(ctx context.Context, guid string) (domain.Employee, error) {
+	row := r.pool.QueryRow(ctx, `SELECT `+employeeCols+` FROM employees WHERE guid = $1`, guid)
+	e, err := scanEmployee(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Employee{}, domain.ErrEmployeeNotFound
+	}
+	return e, err
+}
+
+func (r *Repository) CreateEmployee(ctx context.Context, e domain.Employee) error {
+	rNum, rDenom, err := e.Rate.NumDenom()
+	if err != nil {
+		return fmt.Errorf("rate: %w", err)
+	}
+	_, err = r.pool.Exec(ctx,
+		`INSERT INTO employees
+		   (guid, book_guid, name, username, id, notes, active, currency_guid,
+		    addr_name, addr_addr1, addr_addr2, addr_phone, addr_email,
+		    rate_num, rate_denom, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+		e.GUID, e.BookGUID, e.Name, e.Username, e.ID, e.Notes, e.Active, e.CurrencyGUID,
+		e.Addr.Name, e.Addr.Addr1, e.Addr.Addr2, e.Addr.Phone, e.Addr.Email,
+		rNum, rDenom, e.CreatedAt,
+	)
+	return err
+}
+
+func (r *Repository) UpdateEmployee(ctx context.Context, e domain.Employee) error {
+	rNum, rDenom, err := e.Rate.NumDenom()
+	if err != nil {
+		return fmt.Errorf("rate: %w", err)
+	}
+	ct, err := r.pool.Exec(ctx,
+		`UPDATE employees SET
+		   name=$2, username=$3, id=$4, notes=$5, active=$6, currency_guid=$7,
+		   addr_name=$8, addr_addr1=$9, addr_addr2=$10, addr_phone=$11, addr_email=$12,
+		   rate_num=$13, rate_denom=$14
+		 WHERE guid=$1`,
+		e.GUID, e.Name, e.Username, e.ID, e.Notes, e.Active, e.CurrencyGUID,
+		e.Addr.Name, e.Addr.Addr1, e.Addr.Addr2, e.Addr.Phone, e.Addr.Email,
+		rNum, rDenom,
+	)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrEmployeeNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteEmployee(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM employees WHERE guid = $1`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrEmployeeNotFound
+	}
+	return nil
+}
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanEmployee(s rowScanner) (domain.Employee, error) {
+	var (
+		e            domain.Employee
+		rNum, rDenom int64
+	)
+	err := s.Scan(
+		&e.GUID, &e.BookGUID, &e.Name, &e.Username, &e.ID, &e.Notes, &e.Active, &e.CurrencyGUID,
+		&e.Addr.Name, &e.Addr.Addr1, &e.Addr.Addr2, &e.Addr.Phone, &e.Addr.Email,
+		&rNum, &rDenom, &e.CreatedAt,
+	)
+	if err != nil {
+		return domain.Employee{}, err
+	}
+	e.Rate, err = domain.FromNumDenom(rNum, rDenom)
+	return e, err
+}
+
+// ── Jobs ─────────────────────────────────────────────────────────────────────
+
+const jobCols = `guid, book_guid, name, id, reference, active, owner_type, owner_guid, created_at`
+
+func (r *Repository) ListJobs(ctx context.Context, bookGUID string, activeOnly bool) ([]domain.Job, error) {
+	q := `SELECT ` + jobCols + ` FROM jobs WHERE book_guid = $1`
+	args := []any{bookGUID}
+	if activeOnly {
+		q += " AND active = TRUE"
+	}
+	q += " ORDER BY name"
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list jobs: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, j)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) GetJob(ctx context.Context, guid string) (domain.Job, error) {
+	row := r.pool.QueryRow(ctx, `SELECT `+jobCols+` FROM jobs WHERE guid = $1`, guid)
+	j, err := scanJob(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Job{}, domain.ErrJobNotFound
+	}
+	return j, err
+}
+
+func (r *Repository) CreateJob(ctx context.Context, j domain.Job) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO jobs
+		   (guid, book_guid, name, id, reference, active, owner_type, owner_guid, created_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+		j.GUID, j.BookGUID, j.Name, j.ID, j.Reference, j.Active, j.OwnerType, j.OwnerGUID, j.CreatedAt,
+	)
+	return err
+}
+
+func (r *Repository) UpdateJob(ctx context.Context, j domain.Job) error {
+	ct, err := r.pool.Exec(ctx,
+		`UPDATE jobs SET name=$2, id=$3, reference=$4, active=$5 WHERE guid=$1`,
+		j.GUID, j.Name, j.ID, j.Reference, j.Active,
+	)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrJobNotFound
+	}
+	return nil
+}
+
+func (r *Repository) DeleteJob(ctx context.Context, guid string) error {
+	ct, err := r.pool.Exec(ctx, `DELETE FROM jobs WHERE guid = $1`, guid)
+	if err != nil {
+		return err
+	}
+	if ct.RowsAffected() == 0 {
+		return domain.ErrJobNotFound
+	}
+	return nil
+}
+
+func scanJob(s rowScanner) (domain.Job, error) {
+	var j domain.Job
+	err := s.Scan(
+		&j.GUID, &j.BookGUID, &j.Name, &j.ID, &j.Reference, &j.Active,
+		&j.OwnerType, &j.OwnerGUID, &j.CreatedAt,
+	)
+	return j, err
+}
+
 // ── Invoices ─────────────────────────────────────────────────────────────────
 
 const invoiceCols = `guid, book_guid, id, type, owner_guid,

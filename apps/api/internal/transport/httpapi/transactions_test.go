@@ -83,6 +83,11 @@ type fakeRepo struct {
 	// test can preload refs to exercise duplicate skipping.
 	importRefs map[string]struct{}
 
+	// Business side. employees/jobs back the EmployeeRepository / JobRepository
+	// ports; nil maps are lazily created on first write.
+	employees map[string]domain.Employee
+	jobs      map[string]domain.Job
+
 	// Authz side. The zero value grants owner access so most tests don't set it
 	// up; set role to test a specific permission level, or noMembership for 403.
 	noMembership    bool     // UserBookRole reports no membership row
@@ -341,6 +346,90 @@ func (f *fakeRepo) ImportBook(_ context.Context, data app.GnuCashData, _ string)
 	return nil
 }
 
+func (f *fakeRepo) ListEmployees(_ context.Context, bookGUID string, activeOnly bool) ([]domain.Employee, error) {
+	var out []domain.Employee
+	for _, e := range f.employees {
+		if e.BookGUID == bookGUID && (!activeOnly || e.Active) {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) CreateEmployee(_ context.Context, e domain.Employee) error {
+	if f.employees == nil {
+		f.employees = make(map[string]domain.Employee)
+	}
+	f.employees[e.GUID] = e
+	return nil
+}
+
+func (f *fakeRepo) GetEmployee(_ context.Context, guid string) (domain.Employee, error) {
+	e, ok := f.employees[guid]
+	if !ok {
+		return domain.Employee{}, domain.ErrEmployeeNotFound
+	}
+	return e, nil
+}
+
+func (f *fakeRepo) UpdateEmployee(_ context.Context, e domain.Employee) error {
+	if _, ok := f.employees[e.GUID]; !ok {
+		return domain.ErrEmployeeNotFound
+	}
+	f.employees[e.GUID] = e
+	return nil
+}
+
+func (f *fakeRepo) DeleteEmployee(_ context.Context, guid string) error {
+	if _, ok := f.employees[guid]; !ok {
+		return domain.ErrEmployeeNotFound
+	}
+	delete(f.employees, guid)
+	return nil
+}
+
+func (f *fakeRepo) ListJobs(_ context.Context, bookGUID string, activeOnly bool) ([]domain.Job, error) {
+	var out []domain.Job
+	for _, j := range f.jobs {
+		if j.BookGUID == bookGUID && (!activeOnly || j.Active) {
+			out = append(out, j)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) CreateJob(_ context.Context, j domain.Job) error {
+	if f.jobs == nil {
+		f.jobs = make(map[string]domain.Job)
+	}
+	f.jobs[j.GUID] = j
+	return nil
+}
+
+func (f *fakeRepo) GetJob(_ context.Context, guid string) (domain.Job, error) {
+	j, ok := f.jobs[guid]
+	if !ok {
+		return domain.Job{}, domain.ErrJobNotFound
+	}
+	return j, nil
+}
+
+func (f *fakeRepo) UpdateJob(_ context.Context, j domain.Job) error {
+	if _, ok := f.jobs[j.GUID]; !ok {
+		return domain.ErrJobNotFound
+	}
+	f.jobs[j.GUID] = j
+	return nil
+}
+
+func (f *fakeRepo) DeleteJob(_ context.Context, guid string) error {
+	if _, ok := f.jobs[guid]; !ok {
+		return domain.ErrJobNotFound
+	}
+	delete(f.jobs, guid)
+	return nil
+}
+
 func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handler {
 	posting := app.NewPostingService(repo)
 	var svc *app.ScheduleService
@@ -358,6 +447,7 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 		"ofx": bankimport.OFX{},
 		"qif": bankimport.QIF{},
 	})
+	authz := app.NewAuthzService(repo)
 	return NewServer(
 		posting,
 		app.NewLedgerService(repo),
@@ -366,7 +456,7 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 		app.NewReportService(repo),
 		app.NewForecastService(repo),
 		app.NewProvisionService(repo),
-		app.NewAuthzService(repo),
+		authz,
 		app.NewImportService(repo, repo),
 		app.NewExportService(repo, &fakeWriter{}),
 		app.NewReconcileService(repo),
@@ -382,6 +472,8 @@ func newTestServer(repo *fakeRepo, schedSvc ...*app.ScheduleService) http.Handle
 		nil,
 		quoteSvc,
 		bankImport,
+		app.NewEmployeeService(repo, authz),
+		app.NewJobService(repo, authz),
 	).Routes()
 }
 

@@ -30,14 +30,16 @@ type Server struct {
 	budget       *app.BudgetService
 	customer     *app.CustomerService
 	vendor       *app.VendorService
+	employee     *app.EmployeeService
+	job          *app.JobService
 	invoice      *app.InvoiceService
 	billterm     *app.BillTermService
 	taxtable     *app.TaxTableService
 }
 
 // NewServer builds a Server from its service dependencies.
-func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, forecast *app.ForecastService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService, reconciler *app.ReconcileService, portfolio *app.PortfolioService, trade *app.TradeService, capitalGains *app.CapitalGainsService, schedule *app.ScheduleService, budget *app.BudgetService, customer *app.CustomerService, vendor *app.VendorService, invoice *app.InvoiceService, billterm *app.BillTermService, taxtable *app.TaxTableService, quote *app.QuoteService, bankImport *app.BankImportService) *Server {
-	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, quote: quote, bankImport: bankImport, report: report, forecast: forecast, provision: provision, authz: authz, importer: importer, exporter: exporter, reconciler: reconciler, portfolio: portfolio, trade: trade, capitalGains: capitalGains, schedule: schedule, budget: budget, customer: customer, vendor: vendor, invoice: invoice, billterm: billterm, taxtable: taxtable}
+func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, forecast *app.ForecastService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService, reconciler *app.ReconcileService, portfolio *app.PortfolioService, trade *app.TradeService, capitalGains *app.CapitalGainsService, schedule *app.ScheduleService, budget *app.BudgetService, customer *app.CustomerService, vendor *app.VendorService, invoice *app.InvoiceService, billterm *app.BillTermService, taxtable *app.TaxTableService, quote *app.QuoteService, bankImport *app.BankImportService, employee *app.EmployeeService, job *app.JobService) *Server {
+	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, quote: quote, bankImport: bankImport, report: report, forecast: forecast, provision: provision, authz: authz, importer: importer, exporter: exporter, reconciler: reconciler, portfolio: portfolio, trade: trade, capitalGains: capitalGains, schedule: schedule, budget: budget, customer: customer, vendor: vendor, employee: employee, job: job, invoice: invoice, billterm: billterm, taxtable: taxtable}
 }
 
 // Routes returns the configured HTTP handler. /healthz is public; every
@@ -107,6 +109,18 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/vendors/{id}", s.requireAuth(s.handleGetVendor))
 	mux.HandleFunc("PATCH /api/v1/vendors/{id}", s.requireAuth(s.handleUpdateVendor))
 	mux.HandleFunc("DELETE /api/v1/vendors/{id}", s.requireAuth(s.handleDeleteVendor))
+	// Business: employees
+	mux.HandleFunc("GET /api/v1/books/{id}/employees", s.requireAuth(s.handleListEmployees))
+	mux.HandleFunc("POST /api/v1/books/{id}/employees", s.requireAuth(s.handleCreateEmployee))
+	mux.HandleFunc("GET /api/v1/employees/{id}", s.requireAuth(s.handleGetEmployee))
+	mux.HandleFunc("PATCH /api/v1/employees/{id}", s.requireAuth(s.handleUpdateEmployee))
+	mux.HandleFunc("DELETE /api/v1/employees/{id}", s.requireAuth(s.handleDeleteEmployee))
+	// Business: jobs
+	mux.HandleFunc("GET /api/v1/books/{id}/jobs", s.requireAuth(s.handleListJobs))
+	mux.HandleFunc("POST /api/v1/books/{id}/jobs", s.requireAuth(s.handleCreateJob))
+	mux.HandleFunc("GET /api/v1/jobs/{id}", s.requireAuth(s.handleGetJob))
+	mux.HandleFunc("PATCH /api/v1/jobs/{id}", s.requireAuth(s.handleUpdateJob))
+	mux.HandleFunc("DELETE /api/v1/jobs/{id}", s.requireAuth(s.handleDeleteJob))
 	// Business: invoices and bills
 	mux.HandleFunc("GET /api/v1/books/{id}/invoices", s.requireAuth(s.handleListInvoices))
 	mux.HandleFunc("POST /api/v1/books/{id}/invoices", s.requireAuth(s.handleCreateInvoice))

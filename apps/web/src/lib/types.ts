@@ -386,6 +386,52 @@ export interface NewVendor {
   termsGuid?: string;
 }
 
+export interface Employee {
+  guid: string;
+  bookGuid: string;
+  name: string;
+  username: string;
+  id: string;
+  notes: string;
+  active: boolean;
+  currencyGuid: string;
+  addr: Address;
+  rate: Numeric;
+  createdAt: string;
+}
+
+export interface NewEmployee {
+  name: string;
+  username?: string;
+  id?: string;
+  notes?: string;
+  active?: boolean;
+  currencyGuid: string;
+  addr?: Partial<Address>;
+  rate?: Numeric;
+}
+
+export interface Job {
+  guid: string;
+  bookGuid: string;
+  name: string;
+  id: string;
+  reference: string;
+  active: boolean;
+  ownerType: "customer" | "vendor";
+  ownerGuid: string;
+  createdAt: string;
+}
+
+export interface NewJob {
+  name: string;
+  id?: string;
+  reference?: string;
+  active?: boolean;
+  ownerType: "customer" | "vendor";
+  ownerGuid: string;
+}
+
 export interface NewEntry {
   date?: string;
   description?: string;
