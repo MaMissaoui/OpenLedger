@@ -659,6 +659,33 @@ paths:
           description: The upstream quote provider failed or returned no rate
         "503":
           description: Online quotes are not configured on this server
+
+  /api/v1/prices/refresh-status:
+    get:
+      summary: Get the price auto-refresh status
+      operationId: getPriceRefreshStatus
+      responses:
+        "200":
+          description: Auto-refresh configuration and last run result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceRefreshStatus"
+
+  /api/v1/prices/refresh-now:
+    post:
+      summary: Trigger an immediate price refresh for all recorded pairs
+      operationId: refreshPricesNow
+      responses:
+        "200":
+          description: Refresh completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceRefreshResult"
+        "503":
+          description: Online quotes are not configured on this server
+
   /api/v1/imports/gnucash:
     post:
       summary: Import a GnuCash file as a new book
@@ -2200,6 +2227,32 @@ components:
           allOf:
             - $ref: "#/components/schemas/Numeric"
           description: Units of currency per one unit of commodity.
+    PriceRefreshStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        intervalHours:
+          type: integer
+        lastRunAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastFetched:
+          type: integer
+        lastFailed:
+          type: integer
+
+    PriceRefreshResult:
+      type: object
+      properties:
+        fetched:
+          type: integer
+        skipped:
+          type: integer
+        failed:
+          type: integer
+
     FetchPrice:
       type: object
       required: [commodityGuid, currencyGuid]

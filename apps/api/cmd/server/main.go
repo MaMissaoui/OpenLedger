@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -71,7 +72,30 @@ func main() {
 		"qif": bankimport.QIF{},
 	})
 
-	server := &httpapi.Server{Services: httpapi.Services{
+	// Price auto-refresh: optional background worker controlled by
+	// PRICE_AUTO_REFRESH_HOURS env var (0 or unset = disabled).
+	var refreshStatus *httpapi.RefreshStatus
+	if h, _ := strconv.Atoi(os.Getenv("PRICE_AUTO_REFRESH_HOURS")); h > 0 {
+		refreshStatus = &httpapi.RefreshStatus{Enabled: true, IntervalHours: h}
+		interval := time.Duration(h) * time.Hour
+		go func() {
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			for range ticker.C {
+				result, err := quoteSvc.RefreshAll(context.Background())
+				if err != nil {
+					logger.Error("price auto-refresh failed", "err", err)
+					continue
+				}
+				refreshStatus.Record(result.Fetched, result.Failed)
+				logger.Info("price auto-refresh completed",
+					"fetched", result.Fetched, "skipped", result.Skipped, "failed", result.Failed)
+			}
+		}()
+		logger.Info("price auto-refresh enabled", "intervalHours", h)
+	}
+
+	server := &httpapi.Server{RefreshStatus: refreshStatus, Services: httpapi.Services{
 		Posting:      posting,
 		Ledger:       ledger,
 		Structure:    structure,
