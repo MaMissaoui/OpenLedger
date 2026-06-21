@@ -89,6 +89,28 @@ var schemaDDL = []string{
 	    numeric_val_num BIGINT,
 	    numeric_val_denom BIGINT,
 	    gdate_val TEXT)`,
+	`CREATE TABLE schedxactions (
+	    guid CHAR(32) PRIMARY KEY NOT NULL,
+	    name TEXT,
+	    enabled INTEGER NOT NULL,
+	    start_date TEXT,
+	    end_date TEXT,
+	    last_occur TEXT,
+	    num_occur INTEGER NOT NULL,
+	    rem_occur INTEGER NOT NULL,
+	    auto_create INTEGER NOT NULL,
+	    auto_notify INTEGER NOT NULL,
+	    advance_creation_days INTEGER NOT NULL,
+	    advance_remind_days INTEGER NOT NULL,
+	    instance_count INTEGER NOT NULL,
+	    template_act_guid CHAR(32) NOT NULL)`,
+	`CREATE TABLE recurrences (
+	    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+	    obj_guid CHAR(32) NOT NULL,
+	    recurrence_mult INTEGER NOT NULL,
+	    recurrence_period_type TEXT NOT NULL,
+	    recurrence_period_start TEXT NOT NULL,
+	    recurrence_weekend_adj TEXT NOT NULL)`,
 }
 
 // WriteGnuCashSQLite creates a GnuCash SQLite database at path and writes data
@@ -145,6 +167,9 @@ func (Writer) WriteGnuCashSQLite(ctx context.Context, path string, data app.GnuC
 		return err
 	}
 	if err = writeLots(ctx, tx, data.Lots); err != nil {
+		return err
+	}
+	if err = writeScheduledTransactions(ctx, tx, data.ScheduledTransactions, data.Book.RootTemplateGUID, fraction); err != nil {
 		return err
 	}
 
@@ -278,4 +303,118 @@ func boolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// writeScheduledTransactions writes GnuCash-compatible schedxactions,
+// recurrences, and template accounts/transactions for each scheduled
+// transaction. Each schedule gets a synthesised template account (child of the
+// template root) plus a template transaction whose splits carry the amounts;
+// the marker split (pointing at the template account itself, value=0) is
+// written first so the import path can locate the template by account_guid.
+func writeScheduledTransactions(
+	ctx context.Context,
+	tx *sql.Tx,
+	scheds []domain.ScheduledTransaction,
+	templateRootGUID string,
+	fraction map[string]int64,
+) error {
+	for _, s := range scheds {
+		// Synthesise a template account for this scheduled transaction.
+		templateActGUID := newGUID()
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO accounts (guid, name, account_type, commodity_guid, commodity_scu,
+			    non_std_scu, parent_guid, code, description, hidden, placeholder)
+			 VALUES (?, ?, 'ASSET', NULL, 1, 0, ?, NULL, NULL, 0, 0)`,
+			templateActGUID, s.Name, nullStr(templateRootGUID),
+		); err != nil {
+			return fmt.Errorf("write template account for schedule %s: %w", s.GUID, err)
+		}
+
+		// Synthesise a template transaction and its splits.
+		tmplTxGUID := newGUID()
+		currFraction := fraction[s.CurrencyGUID]
+		if currFraction == 0 {
+			currFraction = 100 // default to cents when currency is unknown
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO transactions (guid, currency_guid, num, post_date, enter_date, description)
+			 VALUES (?, ?, '', ?, ?, ?)`,
+			tmplTxGUID, nullStr(s.CurrencyGUID),
+			gncTime(s.StartDate), gncTime(time.Now().UTC()), s.Name,
+		); err != nil {
+			return fmt.Errorf("write template transaction for schedule %s: %w", s.GUID, err)
+		}
+
+		// Marker split — points at the template account with zero value.
+		markerGUID := newGUID()
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO splits (guid, tx_guid, account_guid, memo, action, reconcile_state,
+			    reconcile_date, value_num, value_denom, quantity_num, quantity_denom, lot_guid)
+			 VALUES (?, ?, ?, '', '', 'n', NULL, 0, 1, 0, 1, NULL)`,
+			markerGUID, tmplTxGUID, templateActGUID,
+		); err != nil {
+			return fmt.Errorf("write marker split for schedule %s: %w", s.GUID, err)
+		}
+
+		// Template splits (one per ScheduledSplit).
+		for _, sp := range s.Splits {
+			vNum, err := sp.Value.AtDenom(currFraction)
+			if err != nil {
+				return fmt.Errorf("schedule %s split %s value: %w", s.GUID, sp.GUID, err)
+			}
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO splits (guid, tx_guid, account_guid, memo, action, reconcile_state,
+				    reconcile_date, value_num, value_denom, quantity_num, quantity_denom, lot_guid)
+				 VALUES (?, ?, ?, ?, '', 'n', NULL, ?, ?, ?, ?, NULL)`,
+				sp.GUID, tmplTxGUID, sp.AccountGUID, sp.Memo,
+				vNum, currFraction, vNum, currFraction,
+			); err != nil {
+				return fmt.Errorf("write template split %s for schedule %s: %w", sp.GUID, s.GUID, err)
+			}
+		}
+
+		// schedxactions row.
+		startStr := ""
+		if !s.StartDate.IsZero() {
+			startStr = s.StartDate.UTC().Format("2006-01-02 00:00:00 UTC")
+		}
+		endStr := ""
+		if !s.EndDate.IsZero() {
+			endStr = s.EndDate.UTC().Format("2006-01-02 00:00:00 UTC")
+		}
+		lastStr := ""
+		if !s.LastPostedDate.IsZero() {
+			lastStr = s.LastPostedDate.UTC().Format("2006-01-02 00:00:00 UTC")
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO schedxactions (guid, name, enabled, start_date, end_date, last_occur,
+			    num_occur, rem_occur, auto_create, auto_notify, advance_creation_days,
+			    advance_remind_days, instance_count, template_act_guid)
+			 VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, ?)`,
+			s.GUID, s.Name, boolToInt(s.Enabled),
+			nullStr(startStr), nullStr(endStr), nullStr(lastStr),
+			templateActGUID,
+		); err != nil {
+			return fmt.Errorf("write schedxaction %s: %w", s.GUID, err)
+		}
+
+		// recurrences row.
+		periodStart := startStr
+		if periodStart == "" {
+			periodStart = time.Now().UTC().Format("2006-01-02 00:00:00 UTC")
+		}
+		every := s.Every
+		if every <= 0 {
+			every = 1
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO recurrences (obj_guid, recurrence_mult, recurrence_period_type,
+			    recurrence_period_start, recurrence_weekend_adj)
+			 VALUES (?, ?, ?, ?, 'none')`,
+			s.GUID, every, reverseGncPeriod(s.Period), periodStart,
+		); err != nil {
+			return fmt.Errorf("write recurrence for schedule %s: %w", s.GUID, err)
+		}
+	}
+	return nil
 }

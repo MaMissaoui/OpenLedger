@@ -20,14 +20,15 @@ var ErrImportConflict = errors.New("book already imported")
 
 // GnuCashData is the parsed contents of one GnuCash file, expressed in domain
 // types: a book together with all the commodities, accounts (including the root
-// account[s]), and transactions it owns. It is the unit an import reads and
-// persists.
+// account[s]), transactions, lots, and scheduled transactions it owns. It is
+// the unit an import reads and persists.
 type GnuCashData struct {
-	Book         domain.Book
-	Commodities  []domain.Commodity
-	Accounts     []domain.Account
-	Transactions []domain.Transaction
-	Lots         []domain.Lot
+	Book                  domain.Book
+	Commodities           []domain.Commodity
+	Accounts              []domain.Account
+	Transactions          []domain.Transaction
+	Lots                  []domain.Lot
+	ScheduledTransactions []domain.ScheduledTransaction
 }
 
 // GnuCashReader reads a GnuCash file from disk into domain types. Both the
@@ -47,10 +48,11 @@ type ImportRepository interface {
 
 // ImportResult summarises a completed import for the API response.
 type ImportResult struct {
-	BookGUID     string
-	Commodities  int
-	Accounts     int
-	Transactions int
+	BookGUID              string
+	Commodities           int
+	Accounts              int
+	Transactions          int
+	ScheduledTransactions int
 }
 
 // ImportService reads a GnuCash file and persists it as a new book owned by the
@@ -110,10 +112,11 @@ func (s *ImportService) persist(ctx context.Context, data GnuCashData, readErr e
 		return ImportResult{}, err
 	}
 	return ImportResult{
-		BookGUID:     data.Book.GUID,
-		Commodities:  len(data.Commodities),
-		Accounts:     len(data.Accounts),
-		Transactions: len(data.Transactions),
+		BookGUID:              data.Book.GUID,
+		Commodities:           len(data.Commodities),
+		Accounts:              len(data.Accounts),
+		Transactions:          len(data.Transactions),
+		ScheduledTransactions: len(data.ScheduledTransactions),
 	}, nil
 }
 
