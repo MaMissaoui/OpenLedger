@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
-import type { Account, AgingReport, BillTerm, Entry, Invoice, NewEntry, NewInvoice, Numeric, TaxTable } from "../lib/types";
+import type { Account, AgingReport, BillTerm, Entry, Invoice, Job, NewEntry, NewInvoice, Numeric, TaxTable } from "../lib/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -428,11 +428,13 @@ export function AgingReportView({
 function InvoiceDetail({
   invoice,
   accounts,
+  jobs,
   onBack,
   onRefresh,
 }: {
   invoice: Invoice;
   accounts: Account[];
+  jobs: Job[];
   onBack: () => void;
   onRefresh: () => void;
 }) {
@@ -509,6 +511,15 @@ function InvoiceDetail({
         )}
       </div>
 
+      {invoice.jobGuid && (() => {
+        const job = jobs.find((j) => j.guid === invoice.jobGuid);
+        if (!job) return null;
+        return (
+          <p style={{ color: "var(--ink-soft)", fontSize: "0.85rem", margin: "0 0 0.5rem" }}>
+            Job: <strong>{job.id ? `${job.id} ${job.name}` : job.name}</strong>
+          </p>
+        );
+      })()}
       {invoice.notes && (
         <p style={{ color: "var(--ink-soft)", fontSize: "0.9rem", margin: "0 0 1rem" }}>{invoice.notes}</p>
       )}
@@ -615,6 +626,7 @@ function InvoiceFormDialog({
   bookGuid,
   invType,
   owners,
+  jobs,
   existing,
   onClose,
   onSaved,
@@ -622,12 +634,14 @@ function InvoiceFormDialog({
   bookGuid: string;
   invType: "invoice" | "bill";
   owners: Array<{ guid: string; name: string; id?: string }>;
+  jobs: Job[];
   existing?: Invoice;
   onClose: () => void;
   onSaved: (inv: Invoice) => void;
 }) {
   const [id, setId] = useState(existing?.id ?? "");
   const [ownerGuid, setOwnerGuid] = useState(existing?.ownerGuid ?? "");
+  const [jobGuid, setJobGuid] = useState(existing?.jobGuid ?? "");
   const [dateOpened, setDateOpened] = useState(existing?.dateOpened ?? today());
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [currencyGuid, setCurrencyGuid] = useState(existing?.currencyGuid ?? "");
@@ -649,7 +663,7 @@ function InvoiceFormDialog({
     setError(null);
     if (!ownerGuid) { setError(`${invType === "invoice" ? "Customer" : "Vendor"} is required.`); return; }
     if (!currencyGuid) { setError("Currency is required."); return; }
-    const input: NewInvoice = { id, type: invType, ownerGuid, dateOpened, notes, active: true, currencyGuid, termsGuid: termsGuid || undefined };
+    const input: NewInvoice = { id, type: invType, ownerGuid, jobGuid: jobGuid || undefined, dateOpened, notes, active: true, currencyGuid, termsGuid: termsGuid || undefined };
     setSaving(true);
     try {
       let result: Invoice;
@@ -681,11 +695,27 @@ function InvoiceFormDialog({
 
           <label className="field">
             <span>{entityLabel} *</span>
-            <select value={ownerGuid} onChange={(e) => setOwnerGuid(e.target.value)}>
+            <select value={ownerGuid} onChange={(e) => { setOwnerGuid(e.target.value); setJobGuid(""); }}>
               <option value="">— select {entityLabel.toLowerCase()} —</option>
               {owners.map((o) => <option key={o.guid} value={o.guid}>{o.id ? `${o.id} — ${o.name}` : o.name}</option>)}
             </select>
           </label>
+
+          {(() => {
+            const ownerJobs = jobs.filter((j) => j.ownerGuid === ownerGuid && j.active);
+            if (!ownerGuid || ownerJobs.length === 0) return null;
+            return (
+              <label className="field">
+                <span>Job</span>
+                <select value={jobGuid} onChange={(e) => setJobGuid(e.target.value)}>
+                  <option value="">— none —</option>
+                  {ownerJobs.map((j) => (
+                    <option key={j.guid} value={j.guid}>{j.id ? `${j.id} ${j.name}` : j.name}</option>
+                  ))}
+                </select>
+              </label>
+            );
+          })()}
 
           <div className="dialog__row">
             <label className="field" style={{ flex: 1 }}>
@@ -754,9 +784,11 @@ export default function InvoiceView({
 
   // Owners: customers for invoices, vendors for bills
   const [owners, setOwners] = useState<Array<{ guid: string; name: string; id?: string }>>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   useEffect(() => {
     const fn = invType === "invoice" ? api.listCustomers : api.listVendors;
     fn(bookGuid).then((list) => setOwners(list)).catch(() => null);
+    api.listJobs(bookGuid).then(setJobs).catch(() => null);
   }, [bookGuid, invType]);
 
   function load() {
@@ -800,6 +832,7 @@ export default function InvoiceView({
         <InvoiceDetail
           invoice={selected}
           accounts={accounts}
+          jobs={jobs}
           onBack={() => setSelected(null)}
           onRefresh={() => {
             api.getInvoice(selected.guid)
@@ -815,6 +848,7 @@ export default function InvoiceView({
   const ownerDisplay = Object.fromEntries(
     owners.map((o) => [o.guid, o.id ? `${o.id} — ${o.name}` : o.name])
   );
+  const jobMap = Object.fromEntries(jobs.map((j) => [j.guid, j.id ? `${j.id} ${j.name}` : j.name]));
   const filtered = query
     ? invoices?.filter((inv) => {
         const q = query.toLowerCase();
@@ -861,6 +895,7 @@ export default function InvoiceView({
             <tr>
               <th>Number</th>
               <th>{invType === "invoice" ? "Customer" : "Vendor"}</th>
+              <th>Job</th>
               <th>Date</th>
               <th>Due</th>
               <th style={{ textAlign: "right" }}>Total</th>
@@ -876,6 +911,9 @@ export default function InvoiceView({
                 </td>
                 <td style={{ fontWeight: 500 }}>
                   {ownerDisplay[inv.ownerGuid] ?? <span style={{ color: "var(--ink-soft)" }}>—</span>}
+                </td>
+                <td style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>
+                  {inv.jobGuid ? jobMap[inv.jobGuid] ?? "—" : "—"}
                 </td>
                 <td className="mono" style={{ fontSize: "0.85rem" }}>{inv.dateOpened}</td>
                 <td className="mono" style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
@@ -912,6 +950,7 @@ export default function InvoiceView({
           bookGuid={bookGuid}
           invType={invType}
           owners={owners}
+          jobs={jobs}
           existing={editing}
           onClose={() => setFormOpen(false)}
           onSaved={(inv) => {

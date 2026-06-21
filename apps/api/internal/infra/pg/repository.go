@@ -2742,7 +2742,7 @@ func scanJob(s rowScanner) (domain.Job, error) {
 const invoiceCols = `guid, book_guid, id, type, owner_guid,
 	       date_opened, date_posted, date_due, notes, active, currency_guid,
 	       COALESCE(post_txn_guid,''), COALESCE(post_acc_guid,''), COALESCE(terms_guid,''),
-	       paid_at, COALESCE(paid_txn_guid,''), created_at`
+	       paid_at, COALESCE(paid_txn_guid,''), created_at, COALESCE(job_guid,'')`
 
 func (r *Repository) ListInvoices(ctx context.Context, bookGUID, invoiceType string) ([]domain.Invoice, error) {
 	rows, err := r.pool.Query(ctx, `SELECT `+invoiceCols+`
@@ -2804,13 +2804,17 @@ func (r *Repository) CreateInvoice(ctx context.Context, inv domain.Invoice) erro
 	if inv.TermsGUID != "" {
 		termsGUID = &inv.TermsGUID
 	}
+	var jobGUID *string
+	if inv.JobGUID != "" {
+		jobGUID = &inv.JobGUID
+	}
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO invoices
 		  (guid, book_guid, id, type, owner_guid,
-		   date_opened, notes, active, currency_guid, terms_guid)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		   date_opened, notes, active, currency_guid, terms_guid, job_guid)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
 		inv.GUID, inv.BookGUID, inv.ID, string(inv.Type), inv.OwnerGUID,
-		inv.DateOpened.Format("2006-01-02"), inv.Notes, inv.Active, inv.CurrencyGUID, termsGUID)
+		inv.DateOpened.Format("2006-01-02"), inv.Notes, inv.Active, inv.CurrencyGUID, termsGUID, jobGUID)
 	return err
 }
 
@@ -3087,15 +3091,19 @@ func (r *Repository) UpdateInvoice(ctx context.Context, inv domain.Invoice) erro
 	if inv.TermsGUID != "" {
 		termsGUID = &inv.TermsGUID
 	}
+	var jobGUID *string
+	if inv.JobGUID != "" {
+		jobGUID = &inv.JobGUID
+	}
 	ct, err := r.pool.Exec(ctx, `
 		UPDATE invoices SET
 		  id=$2, owner_guid=$3,
 		  date_opened=$4, date_due=$5, notes=$6, active=$7,
-		  currency_guid=$8, terms_guid=$9
+		  currency_guid=$8, terms_guid=$9, job_guid=$10
 		WHERE guid=$1 AND date_posted IS NULL`,
 		inv.GUID, inv.ID, inv.OwnerGUID,
 		inv.DateOpened.Format("2006-01-02"), inv.DateDue, inv.Notes, inv.Active,
-		inv.CurrencyGUID, termsGUID)
+		inv.CurrencyGUID, termsGUID, jobGUID)
 	if err != nil {
 		return err
 	}
@@ -3143,7 +3151,7 @@ func scanInvoice(s invoiceScanner) (domain.Invoice, error) {
 		&inv.GUID, &inv.BookGUID, &inv.ID, &invType, &inv.OwnerGUID,
 		&inv.DateOpened, &datePosted, &dateDue, &inv.Notes, &inv.Active, &inv.CurrencyGUID,
 		&inv.PostTxnGUID, &inv.PostAccGUID, &inv.TermsGUID,
-		&paidAt, &inv.PaidTxnGUID, &inv.CreatedAt,
+		&paidAt, &inv.PaidTxnGUID, &inv.CreatedAt, &inv.JobGUID,
 	)
 	if err != nil {
 		return domain.Invoice{}, err

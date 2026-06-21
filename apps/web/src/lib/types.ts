@@ -461,6 +461,7 @@ export interface NewInvoice {
   active?: boolean;
   currencyGuid: string;
   termsGuid?: string;
+  jobGuid?: string;
 }
 
 export interface Invoice extends NewInvoice {

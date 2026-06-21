@@ -3335,6 +3335,9 @@ components:
           type: string
         termsGuid:
           type: string
+        jobGuid:
+          type: string
+          description: Optional job this invoice is grouped under
 
     Invoice:
       allOf:

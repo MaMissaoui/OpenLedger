@@ -57,6 +57,7 @@ type Invoice struct {
 	PostTxnGUID  string // set when posted
 	PostAccGUID  string // A/R or A/P account used when posted
 	TermsGUID    string
+	JobGUID      string     // optional: groups the invoice under a job
 	PaidAt       *time.Time // nil = unpaid
 	PaidTxnGUID  string     // set when paid
 	CreatedAt    time.Time
