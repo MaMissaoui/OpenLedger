@@ -16,6 +16,7 @@ type invoiceBodyDTO struct {
 	ID           string `json:"id"`
 	Type         string `json:"type"` // "invoice" or "bill"
 	OwnerGUID    string `json:"ownerGuid"`
+	JobGUID      string `json:"jobGuid"`
 	DateOpened   string `json:"dateOpened"`
 	Notes        string `json:"notes"`
 	Active       bool   `json:"active"`
@@ -58,6 +59,7 @@ func invoiceToResponse(inv domain.Invoice) map[string]any {
 		"postTxnGuid":  inv.PostTxnGUID,
 		"postAccGuid":  inv.PostAccGUID,
 		"termsGuid":    inv.TermsGUID,
+		"jobGuid":      inv.JobGUID,
 		"paidTxnGuid":  inv.PaidTxnGUID,
 		"createdAt":    inv.CreatedAt.Format(time.RFC3339),
 	}
@@ -144,6 +146,7 @@ func (s *Server) handleCreateInvoice(w http.ResponseWriter, r *http.Request) {
 		ID:           body.ID,
 		Type:         domain.InvoiceType(body.Type),
 		OwnerGUID:    body.OwnerGUID,
+		JobGUID:      body.JobGUID,
 		DateOpened:   dateOpened,
 		Notes:        body.Notes,
 		Active:       body.Active,
@@ -186,6 +189,7 @@ func (s *Server) handleUpdateInvoice(w http.ResponseWriter, r *http.Request) {
 		GUID:         guid,
 		ID:           body.ID,
 		OwnerGUID:    body.OwnerGUID,
+		JobGUID:      body.JobGUID,
 		DateOpened:   dateOpened,
 		Notes:        body.Notes,
 		Active:       body.Active,
