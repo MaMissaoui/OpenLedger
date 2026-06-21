@@ -76,7 +76,7 @@ func run() error {
 	}
 
 	// 3. Book.
-	book, err := structure.CreateBook(ctx, ownerID)
+	book, err := structure.CreateBook(ctx, ownerID, "Demo Company", "")
 	if err != nil {
 		return fmt.Errorf("create book: %w", err)
 	}

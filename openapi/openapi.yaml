@@ -64,8 +64,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/BookList"
     post:
-      summary: Create a book (ledger) with its root account
+      summary: Create a book (ledger/company) with its root account
       operationId: createBook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewBook"
       responses:
         "201":
           description: Book created
@@ -73,6 +79,33 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Book"
+  /api/v1/books/{id}:
+    patch:
+      summary: Rename a book or change its home currency (admin only)
+      operationId: updateBook
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBook"
+      responses:
+        "200":
+          description: Book updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "403":
+          description: Insufficient role (admin required)
+        "404":
+          description: Book not found
   /api/v1/books/{id}/accounts:
     get:
       summary: List a book's chart of accounts
@@ -2293,9 +2326,33 @@ components:
       properties:
         guid:
           type: string
+        name:
+          type: string
+          description: Human-readable company/ledger name.
+        currencyGuid:
+          type: string
+          description: Home currency commodity GUID; empty string if not set.
         rootAccountGuid:
           type: string
           description: Parent for top-level accounts.
+    NewBook:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Human-readable company/ledger name.
+        currencyGuid:
+          type: string
+          description: Home currency commodity GUID; empty string if not set.
+    UpdateBook:
+      type: object
+      properties:
+        name:
+          type: string
+          description: New company/ledger name.
+        currencyGuid:
+          type: string
+          description: Home currency commodity GUID; empty string to unset.
     BookList:
       type: object
       properties:

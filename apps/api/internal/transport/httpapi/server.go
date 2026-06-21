@@ -61,6 +61,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/commodities", s.requireAuth(s.handleCreateCommodity))
 	mux.HandleFunc("GET /api/v1/books", s.requireAuth(s.handleListBooks))
 	mux.HandleFunc("POST /api/v1/books", s.requireAuth(s.handleCreateBook))
+	mux.HandleFunc("PATCH /api/v1/books/{id}", s.requireAuth(s.handleUpdateBook))
 	mux.HandleFunc("GET /api/v1/books/{id}/accounts", s.requireAuth(s.handleListAccounts))
 	mux.HandleFunc("GET /api/v1/books/{id}/reports/balance-sheet", s.requireAuth(s.handleBalanceSheet))
 	mux.HandleFunc("GET /api/v1/books/{id}/reports/income-statement", s.requireAuth(s.handleIncomeStatement))

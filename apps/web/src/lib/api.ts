@@ -96,9 +96,16 @@ function post<T>(path: string, body: unknown): Promise<T> {
   return request<T>(path, { method: "POST", body: JSON.stringify(body) });
 }
 
+function patch<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, { method: "PATCH", body: JSON.stringify(body) });
+}
+
 export const api = {
   listBooks: () => request<{ books: Book[] }>("/api/v1/books").then((r) => r.books),
-  createBook: () => post<Book>("/api/v1/books", {}),
+  createBook: (name: string, currencyGuid?: string) =>
+    post<Book>("/api/v1/books", { name, currencyGuid: currencyGuid ?? "" }),
+  updateBook: (guid: string, name: string, currencyGuid?: string) =>
+    patch<Book>(`/api/v1/books/${guid}`, { name, currencyGuid: currencyGuid ?? "" }),
   listCommodities: () =>
     request<{ commodities: Commodity[] }>("/api/v1/commodities").then((r) => r.commodities),
   createCommodity: (mnemonic: string, fraction: number, fullname?: string, namespace?: string) =>

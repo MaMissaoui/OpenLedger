@@ -374,9 +374,9 @@ func (r *Repository) InsertBook(ctx context.Context, b domain.Book, root, templa
 			}
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO books (guid, root_account_guid, root_template_guid)
-			 VALUES ($1, $2, $3)`,
-			b.GUID, b.RootAccountGUID, b.RootTemplateGUID,
+			`INSERT INTO books (guid, name, currency_guid, root_account_guid, root_template_guid)
+			 VALUES ($1, $2, NULLIF($3,''), $4, $5)`,
+			b.GUID, b.Name, b.CurrencyGUID, b.RootAccountGUID, b.RootTemplateGUID,
 		); err != nil {
 			return fmt.Errorf("insert book: %w", err)
 		}
@@ -897,11 +897,12 @@ func referencedCommodities(accounts []domain.Account, txns []domain.Transaction)
 // ListBooksForUser returns the books a user has a membership on, newest first.
 func (r *Repository) ListBooksForUser(ctx context.Context, userID string) ([]domain.Book, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT b.guid, b.root_account_guid, b.root_template_guid
+		`SELECT b.guid, COALESCE(b.name,''), COALESCE(b.currency_guid,''),
+		        b.root_account_guid, b.root_template_guid
 		   FROM books b
 		   JOIN memberships m ON m.book_guid = b.guid
 		  WHERE m.user_id = $1
-		  ORDER BY b.guid`, userID)
+		  ORDER BY b.name, b.guid`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list books for user: %w", err)
 	}
@@ -910,12 +911,27 @@ func (r *Repository) ListBooksForUser(ctx context.Context, userID string) ([]dom
 	var books []domain.Book
 	for rows.Next() {
 		var b domain.Book
-		if err := rows.Scan(&b.GUID, &b.RootAccountGUID, &b.RootTemplateGUID); err != nil {
+		if err := rows.Scan(&b.GUID, &b.Name, &b.CurrencyGUID, &b.RootAccountGUID, &b.RootTemplateGUID); err != nil {
 			return nil, fmt.Errorf("scan book: %w", err)
 		}
 		books = append(books, b)
 	}
 	return books, rows.Err()
+}
+
+// UpdateBook persists a book's name and currency_guid. Returns ErrBookNotFound
+// when the guid is unknown.
+func (r *Repository) UpdateBook(ctx context.Context, b domain.Book) error {
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE books SET name=$1, currency_guid=NULLIF($2,'') WHERE guid=$3`,
+		b.Name, b.CurrencyGUID, b.GUID)
+	if err != nil {
+		return fmt.Errorf("update book: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return app.ErrBookNotFound
+	}
+	return nil
 }
 
 // InsertAccount writes a single account row.

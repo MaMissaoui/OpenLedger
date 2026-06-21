@@ -56,16 +56,37 @@ func commodityDTO(c domain.Commodity) map[string]any {
 	}
 }
 
+type newBookDTO struct {
+	Name         string `json:"name"`
+	CurrencyGUID string `json:"currencyGuid"`
+}
+
+type updateBookDTO struct {
+	Name         string `json:"name"`
+	CurrencyGUID string `json:"currencyGuid"`
+}
+
+func bookToResponse(b domain.Book) map[string]any {
+	return map[string]any{
+		"guid":            b.GUID,
+		"name":            b.Name,
+		"currencyGuid":    b.CurrencyGUID,
+		"rootAccountGuid": b.RootAccountGUID,
+	}
+}
+
 func (s *Server) handleCreateBook(w http.ResponseWriter, r *http.Request) {
+	var dto newBookDTO
+	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
 	actor := actorFromContext(r.Context())
-	book, err := s.Structure.CreateBook(r.Context(), actor.UserID)
+	book, err := s.Structure.CreateBook(r.Context(), actor.UserID, dto.Name, dto.CurrencyGUID)
 	if writeStructureError(w, err) {
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"guid":            book.GUID,
-		"rootAccountGuid": book.RootAccountGUID,
-	})
+	writeJSON(w, http.StatusCreated, bookToResponse(book))
 }
 
 func (s *Server) handleListBooks(w http.ResponseWriter, r *http.Request) {
@@ -76,12 +97,30 @@ func (s *Server) handleListBooks(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(books))
 	for _, b := range books {
-		out = append(out, map[string]any{
-			"guid":            b.GUID,
-			"rootAccountGuid": b.RootAccountGUID,
-		})
+		out = append(out, bookToResponse(b))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"books": out})
+}
+
+func (s *Server) handleUpdateBook(w http.ResponseWriter, r *http.Request) {
+	bookGUID := r.PathValue("id")
+	if !s.authorizeBook(w, r, bookGUID, app.AccessAdmin) {
+		return
+	}
+	var dto updateBookDTO
+	if err := json.NewDecoder(r.Body).Decode(&dto); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	book, err := s.Structure.UpdateBook(r.Context(), domain.Book{
+		GUID:         bookGUID,
+		Name:         dto.Name,
+		CurrencyGUID: dto.CurrencyGUID,
+	})
+	if writeStructureError(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, bookToResponse(book))
 }
 
 type newAccountDTO struct {
