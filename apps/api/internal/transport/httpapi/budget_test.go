@@ -82,35 +82,11 @@ func (f *fakeBudgetRepoH) AccountBalances(_ context.Context, _ string, _, _ *tim
 }
 
 func newBudgetTestServer(fr *fakeBudgetRepoH) http.Handler {
-	posting := app.NewPostingService(fr.fakeRepo)
-	budgetSvc := app.NewBudgetService(fr)
-	return NewServer(
-		posting,
-		app.NewLedgerService(fr.fakeRepo),
-		app.NewStructureService(fr.fakeRepo),
-		app.NewPriceService(fr.fakeRepo),
-		app.NewReportService(fr.fakeRepo),
-		app.NewForecastService(fr.fakeRepo),
-		app.NewProvisionService(fr.fakeRepo),
-		app.NewAuthzService(fr.fakeRepo),
-		app.NewImportService(fr.fakeRepo, fr.fakeRepo),
-		app.NewExportService(fr.fakeRepo, &fakeWriter{}),
-		app.NewReconcileService(fr.fakeRepo),
-		app.NewPortfolioService(fr.fakeRepo),
-		app.NewTradeService(fr.fakeRepo, posting),
-		app.NewCapitalGainsService(fr.fakeRepo),
-		nil,
-		budgetSvc,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	).Routes()
+	return (&Server{Services: Services{
+		Provision: app.NewProvisionService(fr.fakeRepo),
+		Authz:     app.NewAuthzService(fr.fakeRepo),
+		Budget:    app.NewBudgetService(fr),
+	}}).Routes()
 }
 
 func budgetReq(h http.Handler, method, path string, body any) *httptest.ResponseRecorder {

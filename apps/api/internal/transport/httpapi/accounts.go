@@ -43,7 +43,7 @@ func (s *Server) handleAccountRegister(w http.ResponseWriter, r *http.Request) {
 	limit := clampQueryInt(r, "limit", defaultRegisterLimit, 1, maxRegisterLimit)
 	offset := clampQueryInt(r, "offset", 0, 0, 1<<31-1)
 
-	page, err := s.ledger.AccountRegister(r.Context(), id, limit, offset)
+	page, err := s.Ledger.AccountRegister(r.Context(), id, limit, offset)
 	switch {
 	case errors.Is(err, app.ErrAccountNotFound):
 		writeError(w, http.StatusNotFound, "account not found")

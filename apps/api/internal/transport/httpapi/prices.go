@@ -43,7 +43,7 @@ func (s *Server) handleCreatePrice(w http.ResponseWriter, r *http.Request) {
 		price.Date = *dto.Date
 	}
 
-	created, err := s.price.CreatePrice(r.Context(), price)
+	created, err := s.Price.CreatePrice(r.Context(), price)
 	if writeStructureError(w, err) {
 		return
 	}
@@ -54,7 +54,7 @@ func (s *Server) handleCreatePrice(w http.ResponseWriter, r *http.Request) {
 // commodity query parameter is required.
 func (s *Server) handleListPrices(w http.ResponseWriter, r *http.Request) {
 	commodity := r.URL.Query().Get("commodity")
-	prices, err := s.price.ListPrices(r.Context(), commodity)
+	prices, err := s.Price.ListPrices(r.Context(), commodity)
 	if writeStructureError(w, err) {
 		return
 	}
@@ -75,7 +75,7 @@ type fetchPriceDTO struct {
 // Prices are shared reference data, so there is no book authorization. Upstream
 // provider failures map to 502; an unknown commodity to 404.
 func (s *Server) handleFetchPrice(w http.ResponseWriter, r *http.Request) {
-	if s.quote == nil {
+	if s.Quote == nil {
 		writeError(w, http.StatusServiceUnavailable, "online price quotes are not configured")
 		return
 	}
@@ -85,7 +85,7 @@ func (s *Server) handleFetchPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	price, err := s.quote.FetchAndStore(r.Context(), dto.CommodityGUID, dto.CurrencyGUID)
+	price, err := s.Quote.FetchAndStore(r.Context(), dto.CommodityGUID, dto.CurrencyGUID)
 	if errors.Is(err, app.ErrQuoteUnavailable) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return

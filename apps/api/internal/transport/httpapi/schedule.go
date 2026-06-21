@@ -116,7 +116,7 @@ func (s *Server) handleListScheduledTransactions(w http.ResponseWriter, r *http.
 	if !s.authorizeBook(w, r, bookGUID, app.AccessRead) {
 		return
 	}
-	scheds, err := s.schedule.List(r.Context(), bookGUID)
+	scheds, err := s.Schedule.List(r.Context(), bookGUID)
 	if writeStructureError(w, err) {
 		return
 	}
@@ -142,7 +142,7 @@ func (s *Server) handleCreateScheduledTransaction(w http.ResponseWriter, r *http
 		writeError(w, http.StatusBadRequest, "invalid schedule: "+err.Error())
 		return
 	}
-	created, err := s.schedule.Create(r.Context(), sched, actorFromContext(r.Context()))
+	created, err := s.Schedule.Create(r.Context(), sched, actorFromContext(r.Context()))
 	switch {
 	case errors.Is(err, app.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, "invalid scheduled transaction")
@@ -159,7 +159,7 @@ func (s *Server) handleCreateScheduledTransaction(w http.ResponseWriter, r *http
 
 func (s *Server) handleGetScheduledTransaction(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	sched, err := s.schedule.Get(r.Context(), guid)
+	sched, err := s.Schedule.Get(r.Context(), guid)
 	if errors.Is(err, app.ErrScheduleNotFound) {
 		writeError(w, http.StatusNotFound, "scheduled transaction not found")
 		return
@@ -168,7 +168,7 @@ func (s *Server) handleGetScheduledTransaction(w http.ResponseWriter, r *http.Re
 		writeError(w, http.StatusInternalServerError, "could not load scheduled transaction")
 		return
 	}
-	bookGUID, err := s.schedule.BookGUIDForSchedule(r.Context(), guid)
+	bookGUID, err := s.Schedule.BookGUIDForSchedule(r.Context(), guid)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not authorize")
 		return
@@ -181,7 +181,7 @@ func (s *Server) handleGetScheduledTransaction(w http.ResponseWriter, r *http.Re
 
 func (s *Server) handleUpdateScheduledTransaction(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	bookGUID, err := s.schedule.BookGUIDForSchedule(r.Context(), guid)
+	bookGUID, err := s.Schedule.BookGUIDForSchedule(r.Context(), guid)
 	if errors.Is(err, app.ErrScheduleNotFound) {
 		writeError(w, http.StatusNotFound, "scheduled transaction not found")
 		return
@@ -203,7 +203,7 @@ func (s *Server) handleUpdateScheduledTransaction(w http.ResponseWriter, r *http
 		writeError(w, http.StatusBadRequest, "invalid schedule: "+err.Error())
 		return
 	}
-	updated, err := s.schedule.Update(r.Context(), sched)
+	updated, err := s.Schedule.Update(r.Context(), sched)
 	switch {
 	case errors.Is(err, app.ErrScheduleNotFound):
 		writeError(w, http.StatusNotFound, "scheduled transaction not found")
@@ -223,7 +223,7 @@ func (s *Server) handleUpdateScheduledTransaction(w http.ResponseWriter, r *http
 
 func (s *Server) handleDeleteScheduledTransaction(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	bookGUID, err := s.schedule.BookGUIDForSchedule(r.Context(), guid)
+	bookGUID, err := s.Schedule.BookGUIDForSchedule(r.Context(), guid)
 	if errors.Is(err, app.ErrScheduleNotFound) {
 		writeError(w, http.StatusNotFound, "scheduled transaction not found")
 		return
@@ -235,7 +235,7 @@ func (s *Server) handleDeleteScheduledTransaction(w http.ResponseWriter, r *http
 	if !s.authorizeBook(w, r, bookGUID, app.AccessWrite) {
 		return
 	}
-	if err := s.schedule.Delete(r.Context(), guid); errors.Is(err, app.ErrScheduleNotFound) {
+	if err := s.Schedule.Delete(r.Context(), guid); errors.Is(err, app.ErrScheduleNotFound) {
 		writeError(w, http.StatusNotFound, "scheduled transaction not found")
 		return
 	} else if err != nil {
@@ -254,7 +254,7 @@ func (s *Server) handlePostDueSchedules(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	posted, err := s.schedule.PostDue(r.Context(), bookGUID, asOf, actorFromContext(r.Context()))
+	posted, err := s.Schedule.PostDue(r.Context(), bookGUID, asOf, actorFromContext(r.Context()))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not post due scheduled transactions: "+err.Error())
 		return

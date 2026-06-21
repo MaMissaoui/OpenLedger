@@ -59,7 +59,7 @@ func (s *Server) handlePostTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posted, err := s.posting.Post(r.Context(), tx, actorFromContext(r.Context()))
+	posted, err := s.Posting.Post(r.Context(), tx, actorFromContext(r.Context()))
 	switch {
 	case errors.Is(err, domain.ErrUnbalanced):
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
@@ -80,7 +80,7 @@ func (s *Server) handlePostTransaction(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetTransaction(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
 
-	accounts, err := s.posting.TransactionAccounts(r.Context(), guid)
+	accounts, err := s.Posting.TransactionAccounts(r.Context(), guid)
 	switch {
 	case errors.Is(err, app.ErrTransactionNotFound):
 		writeError(w, http.StatusNotFound, "transaction not found")
@@ -93,7 +93,7 @@ func (s *Server) handleGetTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := s.ledger.GetTransaction(r.Context(), guid)
+	tx, err := s.Ledger.GetTransaction(r.Context(), guid)
 	switch {
 	case errors.Is(err, app.ErrTransactionNotFound):
 		writeError(w, http.StatusNotFound, "transaction not found")
@@ -138,7 +138,7 @@ func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 	// Authorize against the transaction's *current* accounts first (404 if it
 	// does not exist), so a caller can only edit transactions in books they may
 	// write to.
-	existing, err := s.posting.TransactionAccounts(r.Context(), guid)
+	existing, err := s.Posting.TransactionAccounts(r.Context(), guid)
 	switch {
 	case errors.Is(err, app.ErrTransactionNotFound):
 		writeError(w, http.StatusNotFound, "transaction not found")
@@ -173,7 +173,7 @@ func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	updated, err := s.posting.Update(r.Context(), tx, actorFromContext(r.Context()))
+	updated, err := s.Posting.Update(r.Context(), tx, actorFromContext(r.Context()))
 	switch {
 	case errors.Is(err, domain.ErrUnbalanced):
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
@@ -196,7 +196,7 @@ func (s *Server) handleUpdateTransaction(w http.ResponseWriter, r *http.Request)
 func (s *Server) handleDeleteTransaction(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
 
-	existing, err := s.posting.TransactionAccounts(r.Context(), guid)
+	existing, err := s.Posting.TransactionAccounts(r.Context(), guid)
 	switch {
 	case errors.Is(err, app.ErrTransactionNotFound):
 		writeError(w, http.StatusNotFound, "transaction not found")
@@ -209,7 +209,7 @@ func (s *Server) handleDeleteTransaction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	switch err := s.posting.Delete(r.Context(), guid, actorFromContext(r.Context())); {
+	switch err := s.Posting.Delete(r.Context(), guid, actorFromContext(r.Context())); {
 	case errors.Is(err, app.ErrTransactionNotFound):
 		writeError(w, http.StatusNotFound, "transaction not found")
 		return

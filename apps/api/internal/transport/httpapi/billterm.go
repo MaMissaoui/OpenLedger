@@ -77,7 +77,7 @@ func (s *Server) handleListBillTerms(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeBook(w, r, bookGUID, app.AccessRead) {
 		return
 	}
-	terms, err := s.billterm.List(r.Context(), bookGUID)
+	terms, err := s.BillTerm.List(r.Context(), bookGUID)
 	if writeBillTermError(w, err) {
 		return
 	}
@@ -103,7 +103,7 @@ func (s *Server) handleCreateBillTerm(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid bill term: "+err.Error())
 		return
 	}
-	created, err := s.billterm.Create(r.Context(), t)
+	created, err := s.BillTerm.Create(r.Context(), t)
 	if writeBillTermError(w, err) {
 		return
 	}
@@ -112,7 +112,7 @@ func (s *Server) handleCreateBillTerm(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetBillTerm(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	t, err := s.billterm.Get(r.Context(), guid)
+	t, err := s.BillTerm.Get(r.Context(), guid)
 	if writeBillTermError(w, err) {
 		return
 	}
@@ -124,7 +124,7 @@ func (s *Server) handleGetBillTerm(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleUpdateBillTerm(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	bookGUID, err := s.billterm.BookGUIDForBillTerm(r.Context(), guid)
+	bookGUID, err := s.BillTerm.BookGUIDForBillTerm(r.Context(), guid)
 	if writeBillTermError(w, err) {
 		return
 	}
@@ -141,7 +141,7 @@ func (s *Server) handleUpdateBillTerm(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid bill term: "+err.Error())
 		return
 	}
-	updated, err := s.billterm.Update(r.Context(), t)
+	updated, err := s.BillTerm.Update(r.Context(), t)
 	if writeBillTermError(w, err) {
 		return
 	}
@@ -150,14 +150,14 @@ func (s *Server) handleUpdateBillTerm(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteBillTerm(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
-	bookGUID, err := s.billterm.BookGUIDForBillTerm(r.Context(), guid)
+	bookGUID, err := s.BillTerm.BookGUIDForBillTerm(r.Context(), guid)
 	if writeBillTermError(w, err) {
 		return
 	}
 	if !s.authorizeBook(w, r, bookGUID, app.AccessWrite) {
 		return
 	}
-	if err := s.billterm.Delete(r.Context(), guid); writeBillTermError(w, err) {
+	if err := s.BillTerm.Delete(r.Context(), guid); writeBillTermError(w, err) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

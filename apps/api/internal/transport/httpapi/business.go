@@ -96,7 +96,7 @@ func (s *Server) handleListCustomers(w http.ResponseWriter, r *http.Request) {
 	bookGUID := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
 	activeOnly := r.URL.Query().Get("active") == "true"
-	list, err := s.customer.ListCustomers(r.Context(), bookGUID, userID, activeOnly)
+	list, err := s.Customer.ListCustomers(r.Context(), bookGUID, userID, activeOnly)
 	if err != nil {
 		writeAuthzError(w, err)
 		return
@@ -132,7 +132,7 @@ func (s *Server) handleCreateCustomer(w http.ResponseWriter, r *http.Request) {
 		CreditLimit:  credit,
 		TermsGUID:    dto.TermsGUID,
 	}
-	created, err := s.customer.CreateCustomer(r.Context(), userID, c)
+	created, err := s.Customer.CreateCustomer(r.Context(), userID, c)
 	switch {
 	case errors.Is(err, app.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -146,7 +146,7 @@ func (s *Server) handleCreateCustomer(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetCustomer(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
-	c, err := s.customer.GetCustomer(r.Context(), guid, userID)
+	c, err := s.Customer.GetCustomer(r.Context(), guid, userID)
 	switch {
 	case errors.Is(err, domain.ErrCustomerNotFound):
 		writeError(w, http.StatusNotFound, "customer not found")
@@ -181,7 +181,7 @@ func (s *Server) handleUpdateCustomer(w http.ResponseWriter, r *http.Request) {
 		CreditLimit:  credit,
 		TermsGUID:    dto.TermsGUID,
 	}
-	updated, err := s.customer.UpdateCustomer(r.Context(), userID, c)
+	updated, err := s.Customer.UpdateCustomer(r.Context(), userID, c)
 	switch {
 	case errors.Is(err, domain.ErrCustomerNotFound):
 		writeError(w, http.StatusNotFound, "customer not found")
@@ -197,7 +197,7 @@ func (s *Server) handleUpdateCustomer(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteCustomer(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
-	err := s.customer.DeleteCustomer(r.Context(), guid, userID)
+	err := s.Customer.DeleteCustomer(r.Context(), guid, userID)
 	switch {
 	case errors.Is(err, domain.ErrCustomerNotFound):
 		writeError(w, http.StatusNotFound, "customer not found")
@@ -214,7 +214,7 @@ func (s *Server) handleListVendors(w http.ResponseWriter, r *http.Request) {
 	bookGUID := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
 	activeOnly := r.URL.Query().Get("active") == "true"
-	list, err := s.vendor.ListVendors(r.Context(), bookGUID, userID, activeOnly)
+	list, err := s.Vendor.ListVendors(r.Context(), bookGUID, userID, activeOnly)
 	if err != nil {
 		writeAuthzError(w, err)
 		return
@@ -244,7 +244,7 @@ func (s *Server) handleCreateVendor(w http.ResponseWriter, r *http.Request) {
 		Addr:         domain.Address{Name: dto.Addr.Name, Addr1: dto.Addr.Addr1, Addr2: dto.Addr.Addr2, Phone: dto.Addr.Phone, Email: dto.Addr.Email},
 		TermsGUID:    dto.TermsGUID,
 	}
-	created, err := s.vendor.CreateVendor(r.Context(), userID, v)
+	created, err := s.Vendor.CreateVendor(r.Context(), userID, v)
 	switch {
 	case errors.Is(err, app.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -258,7 +258,7 @@ func (s *Server) handleCreateVendor(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetVendor(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
-	v, err := s.vendor.GetVendor(r.Context(), guid, userID)
+	v, err := s.Vendor.GetVendor(r.Context(), guid, userID)
 	switch {
 	case errors.Is(err, domain.ErrVendorNotFound):
 		writeError(w, http.StatusNotFound, "vendor not found")
@@ -287,7 +287,7 @@ func (s *Server) handleUpdateVendor(w http.ResponseWriter, r *http.Request) {
 		Addr:         domain.Address{Name: dto.Addr.Name, Addr1: dto.Addr.Addr1, Addr2: dto.Addr.Addr2, Phone: dto.Addr.Phone, Email: dto.Addr.Email},
 		TermsGUID:    dto.TermsGUID,
 	}
-	updated, err := s.vendor.UpdateVendor(r.Context(), userID, v)
+	updated, err := s.Vendor.UpdateVendor(r.Context(), userID, v)
 	switch {
 	case errors.Is(err, domain.ErrVendorNotFound):
 		writeError(w, http.StatusNotFound, "vendor not found")
@@ -303,7 +303,7 @@ func (s *Server) handleUpdateVendor(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteVendor(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
-	err := s.vendor.DeleteVendor(r.Context(), guid, userID)
+	err := s.Vendor.DeleteVendor(r.Context(), guid, userID)
 	switch {
 	case errors.Is(err, domain.ErrVendorNotFound):
 		writeError(w, http.StatusNotFound, "vendor not found")

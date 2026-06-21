@@ -69,7 +69,7 @@ func (s *Server) handleListEmployees(w http.ResponseWriter, r *http.Request) {
 	bookGUID := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
 	activeOnly := r.URL.Query().Get("active") == "true"
-	list, err := s.employee.ListEmployees(r.Context(), bookGUID, userID, activeOnly)
+	list, err := s.Employee.ListEmployees(r.Context(), bookGUID, userID, activeOnly)
 	if err != nil {
 		writeAuthzError(w, err)
 		return
@@ -94,7 +94,7 @@ func (s *Server) handleCreateEmployee(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid rate")
 		return
 	}
-	created, err := s.employee.CreateEmployee(r.Context(), userID, e)
+	created, err := s.Employee.CreateEmployee(r.Context(), userID, e)
 	switch {
 	case errors.Is(err, app.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -108,7 +108,7 @@ func (s *Server) handleCreateEmployee(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetEmployee(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
-	e, err := s.employee.GetEmployee(r.Context(), guid, userID)
+	e, err := s.Employee.GetEmployee(r.Context(), guid, userID)
 	switch {
 	case errors.Is(err, domain.ErrEmployeeNotFound):
 		writeError(w, http.StatusNotFound, "employee not found")
@@ -132,7 +132,7 @@ func (s *Server) handleUpdateEmployee(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid rate")
 		return
 	}
-	updated, err := s.employee.UpdateEmployee(r.Context(), userID, e)
+	updated, err := s.Employee.UpdateEmployee(r.Context(), userID, e)
 	switch {
 	case errors.Is(err, domain.ErrEmployeeNotFound):
 		writeError(w, http.StatusNotFound, "employee not found")
@@ -148,7 +148,7 @@ func (s *Server) handleUpdateEmployee(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteEmployee(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
-	err := s.employee.DeleteEmployee(r.Context(), guid, userID)
+	err := s.Employee.DeleteEmployee(r.Context(), guid, userID)
 	switch {
 	case errors.Is(err, domain.ErrEmployeeNotFound):
 		writeError(w, http.StatusNotFound, "employee not found")

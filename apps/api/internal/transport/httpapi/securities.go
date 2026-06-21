@@ -66,9 +66,9 @@ func (s *Server) handleTrade(w http.ResponseWriter, r *http.Request, sell bool) 
 	actor := actorFromContext(r.Context())
 	var res app.TradeResult
 	if sell {
-		res, err = s.trade.Sell(r.Context(), trade, actor)
+		res, err = s.Trade.Sell(r.Context(), trade, actor)
 	} else {
-		res, err = s.trade.Buy(r.Context(), trade, actor)
+		res, err = s.Trade.Buy(r.Context(), trade, actor)
 	}
 	switch {
 	case errors.Is(err, app.ErrInvalidInput):

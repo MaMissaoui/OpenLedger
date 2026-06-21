@@ -36,7 +36,7 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 	bookGUID := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
 	activeOnly := r.URL.Query().Get("active") == "true"
-	list, err := s.job.ListJobs(r.Context(), bookGUID, userID, activeOnly)
+	list, err := s.Job.ListJobs(r.Context(), bookGUID, userID, activeOnly)
 	if err != nil {
 		writeAuthzError(w, err)
 		return
@@ -65,7 +65,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		OwnerType: dto.OwnerType,
 		OwnerGUID: dto.OwnerGUID,
 	}
-	created, err := s.job.CreateJob(r.Context(), userID, j)
+	created, err := s.Job.CreateJob(r.Context(), userID, j)
 	switch {
 	case errors.Is(err, app.ErrInvalidInput):
 		writeError(w, http.StatusBadRequest, "name, ownerType (customer|vendor) and ownerGuid are required")
@@ -79,7 +79,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetJob(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
-	j, err := s.job.GetJob(r.Context(), guid, userID)
+	j, err := s.Job.GetJob(r.Context(), guid, userID)
 	switch {
 	case errors.Is(err, domain.ErrJobNotFound):
 		writeError(w, http.StatusNotFound, "job not found")
@@ -105,7 +105,7 @@ func (s *Server) handleUpdateJob(w http.ResponseWriter, r *http.Request) {
 		Reference: dto.Reference,
 		Active:    dto.Active,
 	}
-	updated, err := s.job.UpdateJob(r.Context(), userID, j)
+	updated, err := s.Job.UpdateJob(r.Context(), userID, j)
 	switch {
 	case errors.Is(err, domain.ErrJobNotFound):
 		writeError(w, http.StatusNotFound, "job not found")
@@ -121,7 +121,7 @@ func (s *Server) handleUpdateJob(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDeleteJob(w http.ResponseWriter, r *http.Request) {
 	guid := r.PathValue("id")
 	userID := actorFromContext(r.Context()).UserID
-	err := s.job.DeleteJob(r.Context(), guid, userID)
+	err := s.Job.DeleteJob(r.Context(), guid, userID)
 	switch {
 	case errors.Is(err, domain.ErrJobNotFound):
 		writeError(w, http.StatusNotFound, "job not found")

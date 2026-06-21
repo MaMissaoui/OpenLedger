@@ -8,38 +8,44 @@ import (
 	"github.com/openledger/openledger/apps/api/internal/app"
 )
 
-// Server holds the dependencies the HTTP handlers need.
-type Server struct {
-	posting      *app.PostingService
-	ledger       *app.LedgerService
-	structure    *app.StructureService
-	price        *app.PriceService
-	quote        *app.QuoteService
-	bankImport   *app.BankImportService
-	report       *app.ReportService
-	forecast     *app.ForecastService
-	provision    *app.ProvisionService
-	authz        *app.AuthzService
-	importer     *app.ImportService
-	exporter     *app.ExportService
-	reconciler   *app.ReconcileService
-	portfolio    *app.PortfolioService
-	trade        *app.TradeService
-	capitalGains *app.CapitalGainsService
-	schedule     *app.ScheduleService
-	budget       *app.BudgetService
-	customer     *app.CustomerService
-	vendor       *app.VendorService
-	employee     *app.EmployeeService
-	job          *app.JobService
-	invoice      *app.InvoiceService
-	billterm     *app.BillTermService
-	taxtable     *app.TaxTableService
+// Services is the set of app use-case services the HTTP handlers depend on.
+// It is constructed once (in main.go, or a test helper) and embedded in Server,
+// so adding a service is a one-line field add rather than a positional-argument
+// ripple across every construction site. Handlers reach a service through the
+// promoted field, e.g. s.Posting.
+type Services struct {
+	Posting      *app.PostingService
+	Ledger       *app.LedgerService
+	Structure    *app.StructureService
+	Price        *app.PriceService
+	Quote        *app.QuoteService
+	BankImport   *app.BankImportService
+	Report       *app.ReportService
+	Forecast     *app.ForecastService
+	Provision    *app.ProvisionService
+	Authz        *app.AuthzService
+	Importer     *app.ImportService
+	Exporter     *app.ExportService
+	Reconciler   *app.ReconcileService
+	Portfolio    *app.PortfolioService
+	Trade        *app.TradeService
+	CapitalGains *app.CapitalGainsService
+	Schedule     *app.ScheduleService
+	Budget       *app.BudgetService
+	Customer     *app.CustomerService
+	Vendor       *app.VendorService
+	Employee     *app.EmployeeService
+	Job          *app.JobService
+	Invoice      *app.InvoiceService
+	BillTerm     *app.BillTermService
+	TaxTable     *app.TaxTableService
 }
 
-// NewServer builds a Server from its service dependencies.
-func NewServer(posting *app.PostingService, ledger *app.LedgerService, structure *app.StructureService, price *app.PriceService, report *app.ReportService, forecast *app.ForecastService, provision *app.ProvisionService, authz *app.AuthzService, importer *app.ImportService, exporter *app.ExportService, reconciler *app.ReconcileService, portfolio *app.PortfolioService, trade *app.TradeService, capitalGains *app.CapitalGainsService, schedule *app.ScheduleService, budget *app.BudgetService, customer *app.CustomerService, vendor *app.VendorService, invoice *app.InvoiceService, billterm *app.BillTermService, taxtable *app.TaxTableService, quote *app.QuoteService, bankImport *app.BankImportService, employee *app.EmployeeService, job *app.JobService) *Server {
-	return &Server{posting: posting, ledger: ledger, structure: structure, price: price, quote: quote, bankImport: bankImport, report: report, forecast: forecast, provision: provision, authz: authz, importer: importer, exporter: exporter, reconciler: reconciler, portfolio: portfolio, trade: trade, capitalGains: capitalGains, schedule: schedule, budget: budget, customer: customer, vendor: vendor, employee: employee, job: job, invoice: invoice, billterm: billterm, taxtable: taxtable}
+// Server holds the dependencies the HTTP handlers need. Build one directly:
+// &Server{Services: Services{...}} — the named-field literal is the wiring
+// contract, so field order and unset (nil) services no longer matter.
+type Server struct {
+	Services
 }
 
 // Routes returns the configured HTTP handler. /healthz is public; every

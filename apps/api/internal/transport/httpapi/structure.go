@@ -22,7 +22,7 @@ func (s *Server) handleCreateCommodity(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	c, err := s.structure.CreateCommodity(r.Context(), domain.Commodity{
+	c, err := s.Structure.CreateCommodity(r.Context(), domain.Commodity{
 		Namespace: dto.Namespace,
 		Mnemonic:  dto.Mnemonic,
 		Fullname:  dto.Fullname,
@@ -35,7 +35,7 @@ func (s *Server) handleCreateCommodity(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListCommodities(w http.ResponseWriter, r *http.Request) {
-	commodities, err := s.structure.ListCommodities(r.Context())
+	commodities, err := s.Structure.ListCommodities(r.Context())
 	if writeStructureError(w, err) {
 		return
 	}
@@ -57,7 +57,7 @@ func commodityDTO(c domain.Commodity) map[string]any {
 
 func (s *Server) handleCreateBook(w http.ResponseWriter, r *http.Request) {
 	actor := actorFromContext(r.Context())
-	book, err := s.structure.CreateBook(r.Context(), actor.UserID)
+	book, err := s.Structure.CreateBook(r.Context(), actor.UserID)
 	if writeStructureError(w, err) {
 		return
 	}
@@ -69,7 +69,7 @@ func (s *Server) handleCreateBook(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleListBooks(w http.ResponseWriter, r *http.Request) {
 	actor := actorFromContext(r.Context())
-	books, err := s.structure.ListBooks(r.Context(), actor.UserID)
+	books, err := s.Structure.ListBooks(r.Context(), actor.UserID)
 	if writeStructureError(w, err) {
 		return
 	}
@@ -103,7 +103,7 @@ func (s *Server) handleCreateAccount(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeBook(w, r, dto.BookGUID, app.AccessWrite) {
 		return
 	}
-	a, err := s.structure.CreateAccount(r.Context(), dto.BookGUID, domain.Account{
+	a, err := s.Structure.CreateAccount(r.Context(), dto.BookGUID, domain.Account{
 		Name:          dto.Name,
 		Type:          domain.AccountType(dto.Type),
 		CommodityGUID: dto.CommodityGUID,
@@ -123,7 +123,7 @@ func (s *Server) handleListAccounts(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizeBook(w, r, bookGUID, app.AccessRead) {
 		return
 	}
-	accounts, err := s.structure.ListAccounts(r.Context(), bookGUID)
+	accounts, err := s.Structure.ListAccounts(r.Context(), bookGUID)
 	if writeStructureError(w, err) {
 		return
 	}
