@@ -1,12 +1,114 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/openledger/openledger/apps/api/internal/app"
+	"github.com/openledger/openledger/apps/api/internal/domain"
 )
+
+// bizFake satisfies app.EmployeeRepository and app.JobRepository in memory.
+type bizFake struct {
+	employees map[string]domain.Employee
+	jobs      map[string]domain.Job
+}
+
+func (f *bizFake) ListEmployees(_ context.Context, bookGUID string, activeOnly bool) ([]domain.Employee, error) {
+	var out []domain.Employee
+	for _, e := range f.employees {
+		if e.BookGUID == bookGUID && (!activeOnly || e.Active) {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
+func (f *bizFake) CreateEmployee(_ context.Context, e domain.Employee) error {
+	if f.employees == nil {
+		f.employees = make(map[string]domain.Employee)
+	}
+	f.employees[e.GUID] = e
+	return nil
+}
+
+func (f *bizFake) GetEmployee(_ context.Context, guid string) (domain.Employee, error) {
+	e, ok := f.employees[guid]
+	if !ok {
+		return domain.Employee{}, domain.ErrEmployeeNotFound
+	}
+	return e, nil
+}
+
+func (f *bizFake) UpdateEmployee(_ context.Context, e domain.Employee) error {
+	if _, ok := f.employees[e.GUID]; !ok {
+		return domain.ErrEmployeeNotFound
+	}
+	f.employees[e.GUID] = e
+	return nil
+}
+
+func (f *bizFake) DeleteEmployee(_ context.Context, guid string) error {
+	if _, ok := f.employees[guid]; !ok {
+		return domain.ErrEmployeeNotFound
+	}
+	delete(f.employees, guid)
+	return nil
+}
+
+func (f *bizFake) ListJobs(_ context.Context, bookGUID string, activeOnly bool) ([]domain.Job, error) {
+	var out []domain.Job
+	for _, j := range f.jobs {
+		if j.BookGUID == bookGUID && (!activeOnly || j.Active) {
+			out = append(out, j)
+		}
+	}
+	return out, nil
+}
+
+func (f *bizFake) CreateJob(_ context.Context, j domain.Job) error {
+	if f.jobs == nil {
+		f.jobs = make(map[string]domain.Job)
+	}
+	f.jobs[j.GUID] = j
+	return nil
+}
+
+func (f *bizFake) GetJob(_ context.Context, guid string) (domain.Job, error) {
+	j, ok := f.jobs[guid]
+	if !ok {
+		return domain.Job{}, domain.ErrJobNotFound
+	}
+	return j, nil
+}
+
+func (f *bizFake) UpdateJob(_ context.Context, j domain.Job) error {
+	if _, ok := f.jobs[j.GUID]; !ok {
+		return domain.ErrJobNotFound
+	}
+	f.jobs[j.GUID] = j
+	return nil
+}
+
+func (f *bizFake) DeleteJob(_ context.Context, guid string) error {
+	if _, ok := f.jobs[guid]; !ok {
+		return domain.ErrJobNotFound
+	}
+	delete(f.jobs, guid)
+	return nil
+}
+
+func employeesServer(f *bizFake) http.Handler {
+	authz := app.NewAuthzService(&authStub{})
+	return authedServer(Services{
+		Employee: app.NewEmployeeService(f, authz),
+		Job:      app.NewJobService(f, authz),
+	})
+}
 
 func doReq(h http.Handler, method, path, body string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
@@ -17,7 +119,7 @@ func doReq(h http.Handler, method, path, body string) *httptest.ResponseRecorder
 }
 
 func TestEmployeeCRUD(t *testing.T) {
-	h := newTestServer(&fakeRepo{})
+	h := employeesServer(&bizFake{})
 
 	// Create.
 	rec := doReq(h, http.MethodPost, "/api/v1/books/book-1/employees",
@@ -76,7 +178,7 @@ func TestEmployeeCRUD(t *testing.T) {
 }
 
 func TestJobCRUD(t *testing.T) {
-	h := newTestServer(&fakeRepo{})
+	h := employeesServer(&bizFake{})
 
 	// Missing owner -> 400.
 	rec := doReq(h, http.MethodPost, "/api/v1/books/book-1/jobs", `{"name":"Website rebuild"}`)

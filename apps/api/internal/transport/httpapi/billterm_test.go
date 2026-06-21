@@ -14,12 +14,11 @@ import (
 
 // fakeBillTermRepoH satisfies app.BillTermRepository for HTTP-layer tests.
 type fakeBillTermRepoH struct {
-	*fakeRepo
 	terms map[string]domain.BillTerm
 }
 
 func newFakeBillTermRepoH() *fakeBillTermRepoH {
-	return &fakeBillTermRepoH{fakeRepo: &fakeRepo{}, terms: make(map[string]domain.BillTerm)}
+	return &fakeBillTermRepoH{terms: make(map[string]domain.BillTerm)}
 }
 
 func (f *fakeBillTermRepoH) CreateBillTerm(_ context.Context, t domain.BillTerm) (domain.BillTerm, error) {
@@ -70,11 +69,7 @@ func (f *fakeBillTermRepoH) BookGUIDForBillTerm(_ context.Context, guid string) 
 }
 
 func newBillTermTestServer(fr *fakeBillTermRepoH) http.Handler {
-	return (&Server{Services: Services{
-		Provision: app.NewProvisionService(fr.fakeRepo),
-		Authz:     app.NewAuthzService(fr.fakeRepo),
-		BillTerm:  app.NewBillTermService(fr),
-	}}).Routes()
+	return authedServer(Services{BillTerm: app.NewBillTermService(fr)})
 }
 
 func billTermReq(h http.Handler, method, path string, body any) *httptest.ResponseRecorder {

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
@@ -10,7 +11,53 @@ import (
 
 	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/domain"
+	"github.com/openledger/openledger/apps/api/internal/infra/bankimport"
 )
+
+// bankFake satisfies app.BankImportRepository and app.TransactionRepository
+// (statement lines post through PostingService).
+type bankFake struct {
+	accountCommodities map[string]app.AccountCommodityInfo
+	importRefs         map[string]struct{}
+}
+
+func (f *bankFake) InsertTransaction(context.Context, domain.Transaction, app.AuditActor) error {
+	return nil
+}
+func (f *bankFake) UpdateTransaction(context.Context, domain.Transaction, app.AuditActor) error {
+	return nil
+}
+func (f *bankFake) DeleteTransaction(context.Context, string, app.AuditActor) error { return nil }
+func (f *bankFake) TransactionAccountGUIDs(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+
+func (f *bankFake) AccountCommodity(_ context.Context, accountGUID string) (app.AccountCommodityInfo, error) {
+	if info, ok := f.accountCommodities[accountGUID]; ok {
+		return info, nil
+	}
+	return app.AccountCommodityInfo{}, nil
+}
+
+func (f *bankFake) FindOrCreateImbalanceAccount(_ context.Context, _ string, currency domain.Commodity) (string, error) {
+	return "imbalance-" + currency.GUID, nil
+}
+
+func (f *bankFake) ExistingImportRefs(_ context.Context, _ string) (map[string]struct{}, error) {
+	if f.importRefs == nil {
+		return map[string]struct{}{}, nil
+	}
+	return f.importRefs, nil
+}
+
+func bankServer(f *bankFake, authz *app.AuthzService) http.Handler {
+	posting := app.NewPostingService(f)
+	bank := app.NewBankImportService(posting, f, map[string]app.StatementReader{
+		"ofx": bankimport.OFX{},
+		"qif": bankimport.QIF{},
+	})
+	return authedServer(Services{BankImport: bank, Authz: authz})
+}
 
 const ofxStatement = `OFXHEADER:100
 <OFX><BANKTRANLIST>
@@ -35,8 +82,8 @@ func uploadStatement(h http.Handler, path, format, content string) *httptest.Res
 	return rec
 }
 
-func bankImportRepo() *fakeRepo {
-	return &fakeRepo{
+func bankImportRepo() *bankFake {
+	return &bankFake{
 		accountCommodities: map[string]app.AccountCommodityInfo{
 			"checking": {Commodity: domain.Commodity{GUID: "usd", Namespace: domain.NamespaceCurrency, Mnemonic: "USD"}},
 		},
@@ -45,7 +92,7 @@ func bankImportRepo() *fakeRepo {
 
 func TestImportBankStatement(t *testing.T) {
 	repo := bankImportRepo()
-	rec := uploadStatement(newTestServer(repo), "/api/v1/accounts/checking/import-bank", "ofx", ofxStatement)
+	rec := uploadStatement(bankServer(repo, nil), "/api/v1/accounts/checking/import-bank", "ofx", ofxStatement)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 	}
@@ -60,14 +107,14 @@ func TestImportBankStatement(t *testing.T) {
 
 func TestImportBankStatementSniffsFormat(t *testing.T) {
 	// No "format" field: the handler sniffs OFX from the OFXHEADER marker.
-	rec := uploadStatement(newTestServer(bankImportRepo()), "/api/v1/accounts/checking/import-bank", "", ofxStatement)
+	rec := uploadStatement(bankServer(bankImportRepo(), nil), "/api/v1/accounts/checking/import-bank", "", ofxStatement)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestImportBankStatementUnrecognisedReturns400(t *testing.T) {
-	rec := uploadStatement(newTestServer(bankImportRepo()), "/api/v1/accounts/checking/import-bank", "", "just some text")
+	rec := uploadStatement(bankServer(bankImportRepo(), nil), "/api/v1/accounts/checking/import-bank", "", "just some text")
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
@@ -75,8 +122,7 @@ func TestImportBankStatementUnrecognisedReturns400(t *testing.T) {
 
 func TestImportBankStatementForbidden(t *testing.T) {
 	repo := bankImportRepo()
-	repo.noMembership = true
-	rec := uploadStatement(newTestServer(repo), "/api/v1/accounts/checking/import-bank", "ofx", ofxStatement)
+	rec := uploadStatement(bankServer(repo, app.NewAuthzService(&authStub{noMembership: true})), "/api/v1/accounts/checking/import-bank", "ofx", ofxStatement)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403; body = %s", rec.Code, rec.Body.String())
 	}
@@ -104,7 +150,7 @@ func uploadCSV(h http.Handler, path, content, mapping string) *httptest.Response
 }
 
 func TestPreviewBankCsv(t *testing.T) {
-	rec := uploadStatement(newTestServer(bankImportRepo()),
+	rec := uploadStatement(bankServer(bankImportRepo(), nil),
 		"/api/v1/accounts/checking/import-bank/preview", "", csvStatement)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
@@ -122,7 +168,7 @@ func TestPreviewBankCsv(t *testing.T) {
 
 func TestImportBankCsv(t *testing.T) {
 	mapping := `{"hasHeader":true,"dateCol":0,"dateFormat":"2006-01-02","amountCol":1,"descCols":[2]}`
-	rec := uploadCSV(newTestServer(bankImportRepo()), "/api/v1/accounts/checking/import-bank", csvStatement, mapping)
+	rec := uploadCSV(bankServer(bankImportRepo(), nil), "/api/v1/accounts/checking/import-bank", csvStatement, mapping)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 	}
@@ -135,7 +181,7 @@ func TestImportBankCsv(t *testing.T) {
 
 func TestImportBankCsvMissingAmountMappingReturns400(t *testing.T) {
 	mapping := `{"hasHeader":true,"dateCol":0}` // no amount/debit/credit columns
-	rec := uploadCSV(newTestServer(bankImportRepo()), "/api/v1/accounts/checking/import-bank", csvStatement, mapping)
+	rec := uploadCSV(bankServer(bankImportRepo(), nil), "/api/v1/accounts/checking/import-bank", csvStatement, mapping)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}

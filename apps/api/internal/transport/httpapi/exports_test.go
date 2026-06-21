@@ -1,12 +1,28 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/openledger/openledger/apps/api/internal/app"
 )
+
+// exportFake satisfies app.ExportRepository; the GnuCashWriter is the shared
+// fakeWriter stub.
+type exportFake struct {
+	loadBookData app.GnuCashData
+	loadBookErr  error
+}
+
+func (f *exportFake) LoadBook(context.Context, string) (app.GnuCashData, error) {
+	return f.loadBookData, f.loadBookErr
+}
+
+func exportServer(f *exportFake, authz *app.AuthzService) http.Handler {
+	return authedServer(Services{Exporter: app.NewExportService(f, &fakeWriter{}), Authz: authz})
+}
 
 func exportGnuCash(h http.Handler, bookGUID string) *httptest.ResponseRecorder {
 	return exportGnuCashFormat(h, bookGUID, "")
@@ -24,8 +40,8 @@ func exportGnuCashFormat(h http.Handler, bookGUID, format string) *httptest.Resp
 }
 
 func TestExportGnuCash(t *testing.T) {
-	repo := &fakeRepo{loadBookData: importableData()}
-	rec := exportGnuCash(newTestServer(repo), "book1")
+	repo := &exportFake{loadBookData: importableData()}
+	rec := exportGnuCash(exportServer(repo, nil), "book1")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
@@ -39,8 +55,8 @@ func TestExportGnuCash(t *testing.T) {
 }
 
 func TestExportGnuCashXML(t *testing.T) {
-	repo := &fakeRepo{loadBookData: importableData()}
-	rec := exportGnuCashFormat(newTestServer(repo), "book1", "xml")
+	repo := &exportFake{loadBookData: importableData()}
+	rec := exportGnuCashFormat(exportServer(repo, nil), "book1", "xml")
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
@@ -56,24 +72,24 @@ func TestExportGnuCashXML(t *testing.T) {
 }
 
 func TestExportGnuCashUnknownFormatReturns400(t *testing.T) {
-	repo := &fakeRepo{loadBookData: importableData()}
-	rec := exportGnuCashFormat(newTestServer(repo), "book1", "csv")
+	repo := &exportFake{loadBookData: importableData()}
+	rec := exportGnuCashFormat(exportServer(repo, nil), "book1", "csv")
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestExportGnuCashBookNotFoundReturns404(t *testing.T) {
-	repo := &fakeRepo{loadBookErr: app.ErrBookNotFound}
-	rec := exportGnuCash(newTestServer(repo), "missing")
+	repo := &exportFake{loadBookErr: app.ErrBookNotFound}
+	rec := exportGnuCash(exportServer(repo, nil), "missing")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body = %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestExportGnuCashForbiddenReturns403(t *testing.T) {
-	repo := &fakeRepo{noMembership: true, loadBookData: importableData()}
-	rec := exportGnuCash(newTestServer(repo), "book1")
+	repo := &exportFake{loadBookData: importableData()}
+	rec := exportGnuCash(exportServer(repo, app.NewAuthzService(&authStub{noMembership: true})), "book1")
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403; body = %s", rec.Code, rec.Body.String())
 	}

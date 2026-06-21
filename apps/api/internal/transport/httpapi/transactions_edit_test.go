@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
 
@@ -24,7 +25,7 @@ const balancedBody = `{
 	]}`
 
 func TestGetTransaction(t *testing.T) {
-	repo := &fakeRepo{gotTx: &domain.Transaction{
+	repo := &txFake{gotTx: &domain.Transaction{
 		CurrencyGUID: "USD",
 		Description:  "groceries",
 		Splits: []domain.Split{
@@ -32,7 +33,7 @@ func TestGetTransaction(t *testing.T) {
 			{GUID: "s2", AccountGUID: "groceries", Value: domain.MustFromNumDenom(-7500, 100), Quantity: domain.MustFromNumDenom(-7500, 100)},
 		},
 	}}
-	rec := sendJSON(newTestServer(repo), http.MethodGet, "/api/v1/transactions/tx-1", "")
+	rec := sendJSON(txServer(repo), http.MethodGet, "/api/v1/transactions/tx-1", "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
 	}
@@ -58,15 +59,15 @@ func TestGetTransaction(t *testing.T) {
 }
 
 func TestGetTransactionNotFoundReturns404(t *testing.T) {
-	rec := sendJSON(newTestServer(&fakeRepo{txNotFound: true}), http.MethodGet, "/api/v1/transactions/missing", "")
+	rec := sendJSON(txServer(&txFake{txNotFound: true}), http.MethodGet, "/api/v1/transactions/missing", "")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body = %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestUpdateTransaction(t *testing.T) {
-	repo := &fakeRepo{}
-	rec := sendJSON(newTestServer(repo), http.MethodPatch, "/api/v1/transactions/tx-1", balancedBody)
+	repo := &txFake{}
+	rec := sendJSON(txServer(repo), http.MethodPatch, "/api/v1/transactions/tx-1", balancedBody)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
 	}
@@ -84,7 +85,7 @@ func TestUpdateTransaction(t *testing.T) {
 }
 
 func TestUpdateUnbalancedReturns422(t *testing.T) {
-	rec := sendJSON(newTestServer(&fakeRepo{}), http.MethodPatch, "/api/v1/transactions/tx-1", `{
+	rec := sendJSON(txServer(&txFake{}), http.MethodPatch, "/api/v1/transactions/tx-1", `{
 		"currencyGuid":"USD","splits":[
 			{"accountGuid":"checking","value":{"num":7500,"denom":100},"quantity":{"num":7500,"denom":100}},
 			{"accountGuid":"groceries","value":{"num":-7400,"denom":100},"quantity":{"num":-7400,"denom":100}}
@@ -95,8 +96,8 @@ func TestUpdateUnbalancedReturns422(t *testing.T) {
 }
 
 func TestUpdateNotFoundReturns404(t *testing.T) {
-	repo := &fakeRepo{txNotFound: true}
-	rec := sendJSON(newTestServer(repo), http.MethodPatch, "/api/v1/transactions/missing", balancedBody)
+	repo := &txFake{txNotFound: true}
+	rec := sendJSON(txServer(repo), http.MethodPatch, "/api/v1/transactions/missing", balancedBody)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body = %s", rec.Code, rec.Body.String())
 	}
@@ -106,8 +107,8 @@ func TestUpdateNotFoundReturns404(t *testing.T) {
 }
 
 func TestUpdateForbiddenWithoutMembership(t *testing.T) {
-	repo := &fakeRepo{noMembership: true}
-	rec := sendJSON(newTestServer(repo), http.MethodPatch, "/api/v1/transactions/tx-1", balancedBody)
+	repo := &txFake{}
+	rec := sendJSON(txServerAuthz(repo, app.NewAuthzService(&authStub{noMembership: true})), http.MethodPatch, "/api/v1/transactions/tx-1", balancedBody)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403; body = %s", rec.Code, rec.Body.String())
 	}
@@ -117,8 +118,8 @@ func TestUpdateForbiddenWithoutMembership(t *testing.T) {
 }
 
 func TestDeleteTransaction(t *testing.T) {
-	repo := &fakeRepo{}
-	rec := sendJSON(newTestServer(repo), http.MethodDelete, "/api/v1/transactions/tx-1", "")
+	repo := &txFake{}
+	rec := sendJSON(txServer(repo), http.MethodDelete, "/api/v1/transactions/tx-1", "")
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204; body = %s", rec.Code, rec.Body.String())
 	}
@@ -128,8 +129,8 @@ func TestDeleteTransaction(t *testing.T) {
 }
 
 func TestDeleteNotFoundReturns404(t *testing.T) {
-	repo := &fakeRepo{txNotFound: true}
-	rec := sendJSON(newTestServer(repo), http.MethodDelete, "/api/v1/transactions/missing", "")
+	repo := &txFake{txNotFound: true}
+	rec := sendJSON(txServer(repo), http.MethodDelete, "/api/v1/transactions/missing", "")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body = %s", rec.Code, rec.Body.String())
 	}

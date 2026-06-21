@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,34 @@ import (
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
 
+// portfolioFake satisfies app.PortfolioRepository for the portfolio endpoint.
+type portfolioFake struct {
+	bookRoot     string
+	bookNotFound bool
+	holdings     []app.HoldingBalance
+	latestPrices map[string]domain.Price
+}
+
+func (f *portfolioFake) BookRootAccount(context.Context, string) (string, error) {
+	if f.bookNotFound {
+		return "", app.ErrBookNotFound
+	}
+	return f.bookRoot, nil
+}
+
+func (f *portfolioFake) SecurityHoldings(context.Context, string) ([]app.HoldingBalance, error) {
+	return f.holdings, nil
+}
+
+func (f *portfolioFake) LatestPrice(_ context.Context, commodityGUID string) (domain.Price, bool, error) {
+	p, ok := f.latestPrices[commodityGUID]
+	return p, ok, nil
+}
+
+func portfolioServer(f *portfolioFake, authz *app.AuthzService) http.Handler {
+	return authedServer(Services{Portfolio: app.NewPortfolioService(f), Authz: authz})
+}
+
 func getPortfolio(h http.Handler, bookGUID string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	req := withAuth(httptest.NewRequest(http.MethodGet, "/api/v1/books/"+bookGUID+"/reports/portfolio", nil))
@@ -18,7 +47,7 @@ func getPortfolio(h http.Handler, bookGUID string) *httptest.ResponseRecorder {
 }
 
 func TestPortfolioReport(t *testing.T) {
-	repo := &fakeRepo{
+	repo := &portfolioFake{
 		bookRoot: "root",
 		holdings: []app.HoldingBalance{{
 			Account:    domain.Account{GUID: "aapl-acct", Type: domain.AccountStock, CommodityGUID: "aapl", Name: "AAPL"},
@@ -30,7 +59,7 @@ func TestPortfolioReport(t *testing.T) {
 			"aapl": {CommodityGUID: "aapl", CurrencyGUID: "usd", Value: domain.MustFromNumDenom(1800, 100)},
 		},
 	}
-	rec := getPortfolio(newTestServer(repo), "book1")
+	rec := getPortfolio(portfolioServer(repo, nil), "book1")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
 	}
@@ -66,8 +95,8 @@ func TestPortfolioReport(t *testing.T) {
 }
 
 func TestPortfolioForbiddenReturns403(t *testing.T) {
-	repo := &fakeRepo{noMembership: true, bookRoot: "root"}
-	rec := getPortfolio(newTestServer(repo), "book1")
+	repo := &portfolioFake{bookRoot: "root"}
+	rec := getPortfolio(portfolioServer(repo, app.NewAuthzService(&authStub{noMembership: true})), "book1")
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403; body = %s", rec.Code, rec.Body.String())
 	}
@@ -75,8 +104,8 @@ func TestPortfolioForbiddenReturns403(t *testing.T) {
 
 func TestPortfolioBookNotFoundReturns404(t *testing.T) {
 	// Membership is fine (default owner), but the book's root lookup fails.
-	repo := &fakeRepo{bookNotFound: true}
-	rec := getPortfolio(newTestServer(repo), "missing")
+	repo := &portfolioFake{bookNotFound: true}
+	rec := getPortfolio(portfolioServer(repo, nil), "missing")
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body = %s", rec.Code, rec.Body.String())
 	}

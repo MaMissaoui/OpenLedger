@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,36 @@ import (
 	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
+
+// importFake satisfies app.GnuCashReader (canned data/error) and
+// app.ImportRepository (captures what was persisted).
+type importFake struct {
+	readerData   app.GnuCashData
+	readerErr    error
+	importedData *app.GnuCashData
+	importErr    error
+}
+
+func (f *importFake) ReadGnuCashSQLite(context.Context, string) (app.GnuCashData, error) {
+	return f.readerData, f.readerErr
+}
+
+func (f *importFake) ReadGnuCashXML(context.Context, string) (app.GnuCashData, error) {
+	return f.readerData, f.readerErr
+}
+
+func (f *importFake) ImportBook(_ context.Context, data app.GnuCashData, _ string) error {
+	if f.importErr != nil {
+		return f.importErr
+	}
+	cp := data
+	f.importedData = &cp
+	return nil
+}
+
+func importServer(f *importFake) http.Handler {
+	return authedServer(Services{Importer: app.NewImportService(f, f)})
+}
 
 // sqliteMagic is the SQLite file header, so an upload sniffs as the SQLite
 // backend. The fake reader ignores the rest of the bytes and returns canned
@@ -54,8 +85,8 @@ func importableData() app.GnuCashData {
 }
 
 func TestImportGnuCash(t *testing.T) {
-	repo := &fakeRepo{readerData: importableData()}
-	rec := uploadGnuCash(newTestServer(repo), sqliteMagic)
+	repo := &importFake{readerData: importableData()}
+	rec := uploadGnuCash(importServer(repo), sqliteMagic)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
@@ -69,9 +100,9 @@ func TestImportGnuCash(t *testing.T) {
 }
 
 func TestImportGnuCashXML(t *testing.T) {
-	repo := &fakeRepo{readerData: importableData()}
+	repo := &importFake{readerData: importableData()}
 	// Content starting with '<' sniffs as XML, dispatching to ImportXML.
-	rec := uploadGnuCash(newTestServer(repo), []byte("<?xml version=\"1.0\"?><gnc-v2/>"))
+	rec := uploadGnuCash(importServer(repo), []byte("<?xml version=\"1.0\"?><gnc-v2/>"))
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
@@ -82,8 +113,8 @@ func TestImportGnuCashXML(t *testing.T) {
 }
 
 func TestImportGnuCashUnrecognisedFormatReturns400(t *testing.T) {
-	repo := &fakeRepo{readerData: importableData()}
-	rec := uploadGnuCash(newTestServer(repo), []byte("just some bytes"))
+	repo := &importFake{readerData: importableData()}
+	rec := uploadGnuCash(importServer(repo), []byte("just some bytes"))
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
@@ -95,9 +126,9 @@ func TestImportGnuCashUnrecognisedFormatReturns400(t *testing.T) {
 func TestImportGnuCashUnbalancedReturns422(t *testing.T) {
 	data := importableData()
 	data.Transactions[0].Splits[1].Value = domain.MustFromNumDenom(-4000, 1) // breaks balance
-	repo := &fakeRepo{readerData: data}
+	repo := &importFake{readerData: data}
 
-	rec := uploadGnuCash(newTestServer(repo), sqliteMagic)
+	rec := uploadGnuCash(importServer(repo), sqliteMagic)
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("status = %d, want 422; body = %s", rec.Code, rec.Body.String())
 	}
@@ -107,8 +138,8 @@ func TestImportGnuCashUnbalancedReturns422(t *testing.T) {
 }
 
 func TestImportGnuCashConflictReturns409(t *testing.T) {
-	repo := &fakeRepo{readerData: importableData(), importErr: app.ErrImportConflict}
-	rec := uploadGnuCash(newTestServer(repo), sqliteMagic)
+	repo := &importFake{readerData: importableData(), importErr: app.ErrImportConflict}
+	rec := uploadGnuCash(importServer(repo), sqliteMagic)
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want 409; body = %s", rec.Code, rec.Body.String())
 	}
@@ -117,7 +148,7 @@ func TestImportGnuCashConflictReturns409(t *testing.T) {
 func TestImportGnuCashMissingFileReturns400(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := withAuth(httptest.NewRequest(http.MethodPost, "/api/v1/imports/gnucash", nil))
-	newTestServer(&fakeRepo{}).ServeHTTP(rec, req)
+	importServer(&importFake{}).ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}

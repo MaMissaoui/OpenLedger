@@ -13,7 +13,7 @@ import (
 func TestProtectedRouteRejectsMissingRemoteUser(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/accounts/x/register", nil)
-	newTestServer(&fakeRepo{exists: true}).ServeHTTP(rec, req)
+	registerServer(&ledgerFake{exists: true}).ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401 without Remote-User header", rec.Code)
 	}
@@ -22,10 +22,10 @@ func TestProtectedRouteRejectsMissingRemoteUser(t *testing.T) {
 // TestProtectedRouteAcceptsRemoteUser verifies that a request bearing
 // Remote-User (as Traefik sets after Authelia verification) passes requireAuth.
 func TestProtectedRouteAcceptsRemoteUser(t *testing.T) {
-	repo := &fakeRepo{exists: true}
+	repo := &ledgerFake{exists: true}
 	rec := httptest.NewRecorder()
 	req := withAuth(httptest.NewRequest(http.MethodGet, "/api/v1/accounts/x/register", nil))
-	newTestServer(repo).ServeHTTP(rec, req)
+	registerServer(repo).ServeHTTP(rec, req)
 	if rec.Code == http.StatusUnauthorized {
 		t.Fatalf("status = 401, want auth to pass when Remote-User is set")
 	}
@@ -35,7 +35,7 @@ func TestProtectedRouteAcceptsRemoteUser(t *testing.T) {
 func TestHealthzIsPublic(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
-	newTestServer(&fakeRepo{}).ServeHTTP(rec, req)
+	authedServer(Services{}).ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}

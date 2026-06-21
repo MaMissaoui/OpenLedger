@@ -1,16 +1,37 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
 
+	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
 
+// priceFake satisfies app.PriceRepository. The /prices routes are reference
+// data (auth only, no book authz).
+type priceFake struct {
+	prices []domain.Price
+}
+
+func (f *priceFake) InsertPrice(_ context.Context, p domain.Price) error {
+	f.prices = append(f.prices, p)
+	return nil
+}
+
+func (f *priceFake) ListPricesByCommodity(context.Context, string) ([]domain.Price, error) {
+	return f.prices, nil
+}
+
+func priceServer(f *priceFake) http.Handler {
+	return authedServer(Services{Price: app.NewPriceService(f)})
+}
+
 func TestCreatePrice(t *testing.T) {
-	repo := &fakeRepo{}
-	rec := postTo(newTestServer(repo), "/api/v1/prices",
+	repo := &priceFake{}
+	rec := postTo(priceServer(repo), "/api/v1/prices",
 		`{"commodityGuid":"aapl","currencyGuid":"usd","value":{"num":15000,"denom":100}}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
@@ -28,7 +49,7 @@ func TestCreatePrice(t *testing.T) {
 }
 
 func TestCreatePriceMissingCommodityReturns400(t *testing.T) {
-	rec := postTo(newTestServer(&fakeRepo{}), "/api/v1/prices",
+	rec := postTo(priceServer(&priceFake{}), "/api/v1/prices",
 		`{"currencyGuid":"usd","value":{"num":15000,"denom":100}}`)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
@@ -36,7 +57,7 @@ func TestCreatePriceMissingCommodityReturns400(t *testing.T) {
 }
 
 func TestCreatePriceZeroValueReturns400(t *testing.T) {
-	rec := postTo(newTestServer(&fakeRepo{}), "/api/v1/prices",
+	rec := postTo(priceServer(&priceFake{}), "/api/v1/prices",
 		`{"commodityGuid":"aapl","currencyGuid":"usd","value":{"num":0,"denom":100}}`)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
@@ -44,7 +65,7 @@ func TestCreatePriceZeroValueReturns400(t *testing.T) {
 }
 
 func TestListPricesRequiresCommodity(t *testing.T) {
-	rec := getRegister(newTestServer(&fakeRepo{}), "/api/v1/prices")
+	rec := getRegister(priceServer(&priceFake{}), "/api/v1/prices")
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
 	}
@@ -52,10 +73,10 @@ func TestListPricesRequiresCommodity(t *testing.T) {
 
 func TestListPrices(t *testing.T) {
 	val, _ := domain.FromNumDenom(15000, 100)
-	repo := &fakeRepo{prices: []domain.Price{
+	repo := &priceFake{prices: []domain.Price{
 		{GUID: "p1", CommodityGUID: "aapl", CurrencyGUID: "usd", Value: val},
 	}}
-	rec := getRegister(newTestServer(repo), "/api/v1/prices?commodity=aapl")
+	rec := getRegister(priceServer(repo), "/api/v1/prices?commodity=aapl")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
 	}
