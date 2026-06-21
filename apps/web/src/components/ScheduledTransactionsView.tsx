@@ -167,6 +167,12 @@ interface SplitRow {
 }
 
 function ScheduledTransactionForm({ book, accounts, initial, onClose }: FormProps) {
+  const commodities = useQuery({
+    queryKey: ["commodities"],
+    queryFn: api.listCommodities,
+    select: (list) => list.filter((c) => c.namespace === "CURRENCY"),
+  });
+
   const [name, setName] = useState(initial?.name ?? "");
   const [enabled, setEnabled] = useState(initial?.enabled ?? true);
   const [currencyGuid, setCurrencyGuid] = useState(
@@ -250,7 +256,16 @@ function ScheduledTransactionForm({ book, accounts, initial, onClose }: FormProp
     }
   }
 
-  const postableAccounts = accounts.filter((a) => !a.placeholder && a.type !== "ROOT");
+  const postableAccounts = accounts
+    .filter((a) => !a.placeholder && a.type !== "ROOT")
+    .slice()
+    .sort((a, b) => {
+      const ca = a.code ?? "", cb = b.code ?? "";
+      if (ca && cb) return ca.localeCompare(cb);
+      if (ca) return -1;
+      if (cb) return 1;
+      return a.name.localeCompare(b.name);
+    });
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
@@ -277,13 +292,13 @@ function ScheduledTransactionForm({ book, accounts, initial, onClose }: FormProp
             </label>
           </div>
           <div className="field">
-            <label>Currency (commodity GUID)</label>
-            <input
-              value={currencyGuid}
-              onChange={(e) => setCurrencyGuid(e.target.value)}
-              placeholder="e.g. the GUID of USD"
-              required
-            />
+            <label>Currency</label>
+            <select value={currencyGuid} onChange={(e) => setCurrencyGuid(e.target.value)} required>
+              <option value="">— select currency —</option>
+              {(commodities.data ?? []).map((c) => (
+                <option key={c.guid} value={c.guid}>{c.mnemonic}</option>
+              ))}
+            </select>
           </div>
           <div className="field row">
             <div>
@@ -331,7 +346,7 @@ function ScheduledTransactionForm({ book, accounts, initial, onClose }: FormProp
                 >
                   {postableAccounts.map((a) => (
                     <option key={a.guid} value={a.guid}>
-                      {a.name}
+                      {a.code ? `[${a.code}] ${a.name}` : a.name}
                     </option>
                   ))}
                 </select>
