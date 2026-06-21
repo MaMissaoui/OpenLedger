@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "./lib/api";
 import { SetupLedger } from "./SetupLedger";
@@ -177,6 +177,22 @@ export function Ledger() {
     enabled: book !== null,
   });
 
+  const qc = useQueryClient();
+  const schedulesQ = useQuery({
+    queryKey: ["scheduled-transactions", book?.guid ?? ""],
+    queryFn: () => api.listScheduledTransactions(book!.guid),
+    enabled: book !== null,
+  });
+  const [dueDismissed, setDueDismissed] = useState(false);
+  useEffect(() => { setDueDismissed(false); }, [book?.guid]);
+  const postDueMut = useMutation({
+    mutationFn: () => api.postDueSchedules(book!.guid),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["scheduled-transactions", book!.guid] });
+      qc.invalidateQueries({ queryKey: ["accounts", book!.guid] });
+    },
+  });
+
   const [selectedGuid, setSelectedGuid] = useState<string | null>(null);
   const [showNewTx, setShowNewTx] = useState(false);
   const [editTxGuid, setEditTxGuid] = useState<string | null>(null);
@@ -219,6 +235,12 @@ export function Ledger() {
   if (!book) return <SetupLedger />;
 
   const selected = postable.find((a) => a.guid === selectedGuid) ?? null;
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dueCount = (schedulesQ.data ?? []).filter(
+    (s) => s.enabled && s.nextDueDate != null && s.nextDueDate <= todayStr
+  ).length;
+  const showDueBanner = dueCount > 0 && !dueDismissed;
 
   return (
     <div className="shell">
@@ -305,6 +327,33 @@ export function Ledger() {
 
       {/* ── main content ── */}
       <div className="shell__content">
+        {showDueBanner && (
+          <div style={{
+            padding: "0.55rem 1.5rem",
+            background: "rgba(26,127,55,0.08)",
+            borderBottom: "1px solid rgba(26,127,55,0.18)",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.75rem",
+            fontSize: "0.875rem",
+          }}>
+            <span style={{ flex: 1 }}>
+              <strong>{dueCount}</strong> scheduled transaction{dueCount !== 1 ? "s" : ""} due —{" "}
+              <button className="btn btn--ghost btn--xs" onClick={() => setView("scheduled")}>view</button>
+            </span>
+            <button
+              className="btn btn--primary btn--sm"
+              onClick={() => postDueMut.mutate()}
+              disabled={postDueMut.isPending}
+            >
+              {postDueMut.isPending ? "Posting…" : "Post Now"}
+            </button>
+            <button className="btn btn--ghost btn--sm" onClick={() => setDueDismissed(true)}>
+              Later
+            </button>
+          </div>
+        )}
+
         {view === "dashboard" ? (
           <DashboardView book={book} onNavigate={setView} />
         ) : view === "reports" ? (
