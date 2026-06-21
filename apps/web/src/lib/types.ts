@@ -454,7 +454,7 @@ export interface Entry extends NewEntry {
 
 export interface NewInvoice {
   id?: string;
-  type: "invoice" | "bill";
+  type: "invoice" | "bill" | "expense_voucher";
   ownerGuid: string;
   dateOpened?: string;
   notes?: string;

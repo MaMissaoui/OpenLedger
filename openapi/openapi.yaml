@@ -1894,7 +1894,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [invoice, bill]
+            enum: [invoice, bill, expense_voucher]
             default: invoice
       responses:
         "200":
@@ -3319,7 +3319,7 @@ components:
           description: Display number (e.g. INV-0001)
         type:
           type: string
-          enum: [invoice, bill]
+          enum: [invoice, bill, expense_voucher]
         ownerGuid:
           type: string
           description: Customer GUID (invoice) or Vendor GUID (bill)

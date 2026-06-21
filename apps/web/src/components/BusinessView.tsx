@@ -373,7 +373,7 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
 
 // ── Top-level BusinessView ────────────────────────────────────────────────────
 
-type BizTab = "customers" | "vendors" | "employees" | "jobs" | "invoices" | "bills" | "ar-aging" | "ap-aging" | "terms" | "tax";
+type BizTab = "customers" | "vendors" | "employees" | "jobs" | "invoices" | "bills" | "vouchers" | "ar-aging" | "ap-aging" | "terms" | "tax";
 
 const TAB_LABELS: Record<BizTab, string> = {
   customers: "Customers",
@@ -382,6 +382,7 @@ const TAB_LABELS: Record<BizTab, string> = {
   jobs: "Jobs",
   invoices: "Invoices",
   bills: "Bills",
+  vouchers: "Expense Vouchers",
   "ar-aging": "A/R Aging",
   "ap-aging": "A/P Aging",
   terms: "Bill Terms",
@@ -430,7 +431,7 @@ export default function BusinessView({
         </div>
         <div className="register__actions">
           <div className="biz-tabs">
-            {(["customers", "vendors", "employees", "jobs", "invoices", "bills", "ar-aging", "ap-aging", "terms", "tax"] as BizTab[]).map((t) => (
+            {(["customers", "vendors", "employees", "jobs", "invoices", "bills", "vouchers", "ar-aging", "ap-aging", "terms", "tax"] as BizTab[]).map((t) => (
               <button
                 key={t}
                 className={`biz-tab${tab === t ? " biz-tab--active" : ""}`}
@@ -438,7 +439,7 @@ export default function BusinessView({
               >{TAB_LABELS[t]}</button>
             ))}
           </div>
-          {(tab === "customers" || tab === "vendors" || tab === "employees" || tab === "jobs" || tab === "invoices" || tab === "bills" || tab === "terms" || tab === "tax") && (
+          {(tab === "customers" || tab === "vendors" || tab === "employees" || tab === "jobs" || tab === "invoices" || tab === "bills" || tab === "vouchers" || tab === "terms" || tab === "tax") && (
             <button className="btn btn--primary btn--sm" onClick={handleNew}>
               + New {newLabel}
             </button>
@@ -490,10 +491,10 @@ export default function BusinessView({
       {tab === "jobs" && (
         <JobsView bookGuid={bookGuid} triggerNew={newTrigger} customers={customers} vendors={vendors} />
       )}
-      {(tab === "invoices" || tab === "bills") && (
+      {(tab === "invoices" || tab === "bills" || tab === "vouchers") && (
         <InvoiceView
           bookGuid={bookGuid}
-          invType={tab === "invoices" ? "invoice" : "bill"}
+          invType={tab === "invoices" ? "invoice" : tab === "bills" ? "bill" : "expense_voucher"}
           triggerNew={newTrigger}
           accounts={accounts}
         />
