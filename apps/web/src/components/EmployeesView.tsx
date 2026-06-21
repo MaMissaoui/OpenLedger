@@ -19,6 +19,7 @@ export default function EmployeesView({
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const currencies = commodities.filter((c) => c.namespace === "CURRENCY");
   const commodityMap = Object.fromEntries(commodities.map((c) => [c.guid, c.mnemonic]));
@@ -74,6 +75,27 @@ export default function EmployeesView({
       )}
 
       {employees && employees.length > 0 && (
+        <div style={{ padding: "0.5rem 1.5rem 0", display: "flex", gap: "0.5rem" }}>
+          <input
+            type="search"
+            placeholder="Filter by name, ID, or username…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ maxWidth: "20rem" }}
+          />
+        </div>
+      )}
+
+      {employees && employees.length > 0 && (() => {
+        const filtered = query
+          ? employees.filter((e) => {
+              const q = query.toLowerCase();
+              return e.name.toLowerCase().includes(q) ||
+                (e.id ?? "").toLowerCase().includes(q) ||
+                (e.username ?? "").toLowerCase().includes(q);
+            })
+          : employees;
+        return (
         <table className="ledger-table">
           <thead>
             <tr>
@@ -87,7 +109,7 @@ export default function EmployeesView({
             </tr>
           </thead>
           <tbody>
-            {employees.map((e) => (
+            {filtered.map((e) => (
               <tr key={e.guid} className={e.active ? "" : "row--muted"}>
                 <td style={{ fontWeight: 500 }}>{e.name}</td>
                 <td className="mono" style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>
@@ -132,7 +154,8 @@ export default function EmployeesView({
             ))}
           </tbody>
         </table>
-      )}
+        );
+      })()}
 
       {formOpen && (
         <EmployeeForm
