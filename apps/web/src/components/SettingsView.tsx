@@ -226,7 +226,7 @@ function SystemPanel({ bookGuid }: { bookGuid: string }) {
   }
 
   function handleFiscalYearChange(month: number) {
-    void savePrefs({ ...(prefs ?? {}), fiscalYearStart: month });
+    void savePrefs({ defaultCommodityGuid: prefs?.defaultCommodityGuid ?? null, fiscalYearStart: month });
   }
 
   return (

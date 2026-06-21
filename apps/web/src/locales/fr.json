@@ -82,7 +82,13 @@
     "total": "Total",
     "reconciled": "Rapproché",
     "cleared": "Compensé",
-    "pending": "En attente"
+    "pending": "En attente",
+    "dueBanner_one": "{{count}} transaction programmée en attente",
+    "dueBanner_other": "{{count}} transactions programmées en attente",
+    "viewScheduled": "voir",
+    "postNow": "Valider maintenant",
+    "postNowPending": "Validation…",
+    "later": "Plus tard"
   },
   "accounts": {
     "title": "Comptes",
@@ -251,7 +257,77 @@
       "defaultCurrencyHint": "Pré-remplie lors de la création de nouveaux comptes et transactions.",
       "noCurrency": "— Aucune sélection —",
       "saved": "Enregistré",
-      "saveError": "Impossible d'enregistrer les préférences"
+      "saveError": "Impossible d'enregistrer les préférences",
+      "fiscalYearLabel": "Début de l'exercice fiscal",
+      "fiscalYearEnd": "L'exercice fiscal se termine en {{month}}"
+    }
+  },
+  "business": {
+    "eyebrow": "Gestion commerciale",
+    "customers": "Clients",
+    "vendors": "Fournisseurs",
+    "employees": "Employés",
+    "jobs": "Missions",
+    "invoices": "Factures clients",
+    "bills": "Factures fournisseurs",
+    "vouchers": "Notes de frais",
+    "arAging": "Créances par ancienneté",
+    "apAging": "Dettes par ancienneté",
+    "billTerms": "Conditions de paiement",
+    "taxTables": "Tableaux de taxes",
+    "displayId": "Identifiant",
+    "currency": "Devise",
+    "statusActive": "Actif",
+    "statusInactive": "Inactif",
+    "nameRequired": "Le nom est requis.",
+    "currencyRequired": "La devise est requise.",
+    "saveFailed": "Échec de l'enregistrement",
+    "failedToLoad": "Impossible de charger",
+    "deleteFailed": "Impossible de supprimer",
+    "filterPlaceholder": "Filtrer par nom ou identifiant…",
+    "newAction": {
+      "customers": "Nouveau client",
+      "vendors": "Nouveau fournisseur",
+      "employees": "Nouvel employé",
+      "jobs": "Nouvelle mission",
+      "invoices": "Nouvelle facture",
+      "bills": "Nouvelle facture fournisseur",
+      "vouchers": "Nouvelle note de frais",
+      "terms": "Nouvelle condition",
+      "tax": "Nouveau tableau de taxes"
+    },
+    "terms": {
+      "editTerm": "Modifier la condition",
+      "newTerm": "Nouvelle condition",
+      "noTerms": "Aucune condition de paiement. Créez-en une pour calculer automatiquement les échéances.",
+      "typeLabel": "Type",
+      "netDays": "Jours nets",
+      "proximo": "Proximo (jour du mois suivant)",
+      "dueDays": "Jours d'échéance",
+      "dueDay": "Jour d'échéance (du mois)",
+      "cutoffDay": "Jour limite",
+      "discountDays": "Jours d'escompte",
+      "discountPct": "Escompte %",
+      "termsCol": "Conditions",
+      "discountCol": "Escompte",
+      "summaryNet": "Net {{days}} jours",
+      "summaryProximo": "Échéance le {{day}} du mois suivant (limite le {{cutoff}})"
+    },
+    "tax": {
+      "editTable": "Modifier le tableau de taxes",
+      "newTable": "Nouveau tableau de taxes",
+      "noTables": "Aucun tableau de taxes. Créez-en un pour appliquer des taxes aux lignes de factures.",
+      "components": "Composantes",
+      "taxAccount": "Compte de taxe",
+      "typeLabel": "Type",
+      "rateCol": "Taux / montant",
+      "percentage": "Pourcentage",
+      "flatValue": "Montant fixe",
+      "addComponent": "+ Ajouter une composante",
+      "noComponents": "aucune composante",
+      "flatSuffix": "fixe",
+      "noAccountErr": "Chaque ligne doit avoir un compte de taxe.",
+      "noAmountErr": "Chaque ligne doit avoir un montant valide."
     }
   }
 }

@@ -82,7 +82,13 @@
     "total": "Gesamt",
     "reconciled": "Abgestimmt",
     "cleared": "Verbucht",
-    "pending": "Ausstehend"
+    "pending": "Ausstehend",
+    "dueBanner_one": "{{count}} geplante Transaktion fällig",
+    "dueBanner_other": "{{count}} geplante Transaktionen fällig",
+    "viewScheduled": "anzeigen",
+    "postNow": "Jetzt buchen",
+    "postNowPending": "Wird gebucht…",
+    "later": "Später"
   },
   "accounts": {
     "title": "Konten",
@@ -251,7 +257,77 @@
       "defaultCurrencyHint": "Wird beim Erstellen neuer Konten und Transaktionen vorausgefüllt.",
       "noCurrency": "— Keine Auswahl —",
       "saved": "Gespeichert",
-      "saveError": "Einstellungen konnten nicht gespeichert werden"
+      "saveError": "Einstellungen konnten nicht gespeichert werden",
+      "fiscalYearLabel": "Beginn des Geschäftsjahres",
+      "fiscalYearEnd": "Das Geschäftsjahr endet im {{month}}"
+    }
+  },
+  "business": {
+    "eyebrow": "Geschäftsbetrieb",
+    "customers": "Kunden",
+    "vendors": "Lieferanten",
+    "employees": "Mitarbeiter",
+    "jobs": "Aufträge",
+    "invoices": "Ausgangsrechnungen",
+    "bills": "Eingangsrechnungen",
+    "vouchers": "Spesenbelege",
+    "arAging": "Forderungen nach Fälligkeit",
+    "apAging": "Verbindlichkeiten nach Fälligkeit",
+    "billTerms": "Zahlungsbedingungen",
+    "taxTables": "Steuertabellen",
+    "displayId": "Kennnummer",
+    "currency": "Währung",
+    "statusActive": "Aktiv",
+    "statusInactive": "Inaktiv",
+    "nameRequired": "Name ist erforderlich.",
+    "currencyRequired": "Währung ist erforderlich.",
+    "saveFailed": "Speichern fehlgeschlagen",
+    "failedToLoad": "Laden fehlgeschlagen",
+    "deleteFailed": "Löschen fehlgeschlagen",
+    "filterPlaceholder": "Nach Name oder Kennnummer filtern…",
+    "newAction": {
+      "customers": "Neuer Kunde",
+      "vendors": "Neuer Lieferant",
+      "employees": "Neuer Mitarbeiter",
+      "jobs": "Neuer Auftrag",
+      "invoices": "Neue Ausgangsrechnung",
+      "bills": "Neue Eingangsrechnung",
+      "vouchers": "Neuer Spesenbeleg",
+      "terms": "Neue Bedingung",
+      "tax": "Neue Steuertabelle"
+    },
+    "terms": {
+      "editTerm": "Bedingung bearbeiten",
+      "newTerm": "Neue Bedingung",
+      "noTerms": "Keine Zahlungsbedingungen. Erstellen Sie eine, um Fälligkeitsdaten automatisch zu berechnen.",
+      "typeLabel": "Typ",
+      "netDays": "Netto-Tage",
+      "proximo": "Proximo (Tag des Folgemonats)",
+      "dueDays": "Fälligkeitstage",
+      "dueDay": "Fälligkeitstag (des Monats)",
+      "cutoffDay": "Stichtag",
+      "discountDays": "Skonto-Tage",
+      "discountPct": "Skonto %",
+      "termsCol": "Bedingungen",
+      "discountCol": "Skonto",
+      "summaryNet": "Netto {{days}} Tage",
+      "summaryProximo": "Fällig am {{day}}. des Folgemonats (Stichtag {{cutoff}})"
+    },
+    "tax": {
+      "editTable": "Steuertabelle bearbeiten",
+      "newTable": "Neue Steuertabelle",
+      "noTables": "Keine Steuertabellen. Erstellen Sie eine, um Steuern auf Rechnungspositionen anzuwenden.",
+      "components": "Komponenten",
+      "taxAccount": "Steuerkonto",
+      "typeLabel": "Typ",
+      "rateCol": "Satz / Betrag",
+      "percentage": "Prozentsatz",
+      "flatValue": "Festbetrag",
+      "addComponent": "+ Komponente hinzufügen",
+      "noComponents": "keine Komponenten",
+      "flatSuffix": "fest",
+      "noAccountErr": "Jede Zeile benötigt ein Steuerkonto.",
+      "noAmountErr": "Jede Zeile benötigt einen gültigen Betrag."
     }
   }
 }

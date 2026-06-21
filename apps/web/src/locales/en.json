@@ -82,7 +82,13 @@
     "total": "Total",
     "reconciled": "Reconciled",
     "cleared": "Cleared",
-    "pending": "Pending"
+    "pending": "Pending",
+    "dueBanner_one": "{{count}} scheduled transaction due",
+    "dueBanner_other": "{{count}} scheduled transactions due",
+    "viewScheduled": "view",
+    "postNow": "Post Now",
+    "postNowPending": "Posting…",
+    "later": "Later"
   },
   "accounts": {
     "title": "Accounts",
@@ -251,7 +257,77 @@
       "defaultCurrencyHint": "Pre-filled when creating new accounts and transactions.",
       "noCurrency": "— None selected —",
       "saved": "Saved",
-      "saveError": "Could not save preferences"
+      "saveError": "Could not save preferences",
+      "fiscalYearLabel": "Fiscal year start",
+      "fiscalYearEnd": "Fiscal year ends in {{month}}"
+    }
+  },
+  "business": {
+    "eyebrow": "Business",
+    "customers": "Customers",
+    "vendors": "Vendors",
+    "employees": "Employees",
+    "jobs": "Jobs",
+    "invoices": "Invoices",
+    "bills": "Bills",
+    "vouchers": "Expense Vouchers",
+    "arAging": "A/R Aging",
+    "apAging": "A/P Aging",
+    "billTerms": "Bill Terms",
+    "taxTables": "Tax Tables",
+    "displayId": "Display ID",
+    "currency": "Currency",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "nameRequired": "Name is required.",
+    "currencyRequired": "Currency is required.",
+    "saveFailed": "Save failed",
+    "failedToLoad": "Failed to load",
+    "deleteFailed": "Delete failed",
+    "filterPlaceholder": "Filter by name or ID…",
+    "newAction": {
+      "customers": "New Customer",
+      "vendors": "New Vendor",
+      "employees": "New Employee",
+      "jobs": "New Job",
+      "invoices": "New Invoice",
+      "bills": "New Bill",
+      "vouchers": "New Expense Voucher",
+      "terms": "New Term",
+      "tax": "New Tax Table"
+    },
+    "terms": {
+      "editTerm": "Edit Term",
+      "newTerm": "New Term",
+      "noTerms": "No payment terms yet. Create one to set invoice due dates automatically.",
+      "typeLabel": "Type",
+      "netDays": "Net days",
+      "proximo": "Proximo (day of month)",
+      "dueDays": "Due days",
+      "dueDay": "Due day-of-month",
+      "cutoffDay": "Cutoff day",
+      "discountDays": "Discount days",
+      "discountPct": "Discount %",
+      "termsCol": "Terms",
+      "discountCol": "Discount",
+      "summaryNet": "Net {{days}} days",
+      "summaryProximo": "Due {{day}} of the following month (cutoff {{cutoff}})"
+    },
+    "tax": {
+      "editTable": "Edit Tax Table",
+      "newTable": "New Tax Table",
+      "noTables": "No tax tables yet. Create one to apply tax to invoice and bill lines.",
+      "components": "Components",
+      "taxAccount": "Tax account",
+      "typeLabel": "Type",
+      "rateCol": "Rate / amount",
+      "percentage": "Percentage",
+      "flatValue": "Flat value",
+      "addComponent": "+ Add component",
+      "noComponents": "no components",
+      "flatSuffix": "flat",
+      "noAccountErr": "Every entry needs a tax account.",
+      "noAmountErr": "Every entry needs a valid amount."
     }
   }
 }

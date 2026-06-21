@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { api } from "../lib/api";
 import { parseAmount, toFloat } from "../lib/money";
@@ -34,6 +35,7 @@ function TaxTableDialog({
   onSaved: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(existing?.name ?? "");
   const [rows, setRows] = useState<EntryRow[]>(toRows(existing));
   const [saving, setSaving] = useState(false);
@@ -53,12 +55,12 @@ function TaxTableDialog({
 
   async function handleSave() {
     setError(null);
-    if (!name.trim()) { setError("Name is required."); return; }
+    if (!name.trim()) { setError(t("business.nameRequired")); return; }
     const entries: TaxTableEntry[] = [];
     for (const r of rows) {
-      if (!r.accountGuid) { setError("Every entry needs a tax account."); return; }
+      if (!r.accountGuid) { setError(t("business.tax.noAccountErr")); return; }
       const amount = parseAmount(r.amount, 100);
-      if (amount === null) { setError("Every entry needs a valid amount."); return; }
+      if (amount === null) { setError(t("business.tax.noAmountErr")); return; }
       entries.push({ accountGuid: r.accountGuid, type: r.type, amount });
     }
     const input: NewTaxTable = { name: name.trim(), entries };
@@ -68,7 +70,7 @@ function TaxTableDialog({
       else await api.createTaxTable(bookGuid, input);
       onSaved();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      setError(e instanceof Error ? e.message : t("business.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -78,27 +80,32 @@ function TaxTableDialog({
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <div className="dialog__header">
-          <h2>{existing ? "Edit Tax Table" : "New Tax Table"}</h2>
+          <h2>{existing ? t("business.tax.editTable") : t("business.tax.newTable")}</h2>
           <button className="dialog__close" onClick={onClose} aria-label="Close">×</button>
         </div>
         <div className="dialog__body">
           {error && <p className="error" style={{ margin: 0 }}>{error}</p>}
           <label className="field">
-            <span className="field__label">Name</span>
+            <span className="field__label">{t("common.name")}</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="VAT 20%" autoFocus />
           </label>
           <div className="field">
-            <span className="field__label">Components</span>
+            <span className="field__label">{t("business.tax.components")}</span>
             <table className="ledger-table" style={{ fontSize: "0.85rem" }}>
               <thead>
-                <tr><th>Tax account</th><th>Type</th><th style={{ textAlign: "right" }}>Rate / amount</th><th /></tr>
+                <tr>
+                  <th>{t("business.tax.taxAccount")}</th>
+                  <th>{t("business.tax.typeLabel")}</th>
+                  <th style={{ textAlign: "right" }}>{t("business.tax.rateCol")}</th>
+                  <th />
+                </tr>
               </thead>
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={i}>
                     <td>
                       <select value={r.accountGuid} onChange={(e) => setRow(i, { accountGuid: e.target.value })}>
-                        <option value="">— tax account —</option>
+                        <option value="">— {t("business.tax.taxAccount")} —</option>
                         {taxAccounts.map((a) => (
                           <option key={a.guid} value={a.guid}>{a.name}</option>
                         ))}
@@ -106,8 +113,8 @@ function TaxTableDialog({
                     </td>
                     <td>
                       <select value={r.type} onChange={(e) => setRow(i, { type: e.target.value as "percentage" | "value" })}>
-                        <option value="percentage">Percentage</option>
-                        <option value="value">Flat value</option>
+                        <option value="percentage">{t("business.tax.percentage")}</option>
+                        <option value="value">{t("business.tax.flatValue")}</option>
                       </select>
                     </td>
                     <td>
@@ -125,13 +132,13 @@ function TaxTableDialog({
                 ))}
               </tbody>
             </table>
-            <button className="btn btn--ghost btn--xs" onClick={addRow} style={{ marginTop: "0.5rem" }}>+ Add component</button>
+            <button className="btn btn--ghost btn--xs" onClick={addRow} style={{ marginTop: "0.5rem" }}>{t("business.tax.addComponent")}</button>
           </div>
         </div>
         <div className="dialog__footer">
-          <button className="btn btn--ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn--ghost" onClick={onClose}>{t("common.cancel")}</button>
           <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save"}
+            {saving ? t("common.saving") : t("common.save")}
           </button>
         </div>
       </div>
@@ -148,6 +155,7 @@ export default function TaxTablesView({
   accounts: Account[];
   triggerNew: number;
 }) {
+  const { t } = useTranslation();
   const [tables, setTables] = useState<TaxTable[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -159,7 +167,7 @@ export default function TaxTablesView({
     setError(null);
     api.listTaxTables(bookGuid)
       .then(setTables)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"));
+      .catch((e) => setError(e instanceof Error ? e.message : t("business.failedToLoad")));
   }
   useEffect(reload, [bookGuid]);
 
@@ -178,14 +186,14 @@ export default function TaxTablesView({
       await api.deleteTaxTable(tt.guid);
       setTables((prev) => prev?.filter((x) => x.guid !== tt.guid) ?? null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Delete failed");
+      alert(e instanceof Error ? e.message : t("business.deleteFailed"));
     }
   }
 
   function summary(tt: TaxTable): string {
     return tt.entries
-      .map((e) => (e.type === "percentage" ? `${toFloat(e.amount)}%` : `${toFloat(e.amount)} flat`) + ` → ${accountMap[e.accountGuid] ?? "?"}`)
-      .join(", ") || "no components";
+      .map((e) => (e.type === "percentage" ? `${toFloat(e.amount)}%` : `${toFloat(e.amount)} ${t("business.tax.flatSuffix")}`) + ` → ${accountMap[e.accountGuid] ?? "?"}`)
+      .join(", ") || t("business.tax.noComponents");
   }
 
   return (
@@ -194,11 +202,15 @@ export default function TaxTablesView({
       {tables === null ? (
         <div className="empty"><span className="spinner" /></div>
       ) : tables.length === 0 ? (
-        <div className="empty">No tax tables yet. Create one to apply tax to invoice and bill lines.</div>
+        <div className="empty">{t("business.tax.noTables")}</div>
       ) : (
         <table className="ledger-table">
           <thead>
-            <tr><th>Name</th><th>Components</th><th /></tr>
+            <tr>
+              <th>{t("common.name")}</th>
+              <th>{t("business.tax.components")}</th>
+              <th />
+            </tr>
           </thead>
           <tbody>
             {tables.map((tt) => (
@@ -206,8 +218,8 @@ export default function TaxTablesView({
                 <td>{tt.name}</td>
                 <td style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>{summary(tt)}</td>
                 <td style={{ whiteSpace: "nowrap", textAlign: "right" }}>
-                  <button className="btn btn--ghost btn--xs" onClick={() => { setEditing(tt); setFormOpen(true); }}>Edit</button>{" "}
-                  <button className="btn btn--ghost btn--xs" onClick={() => handleDelete(tt)}>Delete</button>
+                  <button className="btn btn--ghost btn--xs" onClick={() => { setEditing(tt); setFormOpen(true); }}>{t("common.edit")}</button>{" "}
+                  <button className="btn btn--ghost btn--xs" onClick={() => handleDelete(tt)}>{t("common.delete")}</button>
                 </td>
               </tr>
             ))}

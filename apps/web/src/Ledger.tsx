@@ -380,18 +380,18 @@ export function Ledger() {
             fontSize: "0.875rem",
           }}>
             <span style={{ flex: 1 }}>
-              <strong>{dueCount}</strong> scheduled transaction{dueCount !== 1 ? "s" : ""} due —{" "}
-              <button className="btn btn--ghost btn--xs" onClick={() => setView("scheduled")}>view</button>
+              {t("dashboard.dueBanner", { count: dueCount })} —{" "}
+              <button className="btn btn--ghost btn--xs" onClick={() => setView("scheduled")}>{t("dashboard.viewScheduled")}</button>
             </span>
             <button
               className="btn btn--primary btn--sm"
               onClick={() => postDueMut.mutate()}
               disabled={postDueMut.isPending}
             >
-              {postDueMut.isPending ? "Posting…" : "Post Now"}
+              {postDueMut.isPending ? t("dashboard.postNowPending") : t("dashboard.postNow")}
             </button>
             <button className="btn btn--ghost btn--sm" onClick={() => setDueDismissed(true)}>
-              Later
+              {t("dashboard.later")}
             </button>
           </div>
         )}

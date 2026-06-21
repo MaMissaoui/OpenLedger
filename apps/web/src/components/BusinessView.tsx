@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { Account, Commodity, Customer, NewCustomer, NewVendor, Vendor } from "../lib/types";
 import InvoiceView, { AgingReportView } from "./InvoiceView";
@@ -16,6 +17,7 @@ function CommoditySelect({
   value: string;
   onChange: (guid: string) => void;
 }) {
+  const { t } = useTranslation();
   const [commodities, setCommodities] = useState<Commodity[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -28,7 +30,7 @@ function CommoditySelect({
 
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)} disabled={loading}>
-      <option value="">{loading ? "Loading…" : "— select currency —"}</option>
+      <option value="">{loading ? t("common.loading") : "— select currency —"}</option>
       {commodities.map((c) => (
         <option key={c.guid} value={c.guid}>
           {c.mnemonic}
@@ -69,6 +71,7 @@ function ContactForm<T extends NewCustomer | NewVendor>({
   updateFn,
   buildInput,
 }: ContactFormProps<T>) {
+  const { t } = useTranslation();
   const [name, setName] = useState(existing?.name ?? "");
   const [id, setId] = useState(existing?.id ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
@@ -79,7 +82,7 @@ function ContactForm<T extends NewCustomer | NewVendor>({
 
   async function handleSave() {
     setError(null);
-    if (!name.trim()) { setError("Name is required."); return; }
+    if (!name.trim()) { setError(t("business.nameRequired")); return; }
     const input = buildInput({ name: name.trim(), id: id.trim(), notes: notes.trim(), active, currencyGuid });
     setSaving(true);
     try {
@@ -87,7 +90,7 @@ function ContactForm<T extends NewCustomer | NewVendor>({
       else { await createFn(bookGuid, input); }
       onSaved();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      setError(e instanceof Error ? e.message : t("business.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -113,7 +116,7 @@ function ContactForm<T extends NewCustomer | NewVendor>({
           {error && <p className="error" style={{ margin: 0 }}>{error}</p>}
 
           <label className="field">
-            <span>Name *</span>
+            <span>{t("common.name")} *</span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -124,7 +127,7 @@ function ContactForm<T extends NewCustomer | NewVendor>({
 
           <div className="dialog__row">
             <label className="field" style={{ flex: 1 }}>
-              <span>Display ID</span>
+              <span>{t("business.displayId")}</span>
               <input
                 value={id}
                 onChange={(e) => setId(e.target.value)}
@@ -132,13 +135,13 @@ function ContactForm<T extends NewCustomer | NewVendor>({
               />
             </label>
             <label className="field" style={{ flex: 1 }}>
-              <span>Currency</span>
+              <span>{t("business.currency")}</span>
               <CommoditySelect value={currencyGuid} onChange={setCurrencyGuid} />
             </label>
           </div>
 
           <label className="field">
-            <span>Notes</span>
+            <span>{t("common.notes")}</span>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -158,15 +161,15 @@ function ContactForm<T extends NewCustomer | NewVendor>({
               onChange={(e) => setActive(e.target.checked)}
             />
             <span style={{ textTransform: "none", letterSpacing: 0, fontSize: "0.9rem", color: "var(--ink)" }}>
-              Active
+              {t("business.statusActive")}
             </span>
           </label>
         </div>
 
         <div className="dialog__footer">
-          <button className="btn btn--ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn--ghost" onClick={onClose}>{t("common.cancel")}</button>
           <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save"}
+            {saving ? t("common.saving") : t("common.save")}
           </button>
         </div>
       </div>
@@ -189,6 +192,7 @@ interface ContactListProps<C extends Customer | Vendor, N extends NewCustomer | 
 }
 
 function ActiveBadge({ active }: { active: boolean }) {
+  const { t } = useTranslation();
   return (
     <span
       style={{
@@ -202,7 +206,7 @@ function ActiveBadge({ active }: { active: boolean }) {
         color: active ? "var(--forest-dark)" : "var(--ink-soft)",
       }}
     >
-      {active ? "Active" : "Inactive"}
+      {active ? t("business.statusActive") : t("business.statusInactive")}
     </span>
   );
 }
@@ -218,6 +222,7 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
   updateFn,
   buildInput,
 }: ContactListProps<C, N>) {
+  const { t } = useTranslation();
   const [contacts, setContacts] = useState<C[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -234,7 +239,7 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
     setError(null);
     loadFn(bookGuid)
       .then((rows) => { if (!cancelled) setContacts(rows as C[]); })
-      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load"); })
+      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : t("business.failedToLoad")); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [bookGuid]);
@@ -255,7 +260,7 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
       await deleteFn(c.guid);
       setContacts((prev) => prev?.filter((x) => x.guid !== c.guid) ?? null);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Delete failed");
+      alert(e instanceof Error ? e.message : t("business.deleteFailed"));
     }
   }
 
@@ -294,7 +299,7 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
         <div style={{ padding: "0.5rem 1.5rem 0", display: "flex", gap: "0.5rem" }}>
           <input
             type="search"
-            placeholder={`Filter by name or ID…`}
+            placeholder={t("business.filterPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{ maxWidth: "20rem" }}
@@ -313,11 +318,11 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
         <table className="ledger-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>ID</th>
-              <th>Currency</th>
-              <th>Notes</th>
-              <th>Status</th>
+              <th>{t("common.name")}</th>
+              <th>{t("business.displayId")}</th>
+              <th>{t("business.currency")}</th>
+              <th>{t("common.notes")}</th>
+              <th>{t("common.status")}</th>
               <th />
             </tr>
           </thead>
@@ -341,12 +346,12 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
                   <button
                     className="btn btn--ghost btn--xs"
                     onClick={() => { setEditing(c); setFormOpen(true); }}
-                  >Edit</button>{" "}
+                  >{t("common.edit")}</button>{" "}
                   <button
                     className="btn btn--ghost btn--xs"
                     onClick={() => handleDelete(c)}
                     style={{ color: "var(--oxblood-soft)" }}
-                  >Delete</button>
+                  >{t("common.delete")}</button>
                 </td>
               </tr>
             ))}
@@ -375,20 +380,6 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
 
 type BizTab = "customers" | "vendors" | "employees" | "jobs" | "invoices" | "bills" | "vouchers" | "ar-aging" | "ap-aging" | "terms" | "tax";
 
-const TAB_LABELS: Record<BizTab, string> = {
-  customers: "Customers",
-  vendors: "Vendors",
-  employees: "Employees",
-  jobs: "Jobs",
-  invoices: "Invoices",
-  bills: "Bills",
-  vouchers: "Expense Vouchers",
-  "ar-aging": "A/R Aging",
-  "ap-aging": "A/P Aging",
-  terms: "Bill Terms",
-  tax: "Tax Tables",
-};
-
 export default function BusinessView({
   bookGuid,
   accounts,
@@ -398,7 +389,22 @@ export default function BusinessView({
   accounts: Account[];
   initialTab?: BizTab;
 }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<BizTab>(initialTab ?? "customers");
+
+  const TAB_LABELS: Record<BizTab, string> = {
+    customers: t("business.customers"),
+    vendors: t("business.vendors"),
+    employees: t("business.employees"),
+    jobs: t("business.jobs"),
+    invoices: t("business.invoices"),
+    bills: t("business.bills"),
+    vouchers: t("business.vouchers"),
+    "ar-aging": t("business.arAging"),
+    "ap-aging": t("business.apAging"),
+    terms: t("business.billTerms"),
+    tax: t("business.taxTables"),
+  };
 
   // Follow the requested tab from the Reports Center, and fall back to Customers
   // when the caller clears it (e.g. clicking the Business nav while already here).
@@ -420,28 +426,26 @@ export default function BusinessView({
     setNewTrigger((n) => n + 1);
   }
 
-  const newLabel = TAB_LABELS[tab].replace(/s$/, "");
-
   return (
     <section className="register report">
       <header className="register__header">
         <div className="register__title">
-          <div className="eyebrow">Business</div>
+          <div className="eyebrow">{t("business.eyebrow")}</div>
           <h1>{TAB_LABELS[tab]}</h1>
         </div>
         <div className="register__actions">
           <div className="biz-tabs">
-            {(["customers", "vendors", "employees", "jobs", "invoices", "bills", "vouchers", "ar-aging", "ap-aging", "terms", "tax"] as BizTab[]).map((t) => (
+            {(["customers", "vendors", "employees", "jobs", "invoices", "bills", "vouchers", "ar-aging", "ap-aging", "terms", "tax"] as BizTab[]).map((bTab) => (
               <button
-                key={t}
-                className={`biz-tab${tab === t ? " biz-tab--active" : ""}`}
-                onClick={() => setTab(t)}
-              >{TAB_LABELS[t]}</button>
+                key={bTab}
+                className={`biz-tab${tab === bTab ? " biz-tab--active" : ""}`}
+                onClick={() => setTab(bTab)}
+              >{TAB_LABELS[bTab]}</button>
             ))}
           </div>
           {(tab === "customers" || tab === "vendors" || tab === "employees" || tab === "jobs" || tab === "invoices" || tab === "bills" || tab === "vouchers" || tab === "terms" || tab === "tax") && (
             <button className="btn btn--primary btn--sm" onClick={handleNew}>
-              + New {newLabel}
+              + {t(`business.newAction.${tab}`)}
             </button>
           )}
         </div>

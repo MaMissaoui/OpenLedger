@@ -14,6 +14,7 @@ interface Props {
 
 interface Initial {
   description: string;
+  date: string;
   amount: string;
   fromGuid: string;
   toGuid: string;
@@ -22,12 +23,14 @@ interface Initial {
 // TransactionDialog creates or edits a balanced two-split transfer.
 export function TransactionDialog({ accounts, defaultToGuid, editGuid, onClose }: Props) {
   if (!editGuid) {
+    const today = new Date().toISOString().slice(0, 10);
     return (
       <TransactionForm
         accounts={accounts}
         onClose={onClose}
         initial={{
           description: "",
+          date: today,
           amount: "",
           toGuid: defaultToGuid ?? accounts[0]?.guid ?? "",
           fromGuid: accounts.find((a) => a.guid !== defaultToGuid)?.guid ?? "",
@@ -75,7 +78,7 @@ function initialFromTransaction(tx: Transaction): Initial {
   const inflow  = tx.splits.find((s) => s.value.num > 0) ?? tx.splits[0];
   const outflow = tx.splits.find((s) => s.value.num < 0) ?? tx.splits[1];
   const amt = Math.abs(inflow.value.num) / inflow.value.denom;
-  return { description: tx.description, amount: String(amt), toGuid: inflow.accountGuid, fromGuid: outflow.accountGuid };
+  return { description: tx.description, date: tx.postDate, amount: String(amt), toGuid: inflow.accountGuid, fromGuid: outflow.accountGuid };
 }
 
 function TransactionForm({
@@ -84,6 +87,7 @@ function TransactionForm({
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [description, setDescription] = useState(initial.description);
+  const [date, setDate]               = useState(initial.date);
   const [amount, setAmount]           = useState(initial.amount);
   const [toGuid, setToGuid]           = useState(initial.toGuid);
   const [fromGuid, setFromGuid]       = useState(initial.fromGuid);
@@ -97,9 +101,11 @@ function TransactionForm({
     mutationFn: async () => {
       const to    = accounts.find((a) => a.guid === toGuid)!;
       const value = parsed!;
+      const today = new Date().toISOString().slice(0, 10);
       const input = {
         currencyGuid: to.commodityGuid,
         description:  description.trim() || "Transfer",
+        postDate:     date || today,
         splits: [
           { accountGuid: toGuid,   value,          quantity: value },
           { accountGuid: fromGuid, value: negate(value), quantity: negate(value) },
@@ -129,14 +135,25 @@ function TransactionForm({
       <p className="sub">{t("transaction.subtitle")}</p>
 
       <form className="dialog__grid" onSubmit={submit}>
-        <div className="field">
-          <label htmlFor="tx-desc">{t("common.description")}</label>
-          <input
-            id="tx-desc"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={t("transaction.descriptionPlaceholder")}
-          />
+        <div className="dialog__row">
+          <div className="field">
+            <label htmlFor="tx-date">{t("common.date")}</label>
+            <input
+              id="tx-date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
+          <div className="field" style={{ flex: 2 }}>
+            <label htmlFor="tx-desc">{t("common.description")}</label>
+            <input
+              id="tx-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t("transaction.descriptionPlaceholder")}
+            />
+          </div>
         </div>
 
         <div className="dialog__row">
