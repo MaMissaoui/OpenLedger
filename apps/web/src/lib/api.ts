@@ -19,6 +19,9 @@ import type {
   IncomeStatement,
   Invoice,
   Job,
+  Member,
+  NewMember,
+  Role,
   NewBillTerm,
   NewBudget,
   NewCustomer,
@@ -410,6 +413,23 @@ export const api = {
     }),
   deleteTaxTable: (guid: string) =>
     request<void>(`/api/v1/tax-tables/${guid}`, { method: "DELETE" }),
+
+  // Book members / RBAC (Settings). Mutations require admin on the book; a 403
+  // surfaces as a thrown error the view reports inline.
+  listMembers: (bookGuid: string) =>
+    request<{ bookGuid: string; members: Member[] }>(
+      `/api/v1/books/${bookGuid}/members`,
+    ).then((r) => r.members),
+  addMember: (bookGuid: string, input: NewMember) =>
+    post<Member>(`/api/v1/books/${bookGuid}/members`, input),
+  updateMember: (bookGuid: string, userId: string, role: Role) =>
+    request<void>(`/api/v1/books/${bookGuid}/members/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    }),
+  removeMember: (bookGuid: string, userId: string) =>
+    request<void>(`/api/v1/books/${bookGuid}/members/${userId}`, { method: "DELETE" }),
 
   // Import a GnuCash file (SQLite or XML, optionally gzipped) as a new book.
   // The file is sent as multipart/form-data under the "file" field; `request`

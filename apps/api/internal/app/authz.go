@@ -52,14 +52,19 @@ type Access int
 const (
 	AccessRead  Access = iota + 1 // view accounts and registers
 	AccessWrite                   // create accounts, post transactions
+	AccessAdmin                   // manage the book itself (e.g. its members)
 )
 
 // minRole returns the lowest role that satisfies the access level.
 func (a Access) minRole() Role {
-	if a == AccessWrite {
+	switch a {
+	case AccessAdmin:
+		return RoleAdmin
+	case AccessWrite:
 		return RoleEditor
+	default:
+		return RoleViewer
 	}
-	return RoleViewer
 }
 
 // permits reports whether the role is allowed the requested access.

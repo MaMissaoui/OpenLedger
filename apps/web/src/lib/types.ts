@@ -549,6 +549,23 @@ export interface TaxTable extends NewTaxTable {
   bookGuid: string;
 }
 
+// A user's permission level on a book, ranked viewer < editor < admin < owner.
+export type Role = "viewer" | "editor" | "admin" | "owner";
+
+export const ROLES: readonly Role[] = ["viewer", "editor", "admin", "owner"];
+
+export interface Member {
+  userId: string;
+  email: string;
+  ldapUser: string;
+  role: Role;
+}
+
+export interface NewMember {
+  email: string;
+  role: Role;
+}
+
 // Account types the UI offers when creating an account, grouped for the picker.
 export const ACCOUNT_TYPES = [
   "ASSET",

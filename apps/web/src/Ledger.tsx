@@ -17,6 +17,7 @@ import { ScheduledTransactionsView } from "./components/ScheduledTransactionsVie
 import BudgetView from "./components/BudgetView";
 import BusinessView from "./components/BusinessView";
 import CommoditiesView from "./components/CommoditiesView";
+import SettingsView from "./components/SettingsView";
 import ImportDialog from "./components/ImportDialog";
 
 type View =
@@ -30,7 +31,8 @@ type View =
   | "scheduled"
   | "budget"
   | "business"
-  | "commodities";
+  | "commodities"
+  | "settings";
 
 type StatementTab = "balance-sheet" | "income-statement";
 type BizTab = "ar-aging" | "ap-aging";
@@ -88,6 +90,12 @@ const Icon = {
       <ellipse cx="9" cy="4" rx="6" ry="2.2" />
       <path d="M3 4v5c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V4" />
       <path d="M3 9v5c0 1.2 2.7 2.2 6 2.2s6-1 6-2.2V9" />
+    </svg>
+  ),
+  settings: (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="9" r="2.4" />
+      <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M14.3 3.7l-1.4 1.4M5.1 12.9l-1.4 1.4" />
     </svg>
   ),
   download: (
@@ -240,6 +248,7 @@ export function Ledger() {
           <NavItem label="Budget"     icon={Icon.budget}    active={view === "budget"}    collapsed={collapsed} onClick={() => setView("budget")} />
           <NavItem label="Business"   icon={Icon.business}  active={view === "business"}  collapsed={collapsed} onClick={() => { setBusinessTab(undefined); setView("business"); }} />
           <NavItem label="Commodities" icon={Icon.commodities} active={view === "commodities"} collapsed={collapsed} onClick={() => setView("commodities")} />
+          <NavItem label="Settings"    icon={Icon.settings}    active={view === "settings"}    collapsed={collapsed} onClick={() => setView("settings")} />
         </div>
 
         {/* Footer */}
@@ -320,6 +329,8 @@ export function Ledger() {
           <BusinessView bookGuid={book.guid} accounts={accounts.data ?? []} initialTab={businessTab} />
         ) : view === "commodities" ? (
           <CommoditiesView />
+        ) : view === "settings" ? (
+          <SettingsView bookGuid={book.guid} />
         ) : (
           <div className="workspace">
             <AccountTree

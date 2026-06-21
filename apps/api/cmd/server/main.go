@@ -44,6 +44,7 @@ func main() {
 	forecast := app.NewForecastService(repo)
 	provision := app.NewProvisionService(repo)
 	authz := app.NewAuthzService(repo)
+	membership := app.NewMembershipService(repo, authz)
 	importer := app.NewImportService(gnucash.NewReader(), repo)
 	exporter := app.NewExportService(repo, gnucash.NewWriter())
 	reconciler := app.NewReconcileService(repo)
@@ -80,6 +81,7 @@ func main() {
 		Forecast:     forecast,
 		Provision:    provision,
 		Authz:        authz,
+		Membership:   membership,
 		Importer:     importer,
 		Exporter:     exporter,
 		Reconciler:   reconciler,
