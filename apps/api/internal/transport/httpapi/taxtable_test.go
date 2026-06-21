@@ -14,12 +14,11 @@ import (
 
 // fakeTaxTableRepoH satisfies app.TaxTableRepository for HTTP-layer tests.
 type fakeTaxTableRepoH struct {
-	*fakeRepo
 	tables map[string]domain.TaxTable
 }
 
 func newFakeTaxTableRepoH() *fakeTaxTableRepoH {
-	return &fakeTaxTableRepoH{fakeRepo: &fakeRepo{}, tables: make(map[string]domain.TaxTable)}
+	return &fakeTaxTableRepoH{tables: make(map[string]domain.TaxTable)}
 }
 
 func (f *fakeTaxTableRepoH) CreateTaxTable(_ context.Context, tt domain.TaxTable) (domain.TaxTable, error) {
@@ -70,11 +69,7 @@ func (f *fakeTaxTableRepoH) BookGUIDForTaxTable(_ context.Context, guid string) 
 }
 
 func newTaxTableTestServer(fr *fakeTaxTableRepoH) http.Handler {
-	return (&Server{Services: Services{
-		Provision: app.NewProvisionService(fr.fakeRepo),
-		Authz:     app.NewAuthzService(fr.fakeRepo),
-		TaxTable:  app.NewTaxTableService(fr),
-	}}).Routes()
+	return authedServer(Services{TaxTable: app.NewTaxTableService(fr)})
 }
 
 func taxTableReq(h http.Handler, method, path string, body any) *httptest.ResponseRecorder {

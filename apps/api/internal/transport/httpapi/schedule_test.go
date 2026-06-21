@@ -86,10 +86,9 @@ func (f *fakeScheduleRepo) MarkSchedulePosted(_ context.Context, guid string, da
 	return nil
 }
 
-func newSchedHandler(fr *fakeRepo, sr *fakeScheduleRepo) http.Handler {
+func newSchedHandler(sr *fakeScheduleRepo) http.Handler {
 	posting := app.NewPostingService(sr)
-	svc := app.NewScheduleService(sr, posting)
-	return newTestServer(fr, svc)
+	return authedServer(Services{Schedule: app.NewScheduleService(sr, posting)})
 }
 
 func schedReq(h http.Handler, method, path string, body string) *httptest.ResponseRecorder {
@@ -109,7 +108,6 @@ func schedReq(h http.Handler, method, path string, body string) *httptest.Respon
 }
 
 func TestHandleListScheduledTransactions(t *testing.T) {
-	fr := &fakeRepo{bookRoot: "root-1"}
 	sr := newFakeSched()
 	sr.schedules["s1"] = domain.ScheduledTransaction{
 		GUID: "s1", BookGUID: "book-1", Name: "Monthly Rent",
@@ -121,16 +119,15 @@ func TestHandleListScheduledTransactions(t *testing.T) {
 		},
 	}
 
-	rec := schedReq(newSchedHandler(fr, sr), "GET", "/api/v1/books/book-1/scheduled-transactions", "")
+	rec := schedReq(newSchedHandler(sr), "GET", "/api/v1/books/book-1/scheduled-transactions", "")
 	if rec.Code != 200 {
 		t.Fatalf("status = %d, want 200; body: %s", rec.Code, rec.Body)
 	}
 }
 
 func TestHandleCreateScheduledTransaction(t *testing.T) {
-	fr := &fakeRepo{bookRoot: "root-1"}
 	sr := newFakeSched()
-	h := newSchedHandler(fr, sr)
+	h := newSchedHandler(sr)
 
 	body := `{"name":"Monthly Rent","enabled":true,"currencyGuid":"usd","period":"monthly","every":1,"startDate":"2024-01-01","splits":[{"accountGuid":"a1","memo":"","value":{"num":200000,"denom":100}},{"accountGuid":"a2","memo":"","value":{"num":-200000,"denom":100}}]}`
 	rec := schedReq(h, "POST", "/api/v1/books/book-1/scheduled-transactions", body)
@@ -140,9 +137,8 @@ func TestHandleCreateScheduledTransaction(t *testing.T) {
 }
 
 func TestHandleCreateScheduledTransactionUnbalanced(t *testing.T) {
-	fr := &fakeRepo{bookRoot: "root-1"}
 	sr := newFakeSched()
-	h := newSchedHandler(fr, sr)
+	h := newSchedHandler(sr)
 
 	body := `{"name":"Bad","enabled":true,"currencyGuid":"usd","period":"monthly","every":1,"startDate":"2024-01-01","splits":[{"accountGuid":"a1","value":{"num":200000,"denom":100}},{"accountGuid":"a2","value":{"num":-100000,"denom":100}}]}`
 	rec := schedReq(h, "POST", "/api/v1/books/book-1/scheduled-transactions", body)
@@ -152,7 +148,6 @@ func TestHandleCreateScheduledTransactionUnbalanced(t *testing.T) {
 }
 
 func TestHandleDeleteScheduledTransaction(t *testing.T) {
-	fr := &fakeRepo{bookRoot: "root-1"}
 	sr := newFakeSched()
 	sr.schedules["s1"] = domain.ScheduledTransaction{
 		GUID: "s1", BookGUID: "book-1", Name: "Rent",
@@ -164,14 +159,13 @@ func TestHandleDeleteScheduledTransaction(t *testing.T) {
 		},
 	}
 
-	rec := schedReq(newSchedHandler(fr, sr), "DELETE", "/api/v1/scheduled-transactions/s1", "")
+	rec := schedReq(newSchedHandler(sr), "DELETE", "/api/v1/scheduled-transactions/s1", "")
 	if rec.Code != 204 {
 		t.Fatalf("status = %d, want 204; body: %s", rec.Code, rec.Body)
 	}
 }
 
 func TestHandlePostDueSchedules(t *testing.T) {
-	fr := &fakeRepo{bookRoot: "root-1"}
 	sr := newFakeSched()
 	sr.schedules["s1"] = domain.ScheduledTransaction{
 		GUID: "s1", BookGUID: "book-1", Name: "Salary",
@@ -183,7 +177,7 @@ func TestHandlePostDueSchedules(t *testing.T) {
 		},
 	}
 
-	rec := schedReq(newSchedHandler(fr, sr), "POST",
+	rec := schedReq(newSchedHandler(sr), "POST",
 		"/api/v1/books/book-1/scheduled-transactions/post-due?asOf=2024-01-31T00:00:00Z", "")
 	if rec.Code != 200 {
 		t.Fatalf("status = %d, want 200; body: %s", rec.Code, rec.Body)

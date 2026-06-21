@@ -26,20 +26,53 @@ func (s stubQuoteProvider) FetchRate(_ context.Context, _, _ string) (app.Quote,
 	return app.Quote{Rate: s.rate, Date: s.date}, nil
 }
 
-func currencyRepo(provider app.QuoteProvider) *fakeRepo {
-	return &fakeRepo{
-		commodities: []domain.Commodity{
-			{GUID: "usd", Namespace: domain.NamespaceCurrency, Mnemonic: "USD"},
-			{GUID: "eur", Namespace: domain.NamespaceCurrency, Mnemonic: "EUR"},
-		},
-		quoteProvider: provider,
+// quoteFake satisfies app.CommodityReader (currency lookup) and
+// app.PriceRepository (the stored quote is written through PriceService).
+type quoteFake struct {
+	commodities []domain.Commodity
+	prices      []domain.Price
+}
+
+func (f *quoteFake) GetCommodity(_ context.Context, guid string) (domain.Commodity, error) {
+	for _, c := range f.commodities {
+		if c.GUID == guid {
+			return c, nil
+		}
 	}
+	return domain.Commodity{}, app.ErrCommodityNotFound
+}
+
+func (f *quoteFake) InsertPrice(_ context.Context, p domain.Price) error {
+	f.prices = append(f.prices, p)
+	return nil
+}
+
+func (f *quoteFake) ListPricesByCommodity(context.Context, string) ([]domain.Price, error) {
+	return f.prices, nil
+}
+
+func currencyFake() *quoteFake {
+	return &quoteFake{commodities: []domain.Commodity{
+		{GUID: "usd", Namespace: domain.NamespaceCurrency, Mnemonic: "USD"},
+		{GUID: "eur", Namespace: domain.NamespaceCurrency, Mnemonic: "EUR"},
+	}}
+}
+
+// fetchPriceServer wires Price (always) and Quote (only when a provider is
+// given, mirroring production where the fetch endpoint is 503 without one).
+func fetchPriceServer(f *quoteFake, provider app.QuoteProvider) http.Handler {
+	priceSvc := app.NewPriceService(f)
+	svcs := Services{Price: priceSvc}
+	if provider != nil {
+		svcs.Quote = app.NewQuoteService(provider, f, priceSvc)
+	}
+	return authedServer(svcs)
 }
 
 func TestFetchPrice(t *testing.T) {
 	rate, _ := domain.FromDecimalString("0.92")
-	repo := currencyRepo(stubQuoteProvider{rate: rate, date: time.Now()})
-	rec := postTo(newTestServer(repo), "/api/v1/prices/fetch",
+	repo := currencyFake()
+	rec := postTo(fetchPriceServer(repo, stubQuoteProvider{rate: rate, date: time.Now()}), "/api/v1/prices/fetch",
 		`{"commodityGuid":"usd","currencyGuid":"eur"}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
@@ -53,8 +86,8 @@ func TestFetchPrice(t *testing.T) {
 }
 
 func TestFetchPriceProviderErrorReturns502(t *testing.T) {
-	repo := currencyRepo(stubQuoteProvider{err: errors.New("upstream down")})
-	rec := postTo(newTestServer(repo), "/api/v1/prices/fetch",
+	repo := currencyFake()
+	rec := postTo(fetchPriceServer(repo, stubQuoteProvider{err: errors.New("upstream down")}), "/api/v1/prices/fetch",
 		`{"commodityGuid":"usd","currencyGuid":"eur"}`)
 	if rec.Code != http.StatusBadGateway {
 		t.Fatalf("status = %d, want 502; body = %s", rec.Code, rec.Body.String())
@@ -63,8 +96,8 @@ func TestFetchPriceProviderErrorReturns502(t *testing.T) {
 
 func TestFetchPriceUnknownCommodityReturns404(t *testing.T) {
 	rate, _ := domain.FromDecimalString("0.92")
-	repo := currencyRepo(stubQuoteProvider{rate: rate})
-	rec := postTo(newTestServer(repo), "/api/v1/prices/fetch",
+	repo := currencyFake()
+	rec := postTo(fetchPriceServer(repo, stubQuoteProvider{rate: rate}), "/api/v1/prices/fetch",
 		`{"commodityGuid":"usd","currencyGuid":"gbp"}`)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404; body = %s", rec.Code, rec.Body.String())
@@ -73,10 +106,10 @@ func TestFetchPriceUnknownCommodityReturns404(t *testing.T) {
 
 func TestFetchPriceNonCurrencyReturns400(t *testing.T) {
 	rate, _ := domain.FromDecimalString("150")
-	repo := currencyRepo(stubQuoteProvider{rate: rate})
+	repo := currencyFake()
 	repo.commodities = append(repo.commodities,
 		domain.Commodity{GUID: "aapl", Namespace: "STOCK", Mnemonic: "AAPL"})
-	rec := postTo(newTestServer(repo), "/api/v1/prices/fetch",
+	rec := postTo(fetchPriceServer(repo, stubQuoteProvider{rate: rate}), "/api/v1/prices/fetch",
 		`{"commodityGuid":"aapl","currencyGuid":"usd"}`)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
@@ -84,12 +117,12 @@ func TestFetchPriceNonCurrencyReturns400(t *testing.T) {
 }
 
 func TestFetchPriceNotConfiguredReturns503(t *testing.T) {
-	// No quoteProvider set, so newTestServer leaves the quote service nil.
-	repo := &fakeRepo{commodities: []domain.Commodity{
+	// No provider, so fetchPriceServer leaves the quote service nil.
+	repo := &quoteFake{commodities: []domain.Commodity{
 		{GUID: "usd", Namespace: domain.NamespaceCurrency, Mnemonic: "USD"},
 		{GUID: "eur", Namespace: domain.NamespaceCurrency, Mnemonic: "EUR"},
 	}}
-	rec := postTo(newTestServer(repo), "/api/v1/prices/fetch",
+	rec := postTo(fetchPriceServer(repo, nil), "/api/v1/prices/fetch",
 		`{"commodityGuid":"usd","currencyGuid":"eur"}`)
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503; body = %s", rec.Code, rec.Body.String())

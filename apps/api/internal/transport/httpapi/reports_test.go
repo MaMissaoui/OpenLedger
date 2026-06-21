@@ -1,14 +1,34 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
+
+// reportFake satisfies app.ReportRepository for the report endpoints.
+type reportFake struct {
+	bookRoot   string
+	reportRows []app.AccountWithBalance
+}
+
+func (f *reportFake) BookRootAccount(context.Context, string) (string, error) {
+	return f.bookRoot, nil
+}
+
+func (f *reportFake) AccountBalances(context.Context, string, *time.Time, *time.Time) ([]app.AccountWithBalance, error) {
+	return f.reportRows, nil
+}
+
+func reportServer(f *reportFake, authz *app.AuthzService) http.Handler {
+	return authedServer(Services{Report: app.NewReportService(f), Authz: authz})
+}
 
 func getReport(h http.Handler, path string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
@@ -26,13 +46,13 @@ func reportRow(typ domain.AccountType, rawNum int64) app.AccountWithBalance {
 }
 
 func TestBalanceSheet(t *testing.T) {
-	repo := &fakeRepo{bookRoot: "root", reportRows: []app.AccountWithBalance{
+	repo := &reportFake{bookRoot: "root", reportRows: []app.AccountWithBalance{
 		reportRow(domain.AccountBank, 150000),
 		reportRow(domain.AccountEquity, -100000),
 		reportRow(domain.AccountIncome, -70000),
 		reportRow(domain.AccountExpense, 20000),
 	}}
-	rec := getReport(newTestServer(repo), "/api/v1/books/book-1/reports/balance-sheet")
+	rec := getReport(reportServer(repo, nil), "/api/v1/books/book-1/reports/balance-sheet")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
 	}
@@ -56,12 +76,12 @@ func TestBalanceSheet(t *testing.T) {
 }
 
 func TestIncomeStatementEndpoint(t *testing.T) {
-	repo := &fakeRepo{bookRoot: "root", reportRows: []app.AccountWithBalance{
+	repo := &reportFake{bookRoot: "root", reportRows: []app.AccountWithBalance{
 		reportRow(domain.AccountIncome, -70000),
 		reportRow(domain.AccountExpense, 20000),
 		reportRow(domain.AccountBank, 150000),
 	}}
-	rec := getReport(newTestServer(repo),
+	rec := getReport(reportServer(repo, nil),
 		"/api/v1/books/book-1/reports/income-statement?from=2026-01-01T00:00:00Z&to=2026-06-30T00:00:00Z")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body = %s", rec.Code, rec.Body.String())
@@ -78,7 +98,7 @@ func TestIncomeStatementEndpoint(t *testing.T) {
 }
 
 func TestBalanceSheetBadDateReturns400(t *testing.T) {
-	rec := getReport(newTestServer(&fakeRepo{bookRoot: "root"}),
+	rec := getReport(reportServer(&reportFake{bookRoot: "root"}, nil),
 		"/api/v1/books/book-1/reports/balance-sheet?asOf=not-a-date")
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400; body = %s", rec.Code, rec.Body.String())
@@ -86,7 +106,7 @@ func TestBalanceSheetBadDateReturns400(t *testing.T) {
 }
 
 func TestBalanceSheetForbiddenWithoutMembership(t *testing.T) {
-	rec := getReport(newTestServer(&fakeRepo{bookRoot: "root", noMembership: true}),
+	rec := getReport(reportServer(&reportFake{bookRoot: "root"}, app.NewAuthzService(&authStub{noMembership: true})),
 		"/api/v1/books/book-1/reports/balance-sheet")
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403; body = %s", rec.Code, rec.Body.String())

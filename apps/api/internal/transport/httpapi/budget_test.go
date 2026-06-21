@@ -13,9 +13,8 @@ import (
 	"github.com/openledger/openledger/apps/api/internal/domain"
 )
 
-// fakeBudgetRepoH satisfies app.BudgetReportRepository for HTTP-layer tests.
+// fakeBudgetRepoH satisfies app.BudgetRepository and app.BudgetReportRepository.
 type fakeBudgetRepoH struct {
-	*fakeRepo
 	budgets  map[string]domain.Budget
 	actuals  []app.AccountWithBalance
 	bookRoot string
@@ -23,7 +22,6 @@ type fakeBudgetRepoH struct {
 
 func newFakeBudgetRepoH() *fakeBudgetRepoH {
 	return &fakeBudgetRepoH{
-		fakeRepo: &fakeRepo{},
 		budgets:  make(map[string]domain.Budget),
 		bookRoot: "root-1",
 	}
@@ -82,11 +80,7 @@ func (f *fakeBudgetRepoH) AccountBalances(_ context.Context, _ string, _, _ *tim
 }
 
 func newBudgetTestServer(fr *fakeBudgetRepoH) http.Handler {
-	return (&Server{Services: Services{
-		Provision: app.NewProvisionService(fr.fakeRepo),
-		Authz:     app.NewAuthzService(fr.fakeRepo),
-		Budget:    app.NewBudgetService(fr),
-	}}).Routes()
+	return authedServer(Services{Budget: app.NewBudgetService(fr)})
 }
 
 func budgetReq(h http.Handler, method, path string, body any) *httptest.ResponseRecorder {
