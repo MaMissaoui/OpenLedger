@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/openledger/openledger/apps/api/internal/app"
 	"github.com/openledger/openledger/apps/api/internal/domain"
@@ -92,4 +93,93 @@ func splitIndex(t *testing.T, data app.GnuCashData, guid string) int {
 	}
 	t.Fatalf("split %s not in source", guid)
 	return -1
+}
+
+// TestRoundTripScheduledTransactions verifies that scheduled transactions (with
+// their template splits) survive a SQLite write/read cycle with GUIDs, periods,
+// and amounts intact.
+func TestRoundTripScheduledTransactions(t *testing.T) {
+	import_time := func(s string) time.Time {
+		t.Helper()
+		v, err := time.ParseInLocation("2006-01-02", s, time.UTC)
+		if err != nil {
+			t.Fatalf("parse date %q: %v", s, err)
+		}
+		return v
+	}
+
+	path := filepath.Join(t.TempDir(), "sched.gnucash")
+	ctx := context.Background()
+	src := sampleData()
+	src.ScheduledTransactions = []domain.ScheduledTransaction{
+		{
+			GUID:         "sched1",
+			BookGUID:     src.Book.GUID,
+			Name:         "Monthly Salary",
+			Enabled:      true,
+			CurrencyGUID: "usd",
+			Period:       domain.PeriodMonthly,
+			Every:        1,
+			StartDate:    import_time("2025-01-01"),
+			Splits: []domain.ScheduledSplit{
+				{GUID: "ss1", AccountGUID: "chk", Memo: "credit", Value: domain.MustFromNumDenom(5000, 100)},
+				{GUID: "ss2", AccountGUID: "sal", Memo: "debit", Value: domain.MustFromNumDenom(-5000, 100)},
+			},
+		},
+	}
+
+	if err := (Writer{}).WriteGnuCashSQLite(ctx, path, src); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	got, err := (Reader{}).ReadGnuCashSQLite(ctx, path)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+
+	if len(got.ScheduledTransactions) != 1 {
+		t.Fatalf("scheduled transactions = %d, want 1", len(got.ScheduledTransactions))
+	}
+	s := got.ScheduledTransactions[0]
+
+	if s.GUID != "sched1" {
+		t.Errorf("GUID = %q, want sched1", s.GUID)
+	}
+	if s.Name != "Monthly Salary" {
+		t.Errorf("Name = %q, want Monthly Salary", s.Name)
+	}
+	if !s.Enabled {
+		t.Error("Enabled = false, want true")
+	}
+	if s.Period != domain.PeriodMonthly {
+		t.Errorf("Period = %q, want monthly", s.Period)
+	}
+	if s.Every != 1 {
+		t.Errorf("Every = %d, want 1", s.Every)
+	}
+	if !s.StartDate.Equal(import_time("2025-01-01")) {
+		t.Errorf("StartDate = %v, want 2025-01-01", s.StartDate)
+	}
+	if len(s.Splits) != 2 {
+		t.Fatalf("splits = %d, want 2", len(s.Splits))
+	}
+
+	// Verify amounts survived the AtDenom round-trip.
+	byGUID := make(map[string]domain.ScheduledSplit, 2)
+	for _, sp := range s.Splits {
+		byGUID[sp.GUID] = sp
+	}
+	srcByGUID := make(map[string]domain.ScheduledSplit, 2)
+	for _, sp := range src.ScheduledTransactions[0].Splits {
+		srcByGUID[sp.GUID] = sp
+	}
+	for guid, want := range srcByGUID {
+		got, ok := byGUID[guid]
+		if !ok {
+			t.Errorf("split %s missing after round-trip", guid)
+			continue
+		}
+		if !got.Value.Equal(want.Value) {
+			t.Errorf("split %s value = %s, want %s", guid, got.Value, want.Value)
+		}
+	}
 }

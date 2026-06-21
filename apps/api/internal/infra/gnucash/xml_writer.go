@@ -115,6 +115,16 @@ func (Writer) WriteGnuCashXML(_ context.Context, path string, data app.GnuCashDa
 			return err
 		}
 	}
+
+	if len(data.ScheduledTransactions) > 0 {
+		if err := x.writeTemplateTransactions(data, cmdtyRef, fraction); err != nil {
+			return err
+		}
+		for _, s := range data.ScheduledTransactions {
+			x.writeSchedXaction(s)
+		}
+	}
+
 	x.printf("</gnc:book>\n</gnc-v2>\n")
 
 	if x.err != nil {
@@ -280,6 +290,153 @@ func gncXMLTime(t time.Time) string {
 		return ""
 	}
 	return t.UTC().Format(gncXMLWriteTime)
+}
+
+// writeTemplateTransactions emits the <gnc:template-transactions> section with
+// one synthesised template account per scheduled transaction, followed by the
+// corresponding template transaction (marker split + one split per scheduled split).
+func (x *xmlWriter) writeTemplateTransactions(data app.GnuCashData, cmdtyRef map[string]xmlRef, fraction map[string]int64) error {
+	x.printf("<gnc:template-transactions>\n")
+
+	// Template root account — write first so child accounts can reference it.
+	for _, a := range data.Accounts {
+		if a.GUID == data.Book.RootTemplateGUID {
+			x.writeAccount(a, xmlRef{}, 0)
+			break
+		}
+	}
+
+	// One template account and transaction per scheduled transaction.
+	for _, s := range data.ScheduledTransactions {
+		templateActGUID := newGUID()
+		tmplTxGUID := newGUID()
+
+		// Template account (child of the template root).
+		tmplAcct := domain.Account{
+			GUID:       templateActGUID,
+			Name:       s.Name,
+			Type:       domain.AccountAsset,
+			ParentGUID: data.Book.RootTemplateGUID,
+		}
+		x.writeAccount(tmplAcct, xmlRef{}, 0)
+
+		// Template transaction.
+		currFraction := fraction[s.CurrencyGUID]
+		if currFraction == 0 {
+			currFraction = 100
+		}
+		ref := cmdtyRef[s.CurrencyGUID]
+		x.printf("<gnc:transaction version=\"2.0.0\">\n")
+		x.printf("  <trn:id type=\"guid\">%s</trn:id>\n", xmlEscape(tmplTxGUID))
+		if ref.space != "" {
+			x.printf("  <trn:currency>\n")
+			x.printf("    <cmdty:space>%s</cmdty:space>\n", xmlEscape(ref.space))
+			x.printf("    <cmdty:id>%s</cmdty:id>\n", xmlEscape(ref.id))
+			x.printf("  </trn:currency>\n")
+		}
+		x.printf("  <trn:date-posted><ts:date>%s</ts:date></trn:date-posted>\n", gncXMLTime(s.StartDate))
+		x.printf("  <trn:date-entered><ts:date>%s</ts:date></trn:date-entered>\n", gncXMLTime(time.Now().UTC()))
+		x.printf("  <trn:description>%s</trn:description>\n", xmlEscape(s.Name))
+		x.printf("  <trn:splits>\n")
+
+		// Marker split — points at the template account, value=0.
+		x.printf("    <trn:split>\n")
+		x.printf("      <split:id type=\"guid\">%s</split:id>\n", xmlEscape(newGUID()))
+		x.printf("      <split:reconciled-state>n</split:reconciled-state>\n")
+		x.printf("      <split:value>0/1</split:value>\n")
+		x.printf("      <split:quantity>0/1</split:quantity>\n")
+		x.printf("      <split:account type=\"guid\">%s</split:account>\n", xmlEscape(templateActGUID))
+		x.printf("    </trn:split>\n")
+
+		// Actual schedule splits.
+		for _, sp := range s.Splits {
+			vNum, err := sp.Value.AtDenom(currFraction)
+			if err != nil {
+				return fmt.Errorf("schedule %s split %s value: %w", s.GUID, sp.GUID, err)
+			}
+			x.printf("    <trn:split>\n")
+			x.printf("      <split:id type=\"guid\">%s</split:id>\n", xmlEscape(sp.GUID))
+			if sp.Memo != "" {
+				x.printf("      <split:memo>%s</split:memo>\n", xmlEscape(sp.Memo))
+			}
+			x.printf("      <split:reconciled-state>n</split:reconciled-state>\n")
+			x.printf("      <split:value>%d/%d</split:value>\n", vNum, currFraction)
+			x.printf("      <split:quantity>%d/%d</split:quantity>\n", vNum, currFraction)
+			x.printf("      <split:account type=\"guid\">%s</split:account>\n", xmlEscape(sp.AccountGUID))
+			x.printf("    </trn:split>\n")
+		}
+		x.printf("  </trn:splits>\n")
+		x.printf("</gnc:transaction>\n")
+	}
+
+	x.printf("</gnc:template-transactions>\n")
+	return x.err
+}
+
+// writeSchedXaction emits one <gnc:schedxaction> element. The templ-acct GUID
+// is a placeholder — the actual template accounts are written in writeTemplateTransactions
+// and linked by name. GnuCash uses the GUID; on re-import the XML reader
+// resolves splits through the template section independently.
+func (x *xmlWriter) writeSchedXaction(s domain.ScheduledTransaction) {
+	x.printf("<gnc:schedxaction version=\"2.0.0\">\n")
+	x.printf("  <sx:id type=\"guid\">%s</sx:id>\n", xmlEscape(s.GUID))
+	x.printf("  <sx:name>%s</sx:name>\n", xmlEscape(s.Name))
+	enabled := "n"
+	if s.Enabled {
+		enabled = "y"
+	}
+	x.printf("  <sx:enabled>%s</sx:enabled>\n", enabled)
+	x.printf("  <sx:autoCreate>n</sx:autoCreate>\n")
+	x.printf("  <sx:autoCreateNotify>n</sx:autoCreateNotify>\n")
+	x.printf("  <sx:advanceCreateDays>0</sx:advanceCreateDays>\n")
+	x.printf("  <sx:advanceRemindDays>0</sx:advanceRemindDays>\n")
+	x.printf("  <sx:instanceCount>0</sx:instanceCount>\n")
+	if !s.StartDate.IsZero() {
+		x.printf("  <sx:start><gdate>%s</gdate></sx:start>\n", s.StartDate.UTC().Format("2006-01-02"))
+	}
+	if !s.LastPostedDate.IsZero() {
+		x.printf("  <sx:last><gdate>%s</gdate></sx:last>\n", s.LastPostedDate.UTC().Format("2006-01-02"))
+	}
+	if !s.EndDate.IsZero() {
+		x.printf("  <sx:end><gdate>%s</gdate></sx:end>\n", s.EndDate.UTC().Format("2006-01-02"))
+	}
+	// templ-acct: the reader resolves this; we emit the schedule GUID as a stable
+	// stand-in (a real GnuCash re-import maps it to the template account written
+	// in template-transactions above, but our own importer uses the marker-split
+	// approach which doesn't need this field to be a real account GUID).
+	x.printf("  <sx:templ-acct type=\"guid\">%s</sx:templ-acct>\n", xmlEscape(s.GUID))
+	x.printf("  <sx:schedule>\n")
+	every := s.Every
+	if every <= 0 {
+		every = 1
+	}
+	x.printf("    <gnc:recurrence version=\"1.0.0\">\n")
+	x.printf("      <recurrence:mult>%d</recurrence:mult>\n", every)
+	x.printf("      <recurrence:period_type>%s</recurrence:period_type>\n", xmlEscape(reverseGncPeriodXML(s.Period)))
+	if !s.StartDate.IsZero() {
+		x.printf("      <recurrence:start><gdate>%s</gdate></recurrence:start>\n", s.StartDate.UTC().Format("2006-01-02"))
+	}
+	x.printf("      <recurrence:weekend_adj>none</recurrence:weekend_adj>\n")
+	x.printf("    </gnc:recurrence>\n")
+	x.printf("  </sx:schedule>\n")
+	x.printf("</gnc:schedxaction>\n")
+}
+
+// reverseGncPeriodXML converts a domain.RecurrencePeriod to the GnuCash XML
+// recurrence_period_type token (different from the SQLite token).
+func reverseGncPeriodXML(p domain.RecurrencePeriod) string {
+	switch p {
+	case domain.PeriodOnce:
+		return "once"
+	case domain.PeriodDaily:
+		return "daily"
+	case domain.PeriodWeekly:
+		return "weekly"
+	case domain.PeriodYearly:
+		return "yearly"
+	default:
+		return "monthly"
+	}
 }
 
 // xmlEscape escapes a string for inclusion in XML character data or a

@@ -464,6 +464,30 @@ func (r *Repository) ImportBook(ctx context.Context, data app.GnuCashData, owner
 				return err
 			}
 		}
+
+		// Apply commodity remap to scheduled transactions and insert them.
+		for i := range data.ScheduledTransactions {
+			if canon, ok := guidRemap[data.ScheduledTransactions[i].CurrencyGUID]; ok {
+				data.ScheduledTransactions[i].CurrencyGUID = canon
+			}
+		}
+		for _, s := range data.ScheduledTransactions {
+			s.BookGUID = data.Book.GUID
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO scheduled_transactions
+				    (guid, book_guid, name, description, enabled, currency_guid, period, every,
+				     start_date, end_date, last_posted)
+				 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+				s.GUID, s.BookGUID, s.Name, s.Description, boolToInt(s.Enabled),
+				s.CurrencyGUID, string(s.Period), s.Every,
+				schedDate(s.StartDate), schedDate(s.EndDate), schedDate(s.LastPostedDate),
+			); err != nil {
+				return importErr("insert scheduled transaction", err)
+			}
+			if err := insertScheduledSplits(ctx, tx, s.GUID, s.Splits); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 }
@@ -561,12 +585,18 @@ func (r *Repository) LoadBook(ctx context.Context, bookGUID string) (app.GnuCash
 				return err
 			}
 
+			scheds, err := loadBookScheduledTransactions(ctx, tx, book.GUID)
+			if err != nil {
+				return err
+			}
+
 			data = app.GnuCashData{
-				Book:         book,
-				Commodities:  commodities,
-				Accounts:     accounts,
-				Transactions: transactions,
-				Lots:         lots,
+				Book:                  book,
+				Commodities:           commodities,
+				Accounts:              accounts,
+				Transactions:          transactions,
+				Lots:                  lots,
+				ScheduledTransactions: scheds,
 			}
 			return nil
 		})
@@ -603,6 +633,60 @@ func loadBookLots(ctx context.Context, tx pgx.Tx, accountGUIDs []string) ([]doma
 		lots = append(lots, l)
 	}
 	return lots, rows.Err()
+}
+
+// loadBookScheduledTransactions loads all scheduled transactions (with their
+// template splits) for a book within an existing read transaction.
+func loadBookScheduledTransactions(ctx context.Context, tx pgx.Tx, bookGUID string) ([]domain.ScheduledTransaction, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT guid, book_guid, name, description, enabled, currency_guid, period, every,
+		        start_date, end_date, last_posted
+		   FROM scheduled_transactions WHERE book_guid = $1 ORDER BY name`, bookGUID)
+	if err != nil {
+		return nil, fmt.Errorf("load scheduled transactions: %w", err)
+	}
+	defer rows.Close()
+
+	var scheds []domain.ScheduledTransaction
+	for rows.Next() {
+		s, err := scanScheduledTransaction(rows)
+		if err != nil {
+			return nil, err
+		}
+		scheds = append(scheds, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for i := range scheds {
+		splitRows, err := tx.Query(ctx,
+			`SELECT guid, account_guid, memo, value_num, value_denom
+			   FROM scheduled_splits WHERE schedtx_guid = $1 ORDER BY guid`, scheds[i].GUID)
+		if err != nil {
+			return nil, fmt.Errorf("load scheduled splits for %s: %w", scheds[i].GUID, err)
+		}
+		for splitRows.Next() {
+			var (
+				sp           domain.ScheduledSplit
+				valueNum, vD int64
+			)
+			if err := splitRows.Scan(&sp.GUID, &sp.AccountGUID, &sp.Memo, &valueNum, &vD); err != nil {
+				splitRows.Close()
+				return nil, fmt.Errorf("scan scheduled split: %w", err)
+			}
+			if sp.Value, err = domain.FromNumDenom(valueNum, vD); err != nil {
+				splitRows.Close()
+				return nil, fmt.Errorf("scheduled split %s value: %w", sp.GUID, err)
+			}
+			scheds[i].Splits = append(scheds[i].Splits, sp)
+		}
+		splitRows.Close()
+		if err := splitRows.Err(); err != nil {
+			return nil, err
+		}
+	}
+	return scheds, nil
 }
 
 // loadBookAccounts reads the account tree anchored at the book's two roots

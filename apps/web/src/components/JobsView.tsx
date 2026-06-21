@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import type { Job, NewJob } from "../lib/types";
 
-type Owner = { guid: string; name: string };
+type Owner = { guid: string; name: string; id?: string };
 
 // Jobs group invoices/bills under one customer or vendor. Entity CRUD only —
 // attaching a job to an invoice is left to the invoice editor later.
@@ -22,10 +22,13 @@ export default function JobsView({
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Job | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const ownerName = (j: Job) => {
     const pool = j.ownerType === "customer" ? customers : vendors;
-    return pool.find((o) => o.guid === j.ownerGuid)?.name ?? j.ownerGuid;
+    const o = pool.find((x) => x.guid === j.ownerGuid);
+    if (!o) return j.ownerGuid;
+    return o.id ? `${o.id} — ${o.name}` : o.name;
   };
 
   function load() {
@@ -78,8 +81,27 @@ export default function JobsView({
         </div>
       )}
 
-      {jobs && jobs.length > 0 && (
-        <table className="ledger-table">
+      {jobs && jobs.length > 0 && (() => {
+        const filtered = query
+          ? jobs.filter((j) => {
+              const q = query.toLowerCase();
+              return j.name.toLowerCase().includes(q) ||
+                (j.id ?? "").toLowerCase().includes(q) ||
+                ownerName(j).toLowerCase().includes(q);
+            })
+          : jobs;
+        return (
+          <>
+            <div style={{ padding: "0.5rem 1.5rem 0", display: "flex", gap: "0.5rem" }}>
+              <input
+                type="search"
+                placeholder="Filter by name, ID, or owner…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                style={{ maxWidth: "20rem" }}
+              />
+            </div>
+            <table className="ledger-table">
           <thead>
             <tr>
               <th>Name</th>
@@ -91,7 +113,7 @@ export default function JobsView({
             </tr>
           </thead>
           <tbody>
-            {jobs.map((j) => (
+            {filtered.map((j) => (
               <tr key={j.guid} className={j.active ? "" : "row--muted"}>
                 <td style={{ fontWeight: 500 }}>{j.name}</td>
                 <td className="mono" style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>{j.id || "—"}</td>
@@ -130,7 +152,9 @@ export default function JobsView({
             ))}
           </tbody>
         </table>
-      )}
+          </>
+        );
+      })()}
 
       {formOpen && (
         <JobForm
@@ -218,14 +242,14 @@ function JobForm({
               {customers.length > 0 && (
                 <optgroup label="Customers">
                   {customers.map((c) => (
-                    <option key={c.guid} value={`customer:${c.guid}`}>{c.name}</option>
+                    <option key={c.guid} value={`customer:${c.guid}`}>{c.id ? `${c.id} — ${c.name}` : c.name}</option>
                   ))}
                 </optgroup>
               )}
               {vendors.length > 0 && (
                 <optgroup label="Vendors">
                   {vendors.map((v) => (
-                    <option key={v.guid} value={`vendor:${v.guid}`}>{v.name}</option>
+                    <option key={v.guid} value={`vendor:${v.guid}`}>{v.id ? `${v.id} — ${v.name}` : v.name}</option>
                   ))}
                 </optgroup>
               )}

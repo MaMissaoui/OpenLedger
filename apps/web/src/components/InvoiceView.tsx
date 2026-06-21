@@ -36,13 +36,21 @@ function AccountSelect({
   filter?: (a: Account) => boolean;
   placeholder?: string;
 }) {
-  const opts = filter ? accounts.filter(filter) : accounts;
+  const opts = (filter ? accounts.filter(filter) : accounts)
+    .slice()
+    .sort((a, b) => {
+      const ca = a.code ?? "", cb = b.code ?? "";
+      if (ca && cb) return ca.localeCompare(cb);
+      if (ca) return -1;
+      if (cb) return 1;
+      return a.name.localeCompare(b.name);
+    });
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">{placeholder ?? "— select account —"}</option>
       {opts.map((a) => (
         <option key={a.guid} value={a.guid}>
-          {a.name}
+          {a.code ? `[${a.code}] ${a.name}` : a.name}
         </option>
       ))}
     </select>
@@ -333,7 +341,7 @@ export function AgingReportView({
 }: {
   bookGuid: string;
   invType: "invoice" | "bill";
-  owners: Array<{ guid: string; name: string }>;
+  owners: Array<{ guid: string; name: string; id?: string }>;
 }) {
   const [report, setReport] = useState<AgingReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -348,7 +356,9 @@ export function AgingReportView({
       .finally(() => setLoading(false));
   }, [bookGuid, invType]);
 
-  const ownerMap = Object.fromEntries(owners.map((o) => [o.guid, o.name]));
+  const ownerMap = Object.fromEntries(
+    owners.map((o) => [o.guid, o.id ? `${o.id} — ${o.name}` : o.name])
+  );
 
   if (loading) return <div className="empty"><span className="spinner" /></div>;
   if (error) return <div style={{ padding: "1rem 1.5rem" }}><p className="error">{error}</p></div>;
@@ -457,6 +467,12 @@ function InvoiceDetail({
     reloadEntries();
   }
 
+  const accountLabel = (guid: string) => {
+    const a = accounts.find((x) => x.guid === guid);
+    if (!a) return "—";
+    return a.code ? `[${a.code}] ${a.name}` : a.name;
+  };
+
   const total = entries.reduce((sum, e) => sum + numericToFloat(e.lineTotal), 0);
   const isPosted = invoice.datePosted !== null;
   const isPaid = invoice.paidAt !== null;
@@ -528,7 +544,7 @@ function InvoiceDetail({
                 <td className="mono" style={{ fontSize: "0.85rem" }}>{e.date}</td>
                 <td>{e.description || "—"}</td>
                 <td style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>
-                  {accounts.find((a) => a.guid === e.accountGuid)?.name ?? "—"}
+                  {accountLabel(e.accountGuid)}
                 </td>
                 <td style={{ textAlign: "right", fontSize: "0.85rem" }}>{numericToFloat(e.quantity ?? { num: 1, denom: 1 }).toFixed(3)}</td>
                 <td style={{ textAlign: "right", fontSize: "0.85rem" }}>{formatMoney(e.price)}</td>
@@ -605,7 +621,7 @@ function InvoiceFormDialog({
 }: {
   bookGuid: string;
   invType: "invoice" | "bill";
-  owners: Array<{ guid: string; name: string }>;
+  owners: Array<{ guid: string; name: string; id?: string }>;
   existing?: Invoice;
   onClose: () => void;
   onSaved: (inv: Invoice) => void;
@@ -667,7 +683,7 @@ function InvoiceFormDialog({
             <span>{entityLabel} *</span>
             <select value={ownerGuid} onChange={(e) => setOwnerGuid(e.target.value)}>
               <option value="">— select {entityLabel.toLowerCase()} —</option>
-              {owners.map((o) => <option key={o.guid} value={o.guid}>{o.name}</option>)}
+              {owners.map((o) => <option key={o.guid} value={o.guid}>{o.id ? `${o.id} — ${o.name}` : o.name}</option>)}
             </select>
           </label>
 
@@ -734,9 +750,10 @@ export default function InvoiceView({
   const [selected, setSelected] = useState<Invoice | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Invoice | undefined>(undefined);
+  const [query, setQuery] = useState("");
 
   // Owners: customers for invoices, vendors for bills
-  const [owners, setOwners] = useState<Array<{ guid: string; name: string }>>([]);
+  const [owners, setOwners] = useState<Array<{ guid: string; name: string; id?: string }>>([]);
   useEffect(() => {
     const fn = invType === "invoice" ? api.listCustomers : api.listVendors;
     fn(bookGuid).then((list) => setOwners(list)).catch(() => null);
@@ -795,7 +812,16 @@ export default function InvoiceView({
     );
   }
 
-  const ownerMap = Object.fromEntries(owners.map((o) => [o.guid, o.name]));
+  const ownerDisplay = Object.fromEntries(
+    owners.map((o) => [o.guid, o.id ? `${o.id} — ${o.name}` : o.name])
+  );
+  const filtered = query
+    ? invoices?.filter((inv) => {
+        const q = query.toLowerCase();
+        return (inv.id ?? "").toLowerCase().includes(q) ||
+          (ownerDisplay[inv.ownerGuid] ?? "").toLowerCase().includes(q);
+      })
+    : invoices;
 
   return (
     <>
@@ -818,6 +844,18 @@ export default function InvoiceView({
       )}
 
       {invoices && invoices.length > 0 && (
+        <div style={{ padding: "0.5rem 1.5rem 0", display: "flex", gap: "0.5rem" }}>
+          <input
+            type="search"
+            placeholder={`Filter by number or ${invType === "invoice" ? "customer" : "vendor"}…`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ maxWidth: "20rem" }}
+          />
+        </div>
+      )}
+
+      {invoices && invoices.length > 0 && (
         <table className="ledger-table">
           <thead>
             <tr>
@@ -831,13 +869,13 @@ export default function InvoiceView({
             </tr>
           </thead>
           <tbody>
-            {invoices.map((inv) => (
+            {(filtered ?? []).map((inv) => (
               <tr key={inv.guid} style={{ cursor: "pointer" }} onClick={() => setSelected(inv)}>
                 <td className="mono" style={{ fontSize: "0.85rem" }}>
                   {inv.id || inv.guid.slice(0, 8)}
                 </td>
                 <td style={{ fontWeight: 500 }}>
-                  {ownerMap[inv.ownerGuid] ?? <span style={{ color: "var(--ink-soft)" }}>—</span>}
+                  {ownerDisplay[inv.ownerGuid] ?? <span style={{ color: "var(--ink-soft)" }}>—</span>}
                 </td>
                 <td className="mono" style={{ fontSize: "0.85rem" }}>{inv.dateOpened}</td>
                 <td className="mono" style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>

@@ -36,8 +36,37 @@ type xmlFile struct {
 }
 
 type xmlBook struct {
-	ID           string           `xml:"id"`
-	Commodities  []xmlCommodity   `xml:"commodity"`
+	ID                   string             `xml:"id"`
+	Commodities          []xmlCommodity     `xml:"commodity"`
+	Accounts             []xmlAccount       `xml:"account"`
+	Transactions         []xmlTransaction   `xml:"transaction"`
+	ScheduledXactions    []xmlSchedXaction  `xml:"schedxaction"`
+	TemplateTransactions xmlTemplateSection `xml:"template-transactions"`
+}
+
+// xmlSchedXaction is a <gnc:schedxaction> element from a GnuCash XML file.
+type xmlSchedXaction struct {
+	ID        string          `xml:"id"`
+	Name      string          `xml:"name"`
+	Enabled   string          `xml:"enabled"`
+	Start     string          `xml:"start>gdate"`
+	End       string          `xml:"end>gdate"`
+	Last      string          `xml:"last>gdate"`
+	TemplAcct string          `xml:"templ-acct"`
+	Schedule  []xmlRecurrence `xml:"schedule>recurrence"`
+}
+
+// xmlRecurrence is a <gnc:recurrence> inside a scheduled transaction's
+// <sx:schedule> element.
+type xmlRecurrence struct {
+	Mult       string `xml:"mult"`
+	PeriodType string `xml:"period_type"`
+	Start      string `xml:"start>gdate"`
+}
+
+// xmlTemplateSection is the <gnc:template-transactions> block, which holds
+// template accounts and template transactions for scheduled transactions.
+type xmlTemplateSection struct {
 	Accounts     []xmlAccount     `xml:"account"`
 	Transactions []xmlTransaction `xml:"transaction"`
 }
@@ -146,12 +175,48 @@ func (Reader) ReadGnuCashXML(_ context.Context, path string) (app.GnuCashData, e
 	}
 	accounts, rootGUID := xmlAccounts(doc.Book.Accounts, cmdtyGUID)
 
-	// Synthesise the template root GnuCash keeps but the XML omits, so the book
-	// round-trips back out to the SQLite backend with both roots present.
-	templateRoot := domain.Account{GUID: newGUID(), Name: "Template Root", Type: domain.AccountRoot}
-	accounts = append(accounts, templateRoot)
+	// The template root exists in the XML only when there are scheduled
+	// transactions. If present, parse it from the template-transactions section;
+	// otherwise synthesise one so the book round-trips to SQLite with both roots.
+	templateAccounts, templateRootGUID := xmlAccounts(doc.Book.TemplateTransactions.Accounts, cmdtyGUID)
+	var templateRoot domain.Account
+	if templateRootGUID == "" {
+		templateRoot = domain.Account{GUID: newGUID(), Name: "Template Root", Type: domain.AccountRoot}
+		templateRootGUID = templateRoot.GUID
+		accounts = append(accounts, templateRoot)
+	}
+	// Template accounts (non-root) reference the synthesised/parsed template root.
+	for _, ta := range templateAccounts {
+		if ta.Type != domain.AccountRoot {
+			accounts = append(accounts, ta)
+		}
+	}
 
 	transactions, err := xmlTransactions(doc.Book.Transactions, cmdtyGUID)
+	if err != nil {
+		return app.GnuCashData{}, err
+	}
+
+	// Template transactions are used only to resolve scheduled splits; they are
+	// NOT added to the real transaction list.
+	templateTxns, err := xmlTransactions(doc.Book.TemplateTransactions.Transactions, cmdtyGUID)
+	if err != nil {
+		return app.GnuCashData{}, err
+	}
+
+	// Build a lookup of template transactions by GUID for split resolution.
+	tmplTxByGUID := make(map[string]*domain.Transaction, len(templateTxns))
+	for i := range templateTxns {
+		tmplTxByGUID[templateTxns[i].GUID] = &templateTxns[i]
+	}
+
+	// Build a lookup: template account GUID → account (to detect marker splits).
+	tmplAcctByGUID := make(map[string]struct{}, len(templateAccounts))
+	for _, ta := range templateAccounts {
+		tmplAcctByGUID[ta.GUID] = struct{}{}
+	}
+
+	scheds, err := xmlScheduledTransactions(doc.Book.ScheduledXactions, tmplTxByGUID, tmplAcctByGUID, doc.Book.ID)
 	if err != nil {
 		return app.GnuCashData{}, err
 	}
@@ -160,11 +225,12 @@ func (Reader) ReadGnuCashXML(_ context.Context, path string) (app.GnuCashData, e
 		Book: domain.Book{
 			GUID:             doc.Book.ID,
 			RootAccountGUID:  rootGUID,
-			RootTemplateGUID: templateRoot.GUID,
+			RootTemplateGUID: templateRootGUID,
 		},
-		Commodities:  commodities,
-		Accounts:     accounts,
-		Transactions: transactions,
+		Commodities:           commodities,
+		Accounts:              accounts,
+		Transactions:          transactions,
+		ScheduledTransactions: scheds,
 	}, nil
 }
 
@@ -322,6 +388,98 @@ func parseGncXMLTime(s string) (time.Time, error) {
 		}
 	}
 	return time.Time{}, fmt.Errorf("unrecognised timestamp %q", s)
+}
+
+// parseGncXMLDate parses a bare GnuCash <gdate> value ("YYYY-MM-DD"), returning
+// the zero time for an absent or empty value.
+func parseGncXMLDate(s string) time.Time {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}
+	}
+	t, err := time.ParseInLocation("2006-01-02", s, time.UTC)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+// xmlScheduledTransactions converts parsed <gnc:schedxaction> elements into
+// domain.ScheduledTransaction values. Template splits are resolved by looking
+// up each schedxaction's templ-acct in the pre-parsed template transactions.
+func xmlScheduledTransactions(
+	in []xmlSchedXaction,
+	tmplTxByGUID map[string]*domain.Transaction,
+	tmplAcctByGUID map[string]struct{},
+	bookID string,
+) ([]domain.ScheduledTransaction, error) {
+	if len(in) == 0 {
+		return nil, nil
+	}
+
+	// Build a reverse index: template account GUID → template transaction GUIDs.
+	// (A template account appears as the account_guid on the marker split of each
+	// template transaction; the real schedule splits are the other splits.)
+	markerToTx := make(map[string][]string) // templateActGUID → []txGUID
+	for _, tx := range tmplTxByGUID {
+		for _, sp := range tx.Splits {
+			if _, isTemplAcct := tmplAcctByGUID[sp.AccountGUID]; isTemplAcct {
+				markerToTx[sp.AccountGUID] = append(markerToTx[sp.AccountGUID], tx.GUID)
+				break
+			}
+		}
+	}
+
+	var out []domain.ScheduledTransaction
+	for _, sx := range in {
+		s := domain.ScheduledTransaction{
+			GUID:           sx.ID,
+			BookGUID:       bookID,
+			Name:           sx.Name,
+			Enabled:        strings.EqualFold(strings.TrimSpace(sx.Enabled), "y"),
+			StartDate:      parseGncXMLDate(sx.Start),
+			EndDate:        parseGncXMLDate(sx.End),
+			LastPostedDate: parseGncXMLDate(sx.Last),
+			Every:          1,
+			Period:         domain.PeriodMonthly,
+		}
+
+		// Parse the first recurrence rule.
+		if len(sx.Schedule) > 0 {
+			r := sx.Schedule[0]
+			if n, err := strconv.Atoi(strings.TrimSpace(r.Mult)); err == nil && n > 0 {
+				s.Every = n
+			}
+			s.Period = mapGncPeriod(strings.TrimSpace(r.PeriodType))
+		}
+
+		// Resolve template splits via templ-acct.
+		for _, txGUID := range markerToTx[sx.TemplAcct] {
+			tx, ok := tmplTxByGUID[txGUID]
+			if !ok {
+				continue
+			}
+			// Use the transaction's currency for the schedule.
+			if s.CurrencyGUID == "" {
+				s.CurrencyGUID = tx.CurrencyGUID
+			}
+			// Collect non-marker splits as the scheduled split templates.
+			for _, sp := range tx.Splits {
+				if _, isTemplAcct := tmplAcctByGUID[sp.AccountGUID]; isTemplAcct {
+					continue // skip marker split
+				}
+				s.Splits = append(s.Splits, domain.ScheduledSplit{
+					GUID:        sp.GUID,
+					AccountGUID: sp.AccountGUID,
+					Memo:        sp.Memo,
+					Value:       sp.Value,
+				})
+			}
+		}
+
+		out = append(out, s)
+	}
+	return out, nil
 }
 
 // newGUID returns a fresh 32-character hex GUID in GnuCash's identifier format.

@@ -223,6 +223,7 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<C | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   // Map guid → mnemonic for the table
   const commodityMap = Object.fromEntries(commodities.map((c) => [c.guid, c.mnemonic]));
@@ -290,6 +291,25 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
       )}
 
       {contacts && contacts.length > 0 && (
+        <div style={{ padding: "0.5rem 1.5rem 0", display: "flex", gap: "0.5rem" }}>
+          <input
+            type="search"
+            placeholder={`Filter by name or ID…`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ maxWidth: "20rem" }}
+          />
+        </div>
+      )}
+
+      {contacts && contacts.length > 0 && (() => {
+        const filtered = query
+          ? contacts.filter((c) => {
+              const q = query.toLowerCase();
+              return c.name.toLowerCase().includes(q) || (c.id ?? "").toLowerCase().includes(q);
+            })
+          : contacts;
+        return (
         <table className="ledger-table">
           <thead>
             <tr>
@@ -302,7 +322,7 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
             </tr>
           </thead>
           <tbody>
-            {contacts.map((c) => (
+            {filtered.map((c) => (
               <tr key={c.guid} className={c.active ? "" : "row--muted"}>
                 <td style={{ fontWeight: 500 }}>{c.name}</td>
                 <td className="mono" style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>
@@ -332,7 +352,8 @@ function ContactList<C extends Customer | Vendor, N extends NewCustomer | NewVen
             ))}
           </tbody>
         </table>
-      )}
+        );
+      })()}
 
       {formOpen && (
         <ContactForm<N>
@@ -385,8 +406,8 @@ export default function BusinessView({
   }, [initialTab]);
   const [newTrigger, setNewTrigger] = useState(0);
   const [commodities, setCommodities] = useState<Commodity[]>([]);
-  const [customers, setCustomers] = useState<Array<{ guid: string; name: string }>>([]);
-  const [vendors, setVendors] = useState<Array<{ guid: string; name: string }>>([]);
+  const [customers, setCustomers] = useState<Array<{ guid: string; name: string; id?: string }>>([]);
+  const [vendors, setVendors] = useState<Array<{ guid: string; name: string; id?: string }>>([]);
 
   useEffect(() => {
     api.listCommodities().then(setCommodities).catch(() => null);
