@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { Book, CashFlowForecast } from "../lib/types";
 import { formatMoney, toFloat } from "../lib/money";
@@ -32,8 +33,9 @@ function LineChart({ fc }: { fc: CashFlowForecast }) {
   const padY = 24;
 
   // Series: the opening balance, then each month's projected close.
+  const { t } = useTranslation();
   const series = [
-    { label: "Now", value: toFloat(fc.startingCash) },
+    { label: t("reports.forecast.now"), value: toFloat(fc.startingCash) },
     ...fc.points.map((p) => ({ label: shortMonth(p.date), value: toFloat(p.projectedCash) })),
   ];
   const values = series.map((s) => s.value);
@@ -80,6 +82,7 @@ function LineChart({ fc }: { fc: CashFlowForecast }) {
 }
 
 export function ForecastView({ book, onBack }: Props) {
+  const { t } = useTranslation();
   const [months, setMonths] = useState(6);
 
   const q = useQuery({
@@ -93,12 +96,12 @@ export function ForecastView({ book, onBack }: Props) {
         <div className="register__title">
           {onBack ? (
             <button className="back-link" onClick={onBack}>
-              ‹ Reports Center
+              {t("reports.reportsCenter")}
             </button>
           ) : (
-            <div className="eyebrow">Reports</div>
+            <div className="eyebrow">{t("reports.forecast.eyebrow")}</div>
           )}
-          <h1>Cash flow forecast</h1>
+          <h1>{t("reports.forecast.title")}</h1>
         </div>
         <div className="report__tabs">
           {HORIZONS.map((m) => (

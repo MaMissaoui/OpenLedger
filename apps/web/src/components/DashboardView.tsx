@@ -1,4 +1,5 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type {
   Account,
@@ -52,6 +53,7 @@ function bucketIsAsset(type: string): boolean {
 const SEGMENT_COLORS = ["#1a365d", "#555f71", "#4bb278", "#86a0cd", "#c4c6cf"];
 
 export function DashboardView({ book, onNavigate }: Props) {
+  const { t } = useTranslation();
   const balanceSheet = useQuery({
     queryKey: ["balance-sheet", book.guid, "dashboard"],
     queryFn: () => api.getBalanceSheet(book.guid, todayISO()),
@@ -87,11 +89,11 @@ export function DashboardView({ book, onNavigate }: Props) {
     <section className="dash">
       <header className="dash__header">
         <div>
-          <div className="eyebrow">Financial Overview</div>
-          <h1>Dashboard</h1>
+          <div className="eyebrow">{t("dashboard.eyebrow")}</div>
+          <h1>{t("dashboard.title")}</h1>
         </div>
         <button className="btn btn--ghost btn--sm" onClick={() => onNavigate("reports")}>
-          View reports
+          {t("common.viewReports")}
         </button>
       </header>
 
@@ -113,6 +115,7 @@ export function DashboardView({ book, onNavigate }: Props) {
 
 // ── Net worth ─────────────────────────────────────────────────────────────────
 function NetWorthCard({ sheet, prior }: { sheet?: BalanceSheet; prior?: BalanceSheet }) {
+  const { t } = useTranslation();
   if (!sheet) return <div className="card card--span4" />;
 
   const netWorth = subtract(sheet.assets.total, sheet.liabilities.total);
@@ -137,23 +140,23 @@ function NetWorthCard({ sheet, prior }: { sheet?: BalanceSheet; prior?: BalanceS
 
   return (
     <div className="card card--span4 card--feature">
-      <div className="card__label">Total Net Worth</div>
+      <div className="card__label">{t("dashboard.netWorth")}</div>
       <div className="stat mono">{formatMoney(netWorth)}</div>
       {trend && (
         <div className="trend-row">
           <span className={`trend-chip ${trend.up ? "trend-chip--up" : "trend-chip--down"}`}>
             {trend.up ? "▲" : "▼"} {Math.abs(trend.pct).toFixed(1)}%
           </span>
-          <span className="trend-note">vs last month</span>
+          <span className="trend-note">{t("dashboard.vsLastMonth")}</span>
         </div>
       )}
       <div className="card__split">
         <div>
-          <div className="card__split-label">Liquid cash</div>
+          <div className="card__split-label">{t("dashboard.liquidCash")}</div>
           <div className="mono card__split-value">{formatMoney(liquid)}</div>
         </div>
         <div className="card__split-right">
-          <div className="card__split-label">Liabilities</div>
+          <div className="card__split-label">{t("dashboard.liabilities")}</div>
           <div className={`mono card__split-value${sheet.liabilities.total.num !== 0 ? " neg" : ""}`}>
             {formatMoney(sheet.liabilities.total)}
           </div>
@@ -171,6 +174,7 @@ function CashFlowCard({
   income?: IncomeStatement;
   onNavigate: (view: "ledger" | "reports") => void;
 }) {
+  const { t } = useTranslation();
   if (!income) return <div className="card card--span8" />;
 
   const inc = toFloat(income.income.total);
@@ -180,27 +184,27 @@ function CashFlowCard({
   return (
     <div className="card card--span8">
       <div className="card__head">
-        <div className="card__label">Cash Flow · Year to Date</div>
+        <div className="card__label">{t("dashboard.cashFlow")}</div>
         <div className="legend">
           <span className="legend__item">
-            <span className="legend__dot legend__dot--in" /> Income
+            <span className="legend__dot legend__dot--in" /> {t("dashboard.income")}
           </span>
           <span className="legend__item">
-            <span className="legend__dot legend__dot--out" /> Expenses
+            <span className="legend__dot legend__dot--out" /> {t("dashboard.expenses")}
           </span>
         </div>
       </div>
 
       <div className="flow-bars">
         <div className="flow-bar">
-          <div className="flow-bar__label">Income</div>
+          <div className="flow-bar__label">{t("dashboard.income")}</div>
           <div className="flow-bar__track">
             <div className="flow-bar__fill flow-bar__fill--in" style={{ width: `${(inc / max) * 100}%` }} />
           </div>
           <div className="flow-bar__value mono">{formatMoney(income.income.total)}</div>
         </div>
         <div className="flow-bar">
-          <div className="flow-bar__label">Expenses</div>
+          <div className="flow-bar__label">{t("dashboard.expenses")}</div>
           <div className="flow-bar__track">
             <div className="flow-bar__fill flow-bar__fill--out" style={{ width: `${(exp / max) * 100}%` }} />
           </div>
@@ -210,13 +214,13 @@ function CashFlowCard({
 
       <div className="card__foot">
         <div>
-          <div className="card__split-label">Net savings</div>
+          <div className="card__split-label">{t("dashboard.netSavings")}</div>
           <div className={`mono flow-net${income.netIncome.num < 0 ? " neg" : ""}`}>
             {formatMoney(income.netIncome)}
           </div>
         </div>
         <button className="link-btn" onClick={() => onNavigate("reports")}>
-          View report →
+          {t("common.viewReport")}
         </button>
       </div>
     </div>
@@ -224,10 +228,11 @@ function CashFlowCard({
 }
 
 // ── Recent transactions ───────────────────────────────────────────────────────
-const RECON_LABEL: Record<string, { text: string; cls: string }> = {
-  y: { text: "Reconciled", cls: "tag--ok" },
-  c: { text: "Cleared", cls: "tag--ok" },
-  n: { text: "Pending", cls: "tag--muted" },
+const RECON_CLS: Record<string, string> = { y: "tag--ok", c: "tag--ok", n: "tag--muted" };
+const RECON_KEY: Record<string, "dashboard.reconciled" | "dashboard.cleared" | "dashboard.pending"> = {
+  y: "dashboard.reconciled",
+  c: "dashboard.cleared",
+  n: "dashboard.pending",
 };
 
 function RecentTransactions({
@@ -239,6 +244,7 @@ function RecentTransactions({
   accounts: Account[];
   onNavigate: (view: "ledger" | "reports") => void;
 }) {
+  const { t } = useTranslation();
   // Merge entries, tagging each with its account, then dedupe by transaction.
   const seen = new Set<string>();
   const merged: { entry: RegisterEntry; accountName: string }[] = [];
@@ -256,26 +262,27 @@ function RecentTransactions({
   return (
     <div className="card card--span8 card--flush">
       <div className="card__head card__head--padded">
-        <div className="card__label">Recent Transactions</div>
+        <div className="card__label">{t("dashboard.recentTransactions")}</div>
         <button className="link-btn" onClick={() => onNavigate("ledger")}>
-          View all
+          {t("common.viewAll")}
         </button>
       </div>
       {recent.length === 0 ? (
-        <div className="empty">No activity yet.</div>
+        <div className="empty">{t("dashboard.noActivity")}</div>
       ) : (
         <table className="ledger-table ledger-table--flush">
           <thead>
             <tr>
-              <th>Description</th>
-              <th>Account</th>
-              <th className="num">Amount</th>
-              <th>Status</th>
+              <th>{t("common.description")}</th>
+              <th>{t("common.account")}</th>
+              <th className="num">{t("common.amount")}</th>
+              <th>{t("common.status")}</th>
             </tr>
           </thead>
           <tbody>
             {recent.map(({ entry, accountName }) => {
-              const tag = RECON_LABEL[entry.reconcile] ?? RECON_LABEL.n;
+              const reconKey = RECON_KEY[entry.reconcile] ?? RECON_KEY.n;
+              const reconCls = RECON_CLS[entry.reconcile] ?? RECON_CLS.n;
               return (
                 <tr key={entry.splitGuid}>
                   <td>
@@ -287,7 +294,7 @@ function RecentTransactions({
                     {formatMoney(entry.quantity)}
                   </td>
                   <td>
-                    <span className={`tag ${tag.cls}`}>{tag.text}</span>
+                    <span className={`tag ${reconCls}`}>{t(reconKey)}</span>
                   </td>
                 </tr>
               );
@@ -301,6 +308,7 @@ function RecentTransactions({
 
 // ── Expense breakdown (donut + list) ──────────────────────────────────────────
 function ExpenseBreakdown({ income }: { income?: IncomeStatement }) {
+  const { t } = useTranslation();
   if (!income) return <div className="card card--span4" />;
 
   const total = toFloat(income.expense.total);
@@ -316,7 +324,7 @@ function ExpenseBreakdown({ income }: { income?: IncomeStatement }) {
   }));
   if (othersTotal > 0.005) {
     segments.push({
-      label: "Others",
+      label: t("dashboard.others"),
       value: othersTotal,
       pct: total > 0 ? (othersTotal / total) * 100 : 0,
       color: SEGMENT_COLORS[4],
@@ -333,9 +341,9 @@ function ExpenseBreakdown({ income }: { income?: IncomeStatement }) {
 
   return (
     <div className="card card--span4">
-      <div className="card__label">Expense Categories</div>
+      <div className="card__label">{t("dashboard.expenseCategories")}</div>
       {total <= 0 ? (
-        <div className="empty">No expenses recorded this year.</div>
+        <div className="empty">{t("dashboard.noExpenses")}</div>
       ) : (
         <>
           <div className="donut-wrap">
@@ -355,7 +363,7 @@ function ExpenseBreakdown({ income }: { income?: IncomeStatement }) {
               ))}
             </svg>
             <div className="donut__center">
-              <span className="donut__center-label">Total</span>
+              <span className="donut__center-label">{t("dashboard.total")}</span>
               <span className="mono donut__center-value">{formatMoney(income.expense.total)}</span>
             </div>
           </div>

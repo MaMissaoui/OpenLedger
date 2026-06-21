@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api, ApiError } from "./lib/api";
 
 // SetupLedger is the first-run empty state. One click scaffolds a complete demo
@@ -6,6 +7,7 @@ import { api, ApiError } from "./lib/api";
 // transaction — so the register is immediately populated. It exercises the full
 // create -> post -> register slice from the browser.
 export function SetupLedger() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
 
   const scaffold = useMutation({
@@ -51,18 +53,14 @@ export function SetupLedger() {
     <div className="setup">
       <div className="setup__card">
         <div className="seal">§</div>
-        <h1>Open your first book</h1>
-        <p>
-          We'll set up a demo ledger for you: a US Dollar currency, a starter
-          chart of accounts (Checking, Salary, Groceries, Equity), and a $1,000
-          opening balance — all posted as balanced double-entry transactions.
-        </p>
+        <h1>{t("setup.title")}</h1>
+        <p>{t("setup.description")}</p>
         <button className="btn btn--accent" onClick={() => scaffold.mutate()} disabled={scaffold.isPending}>
-          {scaffold.isPending ? <span className="spinner" /> : "Create demo ledger"}
+          {scaffold.isPending ? <span className="spinner" /> : t("setup.createDemo")}
         </button>
         {scaffold.error && (
           <p className="error-note" style={{ marginTop: "1rem" }}>
-            {scaffold.error instanceof ApiError ? scaffold.error.message : "Setup failed"}
+            {scaffold.error instanceof ApiError ? scaffold.error.message : t("setup.setupFailed")}
           </p>
         )}
       </div>

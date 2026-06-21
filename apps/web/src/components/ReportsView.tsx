@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { Book, Numeric, ReportSection } from "../lib/types";
 import { formatMoney } from "../lib/money";
@@ -38,19 +39,20 @@ function equalAmount(a: Numeric, b: Numeric): boolean {
 }
 
 function SectionTable({ label, section }: { label: string; section: ReportSection }) {
+  const { t } = useTranslation();
   return (
     <table className="ledger-table report-section">
       <thead>
         <tr>
           <th>{label}</th>
-          <th className="num">Balance</th>
+          <th className="num">{t("common.balance")}</th>
         </tr>
       </thead>
       <tbody>
         {section.lines.length === 0 ? (
           <tr>
             <td colSpan={2} className="empty">
-              No accounts with a balance.
+              {t("reports.balanceSheet.noBalance")}
             </td>
           </tr>
         ) : (
@@ -64,7 +66,7 @@ function SectionTable({ label, section }: { label: string; section: ReportSectio
       </tbody>
       <tfoot>
         <tr className="report-total">
-          <td>Total {label.toLowerCase()}</td>
+          <td>{t("reports.balanceSheet.totalLabel", { section: label.toLowerCase() })}</td>
           <td className={`num${section.total.num < 0 ? " neg" : ""}`}>{formatMoney(section.total)}</td>
         </tr>
       </tfoot>
@@ -82,6 +84,7 @@ function TotalRow({ label, amount, strong }: { label: string; amount: Numeric; s
 }
 
 function BalanceSheetPanel({ book }: Props) {
+  const { t } = useTranslation();
   const [asOf, setAsOf] = useState(today());
   const q = useQuery({
     queryKey: ["balance-sheet", book.guid, asOf],
@@ -92,7 +95,7 @@ function BalanceSheetPanel({ book }: Props) {
     <>
       <div className="report__controls">
         <label className="field">
-          <span>As of</span>
+          <span>{t("common.asOf")}</span>
           <input type="date" value={asOf} max={today()} onChange={(e) => setAsOf(e.target.value)} />
         </label>
       </div>
@@ -102,22 +105,22 @@ function BalanceSheetPanel({ book }: Props) {
           <span className="spinner" />
         </div>
       ) : q.isError ? (
-        <div className="empty">Could not load the balance sheet.</div>
+        <div className="empty">{t("reports.balanceSheet.loadError")}</div>
       ) : (
         q.data && (
           <>
             <div className="report-grid">
-              <SectionTable label="Assets" section={q.data.assets} />
+              <SectionTable label={t("reports.balanceSheet.assets")} section={q.data.assets} />
               <div className="report-col">
-                <SectionTable label="Liabilities" section={q.data.liabilities} />
-                <SectionTable label="Equity" section={q.data.equity} />
+                <SectionTable label={t("reports.balanceSheet.liabilities")} section={q.data.liabilities} />
+                <SectionTable label={t("reports.balanceSheet.equity")} section={q.data.equity} />
               </div>
             </div>
             <div className="report-summary">
-              <TotalRow label="Retained earnings (net income)" amount={q.data.retainedEarnings} />
-              <TotalRow label="Total assets" amount={q.data.assets.total} strong />
+              <TotalRow label={t("reports.balanceSheet.retainedEarnings")} amount={q.data.retainedEarnings} />
+              <TotalRow label={t("reports.balanceSheet.totalAssets")} amount={q.data.assets.total} strong />
               <TotalRow
-                label="Total liabilities + equity"
+                label={t("reports.balanceSheet.totalLiabilitiesEquity")}
                 amount={q.data.totalLiabilitiesAndEquity}
                 strong
               />
@@ -129,8 +132,8 @@ function BalanceSheetPanel({ book }: Props) {
                 }`}
               >
                 {equalAmount(q.data.assets.total, q.data.totalLiabilitiesAndEquity)
-                  ? "In balance"
-                  : "Out of balance"}
+                  ? t("reports.balanceSheet.inBalance")
+                  : t("reports.balanceSheet.outOfBalance")}
               </span>
             </div>
           </>
@@ -141,6 +144,7 @@ function BalanceSheetPanel({ book }: Props) {
 }
 
 function IncomeStatementPanel({ book }: Props) {
+  const { t } = useTranslation();
   const [from, setFrom] = useState(startOfYear());
   const [to, setTo] = useState(today());
   const q = useQuery({
@@ -152,11 +156,11 @@ function IncomeStatementPanel({ book }: Props) {
     <>
       <div className="report__controls">
         <label className="field">
-          <span>From</span>
+          <span>{t("common.from")}</span>
           <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
         </label>
         <label className="field">
-          <span>To</span>
+          <span>{t("common.to")}</span>
           <input type="date" value={to} max={today()} onChange={(e) => setTo(e.target.value)} />
         </label>
       </div>
@@ -166,18 +170,18 @@ function IncomeStatementPanel({ book }: Props) {
           <span className="spinner" />
         </div>
       ) : q.isError ? (
-        <div className="empty">Could not load the income statement.</div>
+        <div className="empty">{t("reports.incomeStatement.loadError")}</div>
       ) : (
         q.data && (
           <>
             <div className="report-grid">
-              <SectionTable label="Income" section={q.data.income} />
-              <SectionTable label="Expenses" section={q.data.expense} />
+              <SectionTable label={t("reports.incomeStatement.income")} section={q.data.income} />
+              <SectionTable label={t("reports.incomeStatement.expenses")} section={q.data.expense} />
             </div>
             <div className="report-summary">
-              <TotalRow label="Total income" amount={q.data.income.total} />
-              <TotalRow label="Total expenses" amount={q.data.expense.total} />
-              <TotalRow label="Net income" amount={q.data.netIncome} strong />
+              <TotalRow label={t("reports.incomeStatement.totalIncome")} amount={q.data.income.total} />
+              <TotalRow label={t("reports.incomeStatement.totalExpenses")} amount={q.data.expense.total} />
+              <TotalRow label={t("reports.incomeStatement.netIncome")} amount={q.data.netIncome} strong />
             </div>
           </>
         )
@@ -187,6 +191,7 @@ function IncomeStatementPanel({ book }: Props) {
 }
 
 export function ReportsView({ book, initialTab, onBack }: ReportsViewProps) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>(initialTab ?? "balance-sheet");
 
   return (
@@ -195,25 +200,25 @@ export function ReportsView({ book, initialTab, onBack }: ReportsViewProps) {
         <div className="register__title">
           {onBack ? (
             <button className="back-link" onClick={onBack}>
-              ‹ Reports Center
+              {t("reports.reportsCenter")}
             </button>
           ) : (
-            <div className="eyebrow">Reports</div>
+            <div className="eyebrow">{t("nav.reports")}</div>
           )}
-          <h1>{tab === "balance-sheet" ? "Balance sheet" : "Income statement"}</h1>
+          <h1>{tab === "balance-sheet" ? t("reports.balanceSheet.title") : t("reports.incomeStatement.title")}</h1>
         </div>
         <div className="report__tabs">
           <button
             className={`btn btn--sm ${tab === "balance-sheet" ? "btn--accent" : "btn--ghost"}`}
             onClick={() => setTab("balance-sheet")}
           >
-            Balance sheet
+            {t("reports.balanceSheet.tabLabel")}
           </button>
           <button
             className={`btn btn--sm ${tab === "income-statement" ? "btn--accent" : "btn--ghost"}`}
             onClick={() => setTab("income-statement")}
           >
-            Income statement
+            {t("reports.incomeStatement.tabLabel")}
           </button>
         </div>
       </header>
@@ -225,7 +230,7 @@ export function ReportsView({ book, initialTab, onBack }: ReportsViewProps) {
       )}
 
       <p className="report__note">
-        Single-currency only — balances are not yet converted across commodities.
+        {t("reports.balanceSheet.singleCurrencyNote")}
       </p>
     </section>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "./lib/api";
 import { SetupLedger } from "./SetupLedger";
 import { DashboardView } from "./components/DashboardView";
@@ -166,6 +167,7 @@ function NavItem({
 
 // ── Ledger ────────────────────────────────────────────────────────────────────
 export function Ledger() {
+  const { t } = useTranslation();
   const books = useQuery({ queryKey: ["books"], queryFn: api.listBooks });
   const book = books.data?.[0] ?? null;
 
@@ -227,12 +229,12 @@ export function Ledger() {
           <span className="sidenav__brand-mark">OL</span>
           <div className="sidenav__brand-text">
             <span className="sidenav__brand-name">OpenLedger</span>
-            <span className="sidenav__brand-tag">Enterprise Finance</span>
+            <span className="sidenav__brand-tag">{t("nav.brandTag")}</span>
           </div>
           <button
             className="sidenav__toggle"
             onClick={() => setCollapsed((c) => !c)}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
           >
             {collapsed ? Icon.expandMenu : Icon.collapseMenu}
           </button>
@@ -240,15 +242,15 @@ export function Ledger() {
 
         {/* Nav */}
         <div className="sidenav__nav">
-          <NavItem label="Dashboard"  icon={Icon.dashboard} active={view === "dashboard"} collapsed={collapsed} onClick={() => setView("dashboard")} />
-          <NavItem label="Ledger"     icon={Icon.ledger}    active={view === "ledger"}    collapsed={collapsed} onClick={() => setView("ledger")} />
-          <NavItem label="Reports"    icon={Icon.reports}   active={view === "reports" || view === "statements" || view === "cash-flow" || view === "forecast"} collapsed={collapsed} onClick={() => setView("reports")} />
-          <NavItem label="Portfolio"  icon={Icon.portfolio} active={view === "portfolio"} collapsed={collapsed} onClick={() => setView("portfolio")} />
-          <NavItem label="Scheduled"  icon={Icon.scheduled} active={view === "scheduled"} collapsed={collapsed} onClick={() => setView("scheduled")} />
-          <NavItem label="Budget"     icon={Icon.budget}    active={view === "budget"}    collapsed={collapsed} onClick={() => setView("budget")} />
-          <NavItem label="Business"   icon={Icon.business}  active={view === "business"}  collapsed={collapsed} onClick={() => { setBusinessTab(undefined); setView("business"); }} />
-          <NavItem label="Commodities" icon={Icon.commodities} active={view === "commodities"} collapsed={collapsed} onClick={() => setView("commodities")} />
-          <NavItem label="Settings"    icon={Icon.settings}    active={view === "settings"}    collapsed={collapsed} onClick={() => setView("settings")} />
+          <NavItem label={t("nav.dashboard")}   icon={Icon.dashboard}   active={view === "dashboard"} collapsed={collapsed} onClick={() => setView("dashboard")} />
+          <NavItem label={t("nav.ledger")}      icon={Icon.ledger}      active={view === "ledger"}    collapsed={collapsed} onClick={() => setView("ledger")} />
+          <NavItem label={t("nav.reports")}     icon={Icon.reports}     active={view === "reports" || view === "statements" || view === "cash-flow" || view === "forecast"} collapsed={collapsed} onClick={() => setView("reports")} />
+          <NavItem label={t("nav.portfolio")}   icon={Icon.portfolio}   active={view === "portfolio"} collapsed={collapsed} onClick={() => setView("portfolio")} />
+          <NavItem label={t("nav.scheduled")}   icon={Icon.scheduled}   active={view === "scheduled"} collapsed={collapsed} onClick={() => setView("scheduled")} />
+          <NavItem label={t("nav.budget")}      icon={Icon.budget}      active={view === "budget"}    collapsed={collapsed} onClick={() => setView("budget")} />
+          <NavItem label={t("nav.business")}    icon={Icon.business}    active={view === "business"}  collapsed={collapsed} onClick={() => { setBusinessTab(undefined); setView("business"); }} />
+          <NavItem label={t("nav.commodities")} icon={Icon.commodities} active={view === "commodities"} collapsed={collapsed} onClick={() => setView("commodities")} />
+          <NavItem label={t("nav.settings")}    icon={Icon.settings}    active={view === "settings"}    collapsed={collapsed} onClick={() => setView("settings")} />
         </div>
 
         {/* Footer */}
@@ -257,46 +259,46 @@ export function Ledger() {
           <button
             className="sidenav__cta"
             onClick={() => { setView("ledger"); setShowNewTx(true); }}
-            title={collapsed ? "New transaction" : undefined}
+            title={collapsed ? t("nav.newTransaction") : undefined}
           >
             <span className="sidenav__icon">{Icon.plus}</span>
-            <span className="sidenav__cta-label">New Transaction</span>
+            <span className="sidenav__cta-label">{t("nav.newTransaction")}</span>
           </button>
 
           <span className="sidenav__book-id mono">book {book.guid.slice(0, 8)}…</span>
           <button
             className="sidenav__link"
             onClick={() => setShowImport(true)}
-            title={collapsed ? "Import GnuCash" : undefined}
+            title={collapsed ? t("nav.importGnuCash") : undefined}
           >
             <span className="sidenav__link-icon">{Icon.upload}</span>
-            <span className="sidenav__link-text">Import GnuCash</span>
+            <span className="sidenav__link-text">{t("nav.importGnuCash")}</span>
           </button>
           <a
             className="sidenav__link"
             href={api.exportGnuCashUrl(book.guid)}
             download={`${book.guid}.gnucash`}
-            title={collapsed ? "Export SQLite" : undefined}
+            title={collapsed ? t("nav.exportSqlite") : undefined}
           >
             <span className="sidenav__link-icon">{Icon.download}</span>
-            <span className="sidenav__link-text">Export SQLite</span>
+            <span className="sidenav__link-text">{t("nav.exportSqlite")}</span>
           </a>
           <a
             className="sidenav__link"
             href={api.exportGnuCashUrl(book.guid, "xml")}
             download={`${book.guid}.gnucash`}
-            title={collapsed ? "Export XML" : undefined}
+            title={collapsed ? t("nav.exportXml") : undefined}
           >
             <span className="sidenav__link-icon">{Icon.download}</span>
-            <span className="sidenav__link-text">Export XML</span>
+            <span className="sidenav__link-text">{t("nav.exportXml")}</span>
           </a>
           <a
             className="sidenav__link"
             href={`${import.meta.env.VITE_AUTHELIA_PORTAL_URL ?? "http://auth.openledger.localhost"}/logout`}
-            title={collapsed ? "Sign out" : undefined}
+            title={collapsed ? t("nav.signOut") : undefined}
           >
             <span className="sidenav__link-icon">{Icon.signout}</span>
-            <span className="sidenav__link-text">Sign out</span>
+            <span className="sidenav__link-text">{t("nav.signOut")}</span>
           </a>
         </div>
       </nav>
@@ -348,7 +350,7 @@ export function Ledger() {
               />
             ) : (
               <div className="empty" style={{ alignSelf: "center", margin: "auto" }}>
-                {accounts.isLoading ? <span className="spinner" /> : "Add an account to begin."}
+                {accounts.isLoading ? <span className="spinner" /> : t("accounts.addBegin")}
               </div>
             )}
           </div>

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { Book, Numeric } from "../lib/types";
 import { formatMoney } from "../lib/money";
@@ -87,6 +88,7 @@ export function ReportsCenterView({
   onOpenForecast,
   onOpenView,
 }: Props) {
+  const { t } = useTranslation();
   const balanceSheet = useQuery({
     queryKey: ["balance-sheet", book.guid, "center"],
     queryFn: () => api.getBalanceSheet(book.guid, todayISO()),
@@ -110,92 +112,92 @@ export function ReportsCenterView({
     <section className="dash">
       <header className="dash__header">
         <div>
-          <div className="eyebrow">Reports</div>
-          <h1>Reports Center</h1>
+          <div className="eyebrow">{t("reports.center.eyebrow")}</div>
+          <h1>{t("reports.center.title")}</h1>
         </div>
       </header>
 
       {/* Snapshot cards — live headline figures, each opens its full report. */}
       <div className="bento" style={{ marginBottom: "1.6rem" }}>
         <SnapCard
-          label="Net Worth"
+          label={t("reports.center.netWorth")}
           value={netWorth}
-          hint="Assets less liabilities · today"
+          hint={t("reports.center.netWorthHint")}
           tone="primary"
           onClick={() => onOpenStatement("balance-sheet")}
         />
         <SnapCard
-          label="Net Income · YTD"
+          label={t("reports.center.netIncomeYtd")}
           value={netIncome}
-          hint="Income less expenses this year"
+          hint={t("reports.center.netIncomeHint")}
           tone={netIncome && netIncome.num < 0 ? "neg" : "pos"}
           onClick={() => onOpenStatement("income-statement")}
         />
         <SnapCard
-          label="Outstanding Receivables"
+          label={t("reports.center.receivables")}
           value={arTotal}
-          hint="Open customer invoices"
+          hint={t("reports.center.receivablesHint")}
           tone="primary"
           onClick={() => onOpenView("business", "ar-aging")}
         />
       </div>
 
       {/* Report library */}
-      <h2 className="report-lib__heading">Report Library</h2>
+      <h2 className="report-lib__heading">{t("reports.center.reportLibrary")}</h2>
       <div className="bento">
-        <LibraryCard icon={ICONS.statements} title="Financial Statements" count={3}>
+        <LibraryCard icon={ICONS.statements} title={t("reports.center.statements")} count={3}>
           <ReportRow
-            title="Balance Sheet"
-            desc="Assets, liabilities, and equity as of a date."
+            title={t("reports.center.balanceSheet")}
+            desc={t("reports.center.balanceSheetDesc")}
             onClick={() => onOpenStatement("balance-sheet")}
           />
           <ReportRow
-            title="Income Statement (P&L)"
-            desc="Revenue and expenses over a period."
+            title={t("reports.center.incomeStatement")}
+            desc={t("reports.center.incomeStatementDesc")}
             onClick={() => onOpenStatement("income-statement")}
           />
           <ReportRow
-            title="Cash Flow Statement"
-            desc="Operating, investing, and financing cash movement."
+            title={t("reports.center.cashFlowStatement")}
+            desc={t("reports.center.cashFlowDesc")}
             onClick={onOpenCashFlow}
           />
         </LibraryCard>
 
-        <LibraryCard icon={ICONS.investments} title="Investments" count={2}>
+        <LibraryCard icon={ICONS.investments} title={t("reports.center.investmentsGroup")} count={2}>
           <ReportRow
-            title="Portfolio Holdings"
-            desc="Shares, cost basis, and market value by security."
+            title={t("reports.center.portfolio")}
+            desc={t("reports.center.portfolioDesc")}
             onClick={() => onOpenView("portfolio")}
           />
           <ReportRow
-            title="Realized Capital Gains"
-            desc="FIFO gains and losses from security sales."
+            title={t("reports.center.capitalGains")}
+            desc={t("reports.center.capitalGainsDesc")}
             onClick={() => onOpenView("portfolio")}
           />
         </LibraryCard>
 
-        <LibraryCard icon={ICONS.business} title="Receivables & Payables" count={2}>
+        <LibraryCard icon={ICONS.business} title={t("reports.center.businessGroup")} count={2}>
           <ReportRow
-            title="A/R Aging"
-            desc="Outstanding customer invoices by age bucket."
+            title={t("reports.center.arAging")}
+            desc={t("reports.center.arAgingDesc")}
             onClick={() => onOpenView("business", "ar-aging")}
           />
           <ReportRow
-            title="A/P Aging"
-            desc="Outstanding vendor bills by age bucket."
+            title={t("reports.center.apAging")}
+            desc={t("reports.center.apAgingDesc")}
             onClick={() => onOpenView("business", "ap-aging")}
           />
         </LibraryCard>
 
-        <LibraryCard icon={ICONS.planning} title="Planning" count={2}>
+        <LibraryCard icon={ICONS.planning} title={t("reports.center.planningGroup")} count={2}>
           <ReportRow
-            title="Budget vs. Actuals"
-            desc="Variance of actual spend against budget."
+            title={t("reports.center.budgetActuals")}
+            desc={t("reports.center.budgetDesc")}
             onClick={() => onOpenView("budget")}
           />
           <ReportRow
-            title="Cash Flow Forecast"
-            desc="Projected cash from upcoming scheduled transactions."
+            title={t("reports.center.forecast")}
+            desc={t("reports.center.forecastDesc")}
             onClick={onOpenForecast}
           />
         </LibraryCard>

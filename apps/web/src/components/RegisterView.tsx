@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../lib/api";
 import type { Account, Numeric } from "../lib/types";
 import { formatMoney } from "../lib/money";
@@ -20,14 +21,14 @@ function amountCell(n: Numeric) {
   return <td className={cls}>{n.num === 0 ? "—" : formatMoney(n)}</td>;
 }
 
-// Reconcile flags cycle n → c → y on click. Each maps to a glyph and title,
-// matching GnuCash's states.
-const RECONCILE_CYCLE:  Record<string, string> = { n: "c", c: "y", y: "n" };
-const RECONCILE_GLYPH:  Record<string, string> = { n: "○", c: "c", y: "✓" };
-const RECONCILE_TITLE:  Record<string, string> = {
-  n: "Unreconciled — click to mark cleared",
-  c: "Cleared — click to mark reconciled",
-  y: "Reconciled — click to unmark",
+// Reconcile flags cycle n → c → y on click. Each maps to a glyph.
+// Titles are now from the i18n catalog.
+const RECONCILE_CYCLE: Record<string, string> = { n: "c", c: "y", y: "n" };
+const RECONCILE_GLYPH: Record<string, string> = { n: "○", c: "c", y: "✓" };
+const RECONCILE_TITLE_KEY: Record<string, "register.reconTitles.n" | "register.reconTitles.c" | "register.reconTitles.y"> = {
+  n: "register.reconTitles.n",
+  c: "register.reconTitles.c",
+  y: "register.reconTitles.y",
 };
 
 function formatDate(iso: string): string {
@@ -38,6 +39,7 @@ function formatDate(iso: string): string {
 }
 
 export function RegisterView({ account, onNewTransaction, onEditTransaction }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [showImport, setShowImport] = useState(false);
   const { data, isLoading } = useQuery({
@@ -62,7 +64,8 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
   });
 
   function confirmDelete(txGuid: string, description: string) {
-    if (window.confirm(`Delete "${description || "this transaction"}"? This cannot be undone.`)) {
+    const msg = t("register.deleteConfirm", { description: description || t("register.deleteDefault") });
+    if (window.confirm(msg)) {
       del.mutate(txGuid);
     }
   }
@@ -84,7 +87,7 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
         <div style={{ display: "flex", alignItems: "flex-end", gap: "1.4rem" }}>
           {currentBalance && (
             <div className="register__balance">
-              <div className="eyebrow">Balance</div>
+              <div className="eyebrow">{t("register.balance")}</div>
               <div className={`amt${currentBalance.num < 0 ? " neg" : ""}`}>
                 {formatMoney(currentBalance)}
               </div>
@@ -93,11 +96,11 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
           <div className="register__actions">
             {STATEMENT_TYPES.has(account.type) && (
               <button className="btn btn--ghost" onClick={() => setShowImport(true)}>
-                Import statement
+                {t("register.importStatement")}
               </button>
             )}
             <button className="btn btn--primary" onClick={onNewTransaction}>
-              + New transaction
+              {t("register.newTransaction")}
             </button>
           </div>
         </div>
@@ -109,17 +112,17 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
         </div>
       ) : entries.length === 0 ? (
         <div className="empty">
-          No entries yet. Post a transaction to start this account's history.
+          {t("register.noEntries")}
         </div>
       ) : (
         <table className="ledger-table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Description</th>
-              <th className="num">Amount</th>
-              <th className="num">Balance</th>
-              <th className="recon-col" title="Reconciled">R</th>
+              <th>{t("common.date")}</th>
+              <th>{t("common.description")}</th>
+              <th className="num">{t("common.amount")}</th>
+              <th className="num">{t("common.balance")}</th>
+              <th className="recon-col" title={t("register.reconciledTitle")}>R</th>
               <th className="row-actions" aria-label="Actions" />
             </tr>
           </thead>
@@ -145,7 +148,7 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
                       })
                     }
                     disabled={recon.isPending}
-                    title={RECONCILE_TITLE[e.reconcile] ?? "Set reconcile state"}
+                    title={t(RECONCILE_TITLE_KEY[e.reconcile] ?? "register.reconTitles.n")}
                   >
                     {RECONCILE_GLYPH[e.reconcile] ?? e.reconcile}
                   </button>
@@ -154,17 +157,17 @@ export function RegisterView({ account, onNewTransaction, onEditTransaction }: P
                   <button
                     className="row-actions__btn"
                     onClick={() => onEditTransaction(e.txGuid)}
-                    title="Edit transaction"
+                    title={t("register.editTransaction")}
                   >
-                    Edit
+                    {t("register.edit")}
                   </button>
                   <button
                     className="row-actions__btn row-actions__btn--danger"
                     onClick={() => confirmDelete(e.txGuid, e.description)}
                     disabled={del.isPending}
-                    title="Delete transaction"
+                    title={t("register.deleteTransaction")}
                   >
-                    Delete
+                    {t("register.delete")}
                   </button>
                 </td>
               </tr>
