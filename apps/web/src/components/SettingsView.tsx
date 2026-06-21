@@ -186,6 +186,16 @@ const LANGUAGE_OPTIONS = [
   { code: "de", key: "settings.system.languageDe" },
 ] as const;
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// Returns the name of the month that ends the fiscal year given its start month (1–12).
+function fiscalYearEndMonth(startMonth: number): string {
+  return MONTH_NAMES[(startMonth - 2 + 12) % 12];
+}
+
 function SystemPanel({ bookGuid }: { bookGuid: string }) {
   const { t, i18n } = useTranslation();
   const [commodities, setCommodities] = useState<Commodity[]>([]);
@@ -198,8 +208,7 @@ function SystemPanel({ bookGuid }: { bookGuid: string }) {
     void api.getBookPreferences(bookGuid).then(setPrefs);
   }, [bookGuid]);
 
-  async function handleCurrencyChange(guid: string) {
-    const next: BookPreferences = { defaultCommodityGuid: guid || null };
+  async function savePrefs(next: BookPreferences) {
     setPrefs(next);
     setSaveStatus("idle");
     try {
@@ -210,6 +219,14 @@ function SystemPanel({ bookGuid }: { bookGuid: string }) {
     }
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => setSaveStatus("idle"), 2500);
+  }
+
+  function handleCurrencyChange(guid: string) {
+    void savePrefs({ ...(prefs ?? {}), defaultCommodityGuid: guid || null });
+  }
+
+  function handleFiscalYearChange(month: number) {
+    void savePrefs({ ...(prefs ?? {}), fiscalYearStart: month });
   }
 
   return (
@@ -229,7 +246,7 @@ function SystemPanel({ bookGuid }: { bookGuid: string }) {
         <label className="field__label">{t("settings.system.defaultCurrencyLabel")}</label>
         <select
           value={prefs?.defaultCommodityGuid ?? ""}
-          onChange={(e) => void handleCurrencyChange(e.target.value)}
+          onChange={(e) => handleCurrencyChange(e.target.value)}
           disabled={prefs === null}
         >
           <option value="">{t("settings.system.noCurrency")}</option>
@@ -242,6 +259,27 @@ function SystemPanel({ bookGuid }: { bookGuid: string }) {
         <span style={{ fontSize: "0.8rem", color: saveStatus === "error" ? "var(--red)" : saveStatus === "saved" ? "var(--green)" : "var(--ink-soft)", marginTop: "0.25rem", display: "block" }}>
           {saveStatus === "saved" ? t("settings.system.saved") : saveStatus === "error" ? t("settings.system.saveError") : t("settings.system.defaultCurrencyHint")}
         </span>
+      </div>
+
+      {/* Fiscal year */}
+      <div className="field">
+        <label className="field__label">{t("settings.system.fiscalYearLabel", "Fiscal year start")}</label>
+        <select
+          value={prefs?.fiscalYearStart ?? 1}
+          onChange={(e) => handleFiscalYearChange(Number(e.target.value))}
+          disabled={prefs === null}
+        >
+          {MONTH_NAMES.map((name, i) => (
+            <option key={i + 1} value={i + 1}>{name}</option>
+          ))}
+        </select>
+        {(prefs?.fiscalYearStart ?? 1) !== 1 && (
+          <span style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.25rem", display: "block" }}>
+            {t("settings.system.fiscalYearEnd", "Fiscal year ends in {{month}}", {
+              month: fiscalYearEndMonth(prefs?.fiscalYearStart ?? 1),
+            })}
+          </span>
+        )}
       </div>
     </div>
   );

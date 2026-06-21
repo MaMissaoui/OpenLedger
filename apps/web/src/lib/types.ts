@@ -577,6 +577,9 @@ export interface NewMember {
 
 export interface BookPreferences {
   defaultCommodityGuid: string | null;
+  // Month (1–12) on which the fiscal year starts; 1 = January (calendar year).
+  // Fiscal year end = last day of month fiscalYearStart−1 (wrapping to Dec).
+  fiscalYearStart?: number;
 }
 
 // Account types the UI offers when creating an account, grouped for the picker.

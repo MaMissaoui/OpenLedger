@@ -7,6 +7,10 @@ type BookPreferences struct {
 	// DefaultCommodityGUID is the GUID of the commodity used as the book's home
 	// currency. Empty means "not set". Nullable in the DB; see migration 0013.
 	DefaultCommodityGUID string
+	// FiscalYearStart is the month (1–12) on which the fiscal year begins.
+	// 1 = January (calendar year). The fiscal year end is always the last day of
+	// month FiscalYearStart−1 (wrapping to December). Stored in migration 0016.
+	FiscalYearStart int
 }
 
 // PreferencesRepository is the persistence port for book preferences.

@@ -9,10 +9,13 @@ import (
 
 type preferencesDTO struct {
 	DefaultCommodityGUID *string `json:"defaultCommodityGuid"`
+	// FiscalYearStart is the month (1–12) the fiscal year begins; 0 in the
+	// response means "not set / calendar year (January)".
+	FiscalYearStart int `json:"fiscalYearStart"`
 }
 
 func prefsToDTO(p app.BookPreferences) preferencesDTO {
-	dto := preferencesDTO{}
+	dto := preferencesDTO{FiscalYearStart: p.FiscalYearStart}
 	if p.DefaultCommodityGUID != "" {
 		dto.DefaultCommodityGUID = &p.DefaultCommodityGUID
 	}
@@ -38,7 +41,7 @@ func (s *Server) handleUpdatePreferences(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	prefs := app.BookPreferences{}
+	prefs := app.BookPreferences{FiscalYearStart: dto.FiscalYearStart}
 	if dto.DefaultCommodityGUID != nil {
 		prefs.DefaultCommodityGUID = *dto.DefaultCommodityGUID
 	}

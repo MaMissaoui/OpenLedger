@@ -3424,9 +3424,11 @@ func scanEntry(s entryScanner) (domain.InvoiceEntry, error) {
 func (r *Repository) GetBookPreferences(ctx context.Context, bookGUID string) (app.BookPreferences, error) {
 	var p app.BookPreferences
 	var guid *string
+	var fyStart int
 	err := r.pool.QueryRow(ctx,
-		`SELECT default_commodity_guid FROM book_preferences WHERE book_guid = $1`, bookGUID,
-	).Scan(&guid)
+		`SELECT default_commodity_guid, COALESCE(fiscal_year_start, 1)
+		   FROM book_preferences WHERE book_guid = $1`, bookGUID,
+	).Scan(&guid, &fyStart)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, nil
 	}
@@ -3436,6 +3438,7 @@ func (r *Repository) GetBookPreferences(ctx context.Context, bookGUID string) (a
 	if guid != nil {
 		p.DefaultCommodityGUID = *guid
 	}
+	p.FiscalYearStart = fyStart
 	return p, nil
 }
 
@@ -3445,13 +3448,18 @@ func (r *Repository) UpsertBookPreferences(ctx context.Context, bookGUID string,
 	if prefs.DefaultCommodityGUID != "" {
 		guid = &prefs.DefaultCommodityGUID
 	}
+	fyStart := prefs.FiscalYearStart
+	if fyStart < 1 || fyStart > 12 {
+		fyStart = 1
+	}
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO book_preferences (book_guid, default_commodity_guid, updated_at)
-		VALUES ($1, $2, now())
+		INSERT INTO book_preferences (book_guid, default_commodity_guid, fiscal_year_start, updated_at)
+		VALUES ($1, $2, $3, now())
 		ON CONFLICT (book_guid) DO UPDATE
 		  SET default_commodity_guid = EXCLUDED.default_commodity_guid,
+		      fiscal_year_start      = EXCLUDED.fiscal_year_start,
 		      updated_at             = EXCLUDED.updated_at`,
-		bookGUID, guid)
+		bookGUID, guid, fyStart)
 	if err != nil {
 		return fmt.Errorf("upsert book preferences: %w", err)
 	}
