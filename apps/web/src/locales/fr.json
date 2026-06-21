@@ -236,11 +236,15 @@
       "errorRemove": "Impossible de supprimer le membre"
     },
     "system": {
-      "comingSoon": "La configuration système (devise par défaut, locale, formats de date et de nombre) est à venir.",
       "languageLabel": "Langue d'affichage",
       "languageEn": "English",
       "languageFr": "Français",
-      "languageDe": "Deutsch"
+      "languageDe": "Deutsch",
+      "defaultCurrencyLabel": "Devise par défaut",
+      "defaultCurrencyHint": "Pré-remplie lors de la création de nouveaux comptes et transactions.",
+      "noCurrency": "— Aucune sélection —",
+      "saved": "Enregistré",
+      "saveError": "Impossible d'enregistrer les préférences"
     }
   }
 }

@@ -1511,6 +1511,48 @@ paths:
         "409":
           description: Would leave the book without an owner
 
+  /api/v1/books/{id}/preferences:
+    get:
+      summary: Get book preferences (default currency, etc.)
+      operationId: getBookPreferences
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current preferences
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookPreferences"
+        "403":
+          description: Forbidden
+    patch:
+      summary: Update book preferences (requires admin)
+      operationId: updateBookPreferences
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookPreferences"
+      responses:
+        "204":
+          description: Preferences updated
+        "400":
+          description: Validation error
+        "403":
+          description: Forbidden
+
   /api/v1/books/{id}/vendors:
     get:
       summary: List vendors for a book
@@ -2122,6 +2164,8 @@ components:
         namespace:
           type: string
         mnemonic:
+          type: string
+        fullname:
           type: string
         fraction:
           type: integer
@@ -3126,6 +3170,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Vendor"
+
+    BookPreferences:
+      type: object
+      properties:
+        defaultCommodityGuid:
+          type: string
+          nullable: true
+          description: GUID of the book's default commodity (home currency). Null means not set.
 
     MemberRole:
       type: object

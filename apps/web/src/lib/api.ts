@@ -19,6 +19,7 @@ import type {
   IncomeStatement,
   Invoice,
   Job,
+  BookPreferences,
   Member,
   NewMember,
   Role,
@@ -430,6 +431,16 @@ export const api = {
     }),
   removeMember: (bookGuid: string, userId: string) =>
     request<void>(`/api/v1/books/${bookGuid}/members/${userId}`, { method: "DELETE" }),
+
+  // Book preferences (default currency). Reads need read access; writes need admin.
+  getBookPreferences: (bookGuid: string) =>
+    request<BookPreferences>(`/api/v1/books/${bookGuid}/preferences`),
+  updateBookPreferences: (bookGuid: string, prefs: BookPreferences) =>
+    request<void>(`/api/v1/books/${bookGuid}/preferences`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(prefs),
+    }),
 
   // Import a GnuCash file (SQLite or XML, optionally gzipped) as a new book.
   // The file is sent as multipart/form-data under the "file" field; `request`

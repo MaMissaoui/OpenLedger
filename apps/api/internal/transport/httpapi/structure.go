@@ -51,6 +51,7 @@ func commodityDTO(c domain.Commodity) map[string]any {
 		"guid":      c.GUID,
 		"namespace": c.Namespace,
 		"mnemonic":  c.Mnemonic,
+		"fullname":  c.Fullname,
 		"fraction":  c.Fraction,
 	}
 }

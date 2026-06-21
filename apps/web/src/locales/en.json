@@ -236,11 +236,15 @@
       "errorRemove": "Could not remove member"
     },
     "system": {
-      "comingSoon": "System setup (default currency, locale, date & number formats) is coming soon.",
       "languageLabel": "Display language",
       "languageEn": "English",
       "languageFr": "Français",
-      "languageDe": "Deutsch"
+      "languageDe": "Deutsch",
+      "defaultCurrencyLabel": "Default currency",
+      "defaultCurrencyHint": "Pre-filled when creating new accounts and transactions.",
+      "noCurrency": "— None selected —",
+      "saved": "Saved",
+      "saveError": "Could not save preferences"
     }
   }
 }

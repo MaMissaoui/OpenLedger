@@ -25,6 +25,7 @@ type Services struct {
 	Provision    *app.ProvisionService
 	Authz        *app.AuthzService
 	Membership   *app.MembershipService
+	Preferences  *app.PreferencesService
 	Importer     *app.ImportService
 	Exporter     *app.ExportService
 	Reconciler   *app.ReconcileService
@@ -109,6 +110,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/books/{id}/members", s.requireAuth(s.handleAddMember))
 	mux.HandleFunc("PATCH /api/v1/books/{id}/members/{userId}", s.requireAuth(s.handleUpdateMember))
 	mux.HandleFunc("DELETE /api/v1/books/{id}/members/{userId}", s.requireAuth(s.handleRemoveMember))
+	// Settings: book-level preferences (default currency, etc.)
+	mux.HandleFunc("GET /api/v1/books/{id}/preferences", s.requireAuth(s.handleGetPreferences))
+	mux.HandleFunc("PATCH /api/v1/books/{id}/preferences", s.requireAuth(s.handleUpdatePreferences))
 	// Business: customers
 	mux.HandleFunc("GET /api/v1/books/{id}/customers", s.requireAuth(s.handleListCustomers))
 	mux.HandleFunc("POST /api/v1/books/{id}/customers", s.requireAuth(s.handleCreateCustomer))
