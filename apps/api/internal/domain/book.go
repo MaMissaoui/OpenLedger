@@ -6,6 +6,8 @@ package domain
 // GnuCash's books table.
 type Book struct {
 	GUID             string
+	Name             string // human-readable company/ledger name
+	CurrencyGUID     string // home currency commodity GUID; empty = not set
 	RootAccountGUID  string
 	RootTemplateGUID string
 }

@@ -75,7 +75,7 @@ func run() error {
 
 	// 3. Book (and its root account), owned by the LDAP user so it is reachable
 	// through the membership-scoped API.
-	book, err := structure.CreateBook(ctx, ownerID)
+	book, err := structure.CreateBook(ctx, ownerID, "Demo Company", "")
 	if err != nil {
 		return fmt.Errorf("create book: %w", err)
 	}

@@ -46,6 +46,16 @@ func (f *structureFake) ListBooksForUser(context.Context, string) ([]domain.Book
 	return f.books, nil
 }
 
+func (f *structureFake) UpdateBook(_ context.Context, b domain.Book) error {
+	for i, existing := range f.books {
+		if existing.GUID == b.GUID {
+			f.books[i] = b
+			return nil
+		}
+	}
+	return app.ErrBookNotFound
+}
+
 func (f *structureFake) BookRootAccount(context.Context, string) (string, error) {
 	if f.bookNotFound {
 		return "", app.ErrBookNotFound
@@ -119,7 +129,7 @@ func TestListCommodities(t *testing.T) {
 
 func TestCreateBookReturnsRoot(t *testing.T) {
 	repo := &structureFake{}
-	rec := postTo(structureServer(repo), "/api/v1/books", ``)
+	rec := postTo(structureServer(repo), "/api/v1/books", `{"name":"Test Co","currencyGuid":""}`)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201; body = %s", rec.Code, rec.Body.String())
 	}

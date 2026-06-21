@@ -31,6 +31,9 @@ type StructureRepository interface {
 	// in one DB transaction. When ownerUserID is non-empty it also records an
 	// owner membership linking that user to the new book.
 	InsertBook(ctx context.Context, b domain.Book, root, templateRoot domain.Account, ownerUserID string) error
+	// UpdateBook persists a book's name and currency_guid. Returns ErrBookNotFound
+	// when the guid is unknown.
+	UpdateBook(ctx context.Context, b domain.Book) error
 	InsertAccount(ctx context.Context, a domain.Account) error
 	// ListBooksForUser returns the books a user has a membership on.
 	ListBooksForUser(ctx context.Context, userID string) ([]domain.Book, error)
@@ -135,11 +138,13 @@ func (s *StructureService) ListCommodities(ctx context.Context) ([]domain.Commod
 // CreateBook creates a book with a fresh root account and template root. When
 // ownerUserID is non-empty the creator is recorded as the book's owner. The
 // returned book's RootAccountGUID is the parent for top-level accounts.
-func (s *StructureService) CreateBook(ctx context.Context, ownerUserID string) (domain.Book, error) {
+func (s *StructureService) CreateBook(ctx context.Context, ownerUserID, name, currencyGUID string) (domain.Book, error) {
 	root := domain.Account{GUID: s.newGUID(), Name: "Root Account", Type: domain.AccountRoot}
 	templateRoot := domain.Account{GUID: s.newGUID(), Name: "Template Root", Type: domain.AccountRoot}
 	book := domain.Book{
 		GUID:             s.newGUID(),
+		Name:             name,
+		CurrencyGUID:     currencyGUID,
 		RootAccountGUID:  root.GUID,
 		RootTemplateGUID: templateRoot.GUID,
 	}
@@ -147,6 +152,15 @@ func (s *StructureService) CreateBook(ctx context.Context, ownerUserID string) (
 		return domain.Book{}, err
 	}
 	return book, nil
+}
+
+// UpdateBook renames a book or changes its home currency. Authorization is
+// enforced by the HTTP layer before this is called.
+func (s *StructureService) UpdateBook(ctx context.Context, b domain.Book) (domain.Book, error) {
+	if err := s.repo.UpdateBook(ctx, b); err != nil {
+		return domain.Book{}, err
+	}
+	return b, nil
 }
 
 // ListBooks returns the books the given user owns or is a member of.

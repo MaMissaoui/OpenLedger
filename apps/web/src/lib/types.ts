@@ -15,7 +15,14 @@ export interface Tokens {
 
 export interface Book {
   guid: string;
+  name: string;
+  currencyGuid: string;
   rootAccountGuid: string;
+}
+
+export interface NewBook {
+  name: string;
+  currencyGuid?: string;
 }
 
 export interface Account {
