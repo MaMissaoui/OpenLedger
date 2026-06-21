@@ -48,6 +48,7 @@ type Services struct {
 // contract, so field order and unset (nil) services no longer matter.
 type Server struct {
 	Services
+	RefreshStatus *RefreshStatus // non-nil only when auto-refresh is configured
 }
 
 // Routes returns the configured HTTP handler. /healthz is public; every
@@ -101,6 +102,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/prices", s.requireAuth(s.handleListPrices))
 	mux.HandleFunc("POST /api/v1/prices", s.requireAuth(s.handleCreatePrice))
 	mux.HandleFunc("POST /api/v1/prices/fetch", s.requireAuth(s.handleFetchPrice))
+	mux.HandleFunc("GET /api/v1/prices/refresh-status", s.requireAuth(s.handleGetRefreshStatus))
+	mux.HandleFunc("POST /api/v1/prices/refresh-now", s.requireAuth(s.handleRefreshNow))
 	mux.HandleFunc("POST /api/v1/imports/gnucash", s.requireAuth(s.handleImportGnuCash))
 	mux.HandleFunc("POST /api/v1/accounts/{id}/import-bank/preview", s.requireAuth(s.handlePreviewBankCSV))
 	mux.HandleFunc("POST /api/v1/accounts/{id}/import-bank", s.requireAuth(s.handleImportBankStatement))

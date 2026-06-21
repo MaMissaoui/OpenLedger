@@ -319,6 +319,8 @@ function PricesPanel({
 
 // ── Commodities & Prices view ─────────────────────────────────────────────────
 
+type RefreshStatus = { enabled: boolean; intervalHours: number; lastRunAt: string | null; lastFetched: number; lastFailed: number };
+
 export default function CommoditiesView() {
   const [commodities, setCommodities] = useState<Commodity[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -328,6 +330,9 @@ export default function CommoditiesView() {
   const [showFetch, setShowFetch] = useState(false);
   // Bumped to force the prices panel to reload after adding a quote.
   const [pricesReload, setPricesReload] = useState(0);
+  const [refreshStatus, setRefreshStatus] = useState<RefreshStatus | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null);
 
   function reload() {
     setError(null);
@@ -336,6 +341,22 @@ export default function CommoditiesView() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load commodities"));
   }
   useEffect(reload, []);
+  useEffect(() => { api.getPriceRefreshStatus().then(setRefreshStatus).catch(() => null); }, []);
+
+  async function handleRefreshNow() {
+    setRefreshing(true);
+    setRefreshMsg(null);
+    try {
+      const result = await api.refreshPricesNow();
+      setRefreshMsg(`Refreshed: ${result.fetched} updated, ${result.skipped} skipped, ${result.failed} failed`);
+      setPricesReload((n) => n + 1);
+      api.getPriceRefreshStatus().then(setRefreshStatus).catch(() => null);
+    } catch (e) {
+      setRefreshMsg(e instanceof Error ? e.message : "Refresh failed");
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   const list = commodities ?? [];
   const currencies = list.filter((c) => c.namespace === "CURRENCY");
@@ -350,11 +371,35 @@ export default function CommoditiesView() {
           <h1>Commodities &amp; Prices</h1>
         </div>
         <div className="register__actions">
+          {refreshStatus && (
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={handleRefreshNow}
+              disabled={refreshing}
+            >
+              {refreshing ? "Refreshing…" : "Refresh All Now"}
+            </button>
+          )}
           <button className="btn btn--primary btn--sm" onClick={() => setShowNewCommodity(true)}>
             + New Commodity
           </button>
         </div>
       </header>
+
+      {refreshStatus && (
+        <div style={{ padding: "0.4rem 1.5rem", fontSize: "0.82rem", color: "var(--ink-soft)", borderBottom: "1px solid var(--border-faint)", display: "flex", gap: "1rem", alignItems: "center" }}>
+          <span>
+            Auto-refresh: {refreshStatus.enabled
+              ? `every ${refreshStatus.intervalHours}h`
+              : "disabled (set PRICE_AUTO_REFRESH_HOURS to enable)"}
+          </span>
+          {refreshStatus.lastRunAt && (
+            <span>Last run: {new Date(refreshStatus.lastRunAt).toLocaleString()} · {refreshStatus.lastFetched} updated{refreshStatus.lastFailed > 0 ? `, ${refreshStatus.lastFailed} failed` : ""}</span>
+          )}
+          {!refreshStatus.lastRunAt && refreshStatus.enabled && <span style={{ fontStyle: "italic" }}>not yet run</span>}
+          {refreshMsg && <span style={{ color: refreshStatus.lastFailed > 0 ? "var(--oxblood-soft)" : "var(--forest-dark)" }}>{refreshMsg}</span>}
+        </div>
+      )}
 
       {error && (
         <div style={{ padding: "0.75rem 1.5rem" }}>

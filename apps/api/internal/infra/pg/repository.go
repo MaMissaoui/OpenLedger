@@ -343,6 +343,26 @@ func (r *Repository) ListPricesByCommodity(ctx context.Context, commodityGUID st
 	return prices, rows.Err()
 }
 
+// ListDistinctPricePairs returns all distinct (commodity_guid, currency_guid)
+// pairs from the prices table. Used by the price auto-refresh worker.
+func (r *Repository) ListDistinctPricePairs(ctx context.Context) ([]app.PricePair, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT DISTINCT commodity_guid, currency_guid FROM prices`)
+	if err != nil {
+		return nil, fmt.Errorf("list distinct price pairs: %w", err)
+	}
+	defer rows.Close()
+	var pairs []app.PricePair
+	for rows.Next() {
+		var p app.PricePair
+		if err := rows.Scan(&p.CommodityGUID, &p.CurrencyGUID); err != nil {
+			return nil, fmt.Errorf("scan price pair: %w", err)
+		}
+		pairs = append(pairs, p)
+	}
+	return pairs, rows.Err()
+}
+
 // InsertBook writes the root account, the template root account, and the book
 // row in a single DB transaction so a book never exists without its roots. When
 // ownerUserID is non-empty it also inserts an owner membership.

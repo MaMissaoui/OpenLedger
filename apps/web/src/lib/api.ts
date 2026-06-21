@@ -164,6 +164,10 @@ export const api = {
   // and record it as a price. Both GUIDs must be CURRENCY commodities.
   fetchPrice: (commodityGuid: string, currencyGuid: string) =>
     post<Price>("/api/v1/prices/fetch", { commodityGuid, currencyGuid }),
+  getPriceRefreshStatus: () =>
+    request<{ enabled: boolean; intervalHours: number; lastRunAt: string | null; lastFetched: number; lastFailed: number }>("/api/v1/prices/refresh-status"),
+  refreshPricesNow: () =>
+    post<{ fetched: number; skipped: number; failed: number }>("/api/v1/prices/refresh-now", {}),
   // Import an OFX/QIF/CSV bank statement into a currency account. format is
   // optional for OFX/QIF (sniffed) but "csv" with a mapping JSON is required for
   // CSV. Each line posts against the book's Imbalance account; duplicates are

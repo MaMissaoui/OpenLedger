@@ -1,9 +1,11 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/openledger/openledger/apps/api/internal/app"
@@ -94,6 +96,76 @@ func (s *Server) handleFetchPrice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, priceDTO(price))
+}
+
+// RefreshStatus tracks the last automatic price-refresh run, shared between
+// the background goroutine (writer) and the status HTTP handler (reader).
+type RefreshStatus struct {
+	mu            sync.RWMutex
+	Enabled       bool
+	IntervalHours int
+	LastRunAt     *time.Time
+	LastFetched   int
+	LastFailed    int
+}
+
+// Record updates the status after a completed refresh run.
+func (s *RefreshStatus) Record(fetched, failed int) {
+	now := time.Now().UTC()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.LastRunAt = &now
+	s.LastFetched = fetched
+	s.LastFailed = failed
+}
+
+// Snapshot returns a point-in-time copy for serialisation.
+func (s *RefreshStatus) Snapshot() (enabled bool, hours int, lastAt *time.Time, fetched, failed int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.Enabled, s.IntervalHours, s.LastRunAt, s.LastFetched, s.LastFailed
+}
+
+// handleGetRefreshStatus returns the current auto-refresh configuration and
+// the result of the most recent run (or null if it has never run).
+func (s *Server) handleGetRefreshStatus(w http.ResponseWriter, r *http.Request) {
+	if s.RefreshStatus == nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"enabled": false, "intervalHours": 0,
+			"lastRunAt": nil, "lastFetched": 0, "lastFailed": 0,
+		})
+		return
+	}
+	enabled, hours, lastAt, fetched, failed := s.RefreshStatus.Snapshot()
+	var lastAtStr any
+	if lastAt != nil {
+		lastAtStr = lastAt.Format(time.RFC3339)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"enabled": enabled, "intervalHours": hours,
+		"lastRunAt": lastAtStr, "lastFetched": fetched, "lastFailed": failed,
+	})
+}
+
+// handleRefreshNow triggers an immediate price refresh and returns the result.
+func (s *Server) handleRefreshNow(w http.ResponseWriter, r *http.Request) {
+	if s.Quote == nil {
+		writeError(w, http.StatusServiceUnavailable, "online price quotes are not configured")
+		return
+	}
+	result, err := s.Quote.RefreshAll(context.Background())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if s.RefreshStatus != nil {
+		s.RefreshStatus.Record(result.Fetched, result.Failed)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"fetched": result.Fetched,
+		"skipped": result.Skipped,
+		"failed":  result.Failed,
+	})
 }
 
 func priceDTO(p domain.Price) map[string]any {

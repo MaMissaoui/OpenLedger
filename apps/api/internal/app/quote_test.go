@@ -36,6 +36,10 @@ func (s stubCommodities) GetCommodity(_ context.Context, guid string) (domain.Co
 	return c, nil
 }
 
+func (s stubCommodities) ListDistinctPricePairs(_ context.Context) ([]PricePair, error) {
+	return nil, nil
+}
+
 type capturingPriceRepo struct{ inserted []domain.Price }
 
 func (r *capturingPriceRepo) InsertPrice(_ context.Context, p domain.Price) error {

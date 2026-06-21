@@ -51,6 +51,10 @@ func (f *quoteFake) ListPricesByCommodity(context.Context, string) ([]domain.Pri
 	return f.prices, nil
 }
 
+func (f *quoteFake) ListDistinctPricePairs(context.Context) ([]app.PricePair, error) {
+	return nil, nil
+}
+
 func currencyFake() *quoteFake {
 	return &quoteFake{commodities: []domain.Commodity{
 		{GUID: "usd", Namespace: domain.NamespaceCurrency, Mnemonic: "USD"},

@@ -32,10 +32,19 @@ type QuoteProvider interface {
 	Name() string
 }
 
+// PricePair is a (commodity, currency) pair for which a price has been recorded.
+type PricePair struct {
+	CommodityGUID string
+	CurrencyGUID  string
+}
+
 // CommodityReader looks up a single commodity by GUID. Commodities are shared
 // reference data (not book-scoped).
 type CommodityReader interface {
 	GetCommodity(ctx context.Context, guid string) (domain.Commodity, error)
+	// ListDistinctPricePairs returns all distinct (commodity, currency) pairs
+	// that have at least one recorded price. Used by the auto-refresh worker.
+	ListDistinctPricePairs(ctx context.Context) ([]PricePair, error)
 }
 
 // QuoteService fetches an online quote for a commodity and records it as a
@@ -51,6 +60,37 @@ type QuoteService struct {
 // NewQuoteService wires a provider, a commodity lookup, and the price writer.
 func NewQuoteService(provider QuoteProvider, commodities CommodityReader, prices *PriceService) *QuoteService {
 	return &QuoteService{provider: provider, commodities: commodities, prices: prices}
+}
+
+// RefreshResult summarises a RefreshAll run.
+type RefreshResult struct {
+	Fetched int // number of pairs successfully updated
+	Skipped int // pairs skipped (not a currency, same commodity/currency, etc.)
+	Failed  int // pairs where the provider returned an error
+}
+
+// RefreshAll fetches the current rate for every (commodity, currency) pair that
+// has at least one recorded price and stores each as a new price. Errors for
+// individual pairs are counted but do not abort the loop.
+func (s *QuoteService) RefreshAll(ctx context.Context) (RefreshResult, error) {
+	pairs, err := s.commodities.ListDistinctPricePairs(ctx)
+	if err != nil {
+		return RefreshResult{}, fmt.Errorf("list price pairs: %w", err)
+	}
+	var res RefreshResult
+	for _, p := range pairs {
+		if p.CommodityGUID == p.CurrencyGUID {
+			res.Skipped++
+			continue
+		}
+		_, ferr := s.FetchAndStore(ctx, p.CommodityGUID, p.CurrencyGUID)
+		if ferr != nil {
+			res.Failed++
+		} else {
+			res.Fetched++
+		}
+	}
+	return res, nil
 }
 
 // FetchAndStore fetches the current rate for commodityGUID expressed in
